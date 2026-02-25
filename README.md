@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LingayatShaadi
+
+A responsive matrimonial web application for the Lingayat community. Built with Next.js, React, and Tailwind CSS.
+
+## Features
+
+- **Onboarding** - Welcome flow with intro slides
+- **Auth** - Login, Sign up with OTP verification
+- **Profile Creation** - Multi-step form with About Me (show/hide), Profile Details, Horoscope, Education & Career, Family Details, Profile Photo
+- **Home** - Dashboard with quick actions and suggested matches
+- **Search** - List/Grid view with filters
+- **Profiles** - View own profile, edit, match preferences, view other profiles
+- **Messages** - Chat interface
+- **Activities** - Interests, Profile views, Shortlist, Blocked, Notes
+- **Notifications** - Notification list
+- **Membership** - Plans and Trust Badge
+- **Settings** - Account, Notifications, Billing, Help & Support
+
+## Tech Stack
+
+- Next.js 16 (App Router)
+- React 19
+- TypeScript
+- Tailwind CSS
+- Lucide React (icons)
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Demo Login
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Use any email and password to login (mock auth). Example: `test@example.com` / `password123`
 
-## Learn More
+## Project Structure
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/
+├── app/
+│   ├── (app)/          # Authenticated routes with bottom nav
+│   │   ├── home/
+│   │   ├── search/
+│   │   ├── profile/
+│   │   ├── messages/
+│   │   ├── activities/
+│   │   ├── notifications/
+│   │   ├── membership/
+│   │   └── settings/
+│   ├── onboarding/
+│   ├── login/
+│   ├── signup/
+│   └── profile/complete/
+├── components/
+├── contexts/
+├── data/
+├── lib/
+└── types/
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Future: Supabase Integration
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The data types and structure are designed for easy Supabase migration:
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `profiles` - User profiles
+- `interests` - Sent/received interests
+- `messages` - Chat messages
+- `notifications` - User notifications
+- `membership_plans` - Subscription plans
