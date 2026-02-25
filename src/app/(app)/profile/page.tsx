@@ -7,6 +7,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Edit2, Shield, Heart, Settings, ChevronRight, Camera, Images } from "lucide-react";
 import { getAge } from "@/lib/utils";
+import { HobbyTag } from "@/components/ui/HobbyTag";
 
 export default function MyProfilePage() {
   const { user, isLoggedIn, loading } = useAuth();
@@ -98,6 +99,21 @@ export default function MyProfilePage() {
             <div className="mb-4">
               <h4 className="text-sm font-medium text-gray-500 mb-1">About Me</h4>
               <p className="text-gray-700">{user.aboutMe}</p>
+            </div>
+          )}
+          {user.hobbies && user.hobbies.length > 0 && (
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-medium text-gray-500">Hobbies and Interests</h4>
+                <Link href="/profile/edit" className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+                  <Edit2 size={16} />
+                </Link>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {user.hobbies.map((hobby) => (
+                  <HobbyTag key={hobby} label={hobby} />
+                ))}
+              </div>
             </div>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">

@@ -14,6 +14,8 @@ export default function SignupPage() {
     fullName: "",
     email: "",
     password: "",
+    mobile: "",
+    city: "",
     gender: "" as "" | "male" | "female",
     dateOfBirth: "",
   });
@@ -27,7 +29,7 @@ export default function SignupPage() {
 
   const handleStep1 = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.fullName || !form.email || !form.password || !form.gender || !form.dateOfBirth) {
+    if (!form.fullName || !form.email || !form.password || !form.mobile || !form.city || !form.gender || !form.dateOfBirth) {
       setError("Please fill all fields");
       return;
     }
@@ -73,6 +75,20 @@ export default function SignupPage() {
               placeholder="Enter your email"
               value={form.email}
               onChange={(e) => updateForm("email", e.target.value)}
+            />
+            <Input
+              label="Mobile Number"
+              type="tel"
+              placeholder="Enter 10-digit mobile number"
+              value={form.mobile}
+              onChange={(e) => updateForm("mobile", e.target.value.replace(/\D/g, "").slice(0, 10))}
+              maxLength={10}
+            />
+            <Input
+              label="City"
+              placeholder="Enter your city"
+              value={form.city}
+              onChange={(e) => updateForm("city", e.target.value)}
             />
             <Input
               label="Password"

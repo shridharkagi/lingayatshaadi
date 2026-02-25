@@ -1,37 +1,95 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
+/* ============================================
+   LINGAYATSHAADI DESIGN SYSTEM - COLOR TOKENS
+   ============================================ */
+
 :root {
-  --background: #f8f7fa;
-  --foreground: #1a0f24;
-  --primary: #2F0D40;
-  --primary-light: #4a1a5e;
-  --accent: #E6006E;
-  --accent-light: #ff1a7d;
-  --success: #2FE67E;
-  --warning: #FFBF00;
-  --error: #FF006E;
-  --card-bg: #ffffff;
-  --border: #e5e0eb;
+  /* Primary - Deep Saffron */
+  --color-primary: #E67300;
+  --color-primary-hover: #CC6600;
+
+  /* Secondary - Charcoal / Sacred Black */
+  --color-secondary-dark: #1C1C1C;
+
+  /* Gold - Premium / Verified */
+  --color-accent-gold: #D4AF37;
+
+  /* Background & Surface */
+  --color-bg: #FFF8F2;
+  --color-bg-card: #FFFFFF;
+  --color-white: #FFFFFF;
+
+  /* Text */
+  --color-text-primary: #1C1C1C;
+  --color-text-muted: #6B6B6B;
+
+  /* Border & Dividers */
+  --color-border: #F1E5DA;
+  --color-border-focus: #E67300;
+
+  /* Alerts */
+  --color-success: #2E7D32;
+  --color-success-bg: #E8F5E9;
+  --color-error: #C62828;
+  --color-error-bg: #FFEBEE;
+  --color-warning: #F57C00;
+  --color-warning-bg: #FFF3E0;
+  --color-info: #1565C0;
+  --color-info-bg: #E3F2FD;
+
+  /* Legacy mapping for gradual migration */
+  --background: var(--color-bg);
+  --foreground: var(--color-secondary-dark);
+  --primary: var(--color-primary);
+  --primary-light: var(--color-primary-hover);
+  --accent: var(--color-primary);
+  --accent-light: var(--color-primary-hover);
+  --card-bg: var(--color-bg-card);
+  --border: var(--color-border);
 }
 
+/* Tailwind Theme Extension */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-primary: var(--primary);
-  --color-primary-light: var(--primary-light);
-  --color-accent: var(--accent);
-  --color-accent-light: var(--accent-light);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-error: var(--error);
-  --color-card: var(--card-bg);
-  --color-border: var(--border);
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-secondary-dark: var(--color-secondary-dark);
+  --color-accent-gold: var(--color-accent-gold);
+  --color-bg: var(--color-bg);
+  --color-bg-card: var(--color-bg-card);
+  --color-text-primary: var(--color-text-primary);
+  --color-text-muted: var(--color-text-muted);
+  --color-border: var(--color-border);
+  --color-success: var(--color-success);
+  --color-error: var(--color-error);
+  --color-warning: var(--color-warning);
+  --color-info: var(--color-info);
+}
+
+/* Spacing Scale (8px base) */
+:root {
+  --space-1: 0.25rem;   /* 4px */
+  --space-2: 0.5rem;    /* 8px */
+  --space-3: 0.75rem;   /* 12px */
+  --space-4: 1rem;      /* 16px */
+  --space-5: 1.25rem;   /* 20px */
+  --space-6: 1.5rem;    /* 24px */
+  --space-8: 2rem;      /* 32px */
+  --space-10: 2.5rem;   /* 40px */
+  --space-12: 3rem;     /* 48px */
+  --space-16: 4rem;     /* 64px */
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 10px;
+  --radius-xl: 10px;
+  --shadow-soft: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--color-bg);
+  color: var(--color-text-primary);
   font-family: 'Poppins', sans-serif;
 }
 
@@ -42,15 +100,15 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--color-border);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--primary);
+  background: var(--color-primary);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--primary-light);
+  background: var(--color-primary-hover);
 }

@@ -1,0 +1,65 @@
+// Karnataka & Maharashtra districts (as per user spec)
+export const KARNATAKA_DISTRICTS = [
+  "Bagalkot", "Ballari", "Belagavi", "Bengaluru Rural", "Bengaluru Urban", "Bidar", "Chamarajanagar",
+  "Chikballapur", "Chikkamagaluru", "Chitradurga", "Dakshina Kannada", "Davanagere", "Dharwad",
+  "Gadag", "Kalaburagi", "Hassan", "Haveri", "Kodagu", "Kolar", "Koppal", "Mandya", "Mysuru",
+  "Raichur", "Ramanagara", "Shivamogga", "Tumakuru", "Udupi", "Uttara Kannada", "Vijayapura", "Yadgir"
+];
+
+export const MAHARASHTRA_DISTRICTS = [
+  "Ahmednagar", "Akola", "Amravati", "Aurangabad", "Beed", "Bhandara", "Buldhana", "Chandrapur",
+  "Dhule", "Gadchiroli", "Gondia", "Hingoli", "Jalgaon", "Jalna", "Kolhapur", "Latur", "Mumbai City",
+  "Mumbai Suburban", "Nagpur", "Nanded", "Nandurbar", "Nashik", "Osmanabad", "Palghar", "Parbhani",
+  "Pune", "Raigad", "Ratnagiri", "Sangli", "Satara", "Sindhudurg", "Solapur", "Thane", "Wardha",
+  "Washim", "Yavatmal"
+];
+
+export const KA_MA_DISTRICTS = [...new Set([...KARNATAKA_DISTRICTS, ...MAHARASHTRA_DISTRICTS])].sort();
+
+// Indian states
+export const INDIAN_STATES = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat",
+  "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra",
+  "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim",
+  "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal", "Delhi", "Jammu and Kashmir"
+];
+
+// Zodiac signs (Rashi)
+export const ZODIAC_SIGNS = [
+  "Mesha", "Vrishabha", "Mithuna", "Karka", "Simha", "Kanya", "Tula", "Vrishchika",
+  "Dhanu", "Makara", "Kumbha", "Meena"
+];
+
+// Nakshatras
+export const NAKSHATRAS = [
+  "Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya",
+  "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha",
+  "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta",
+  "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"
+];
+
+// Hobbies and interests (suggestions) - id maps to lucide icon name
+export const HOBBY_SUGGESTIONS: { id: string; label: string }[] = [
+  { id: "working-out", label: "Working out" },
+  { id: "foodie", label: "Foodie" },
+  { id: "trekking", label: "Trekking" },
+  { id: "movies", label: "Movies" },
+  { id: "travelling", label: "Travelling" },
+  { id: "reading", label: "Reading" },
+  { id: "music", label: "Music" },
+  { id: "cooking", label: "Cooking" },
+  { id: "photography", label: "Photography" },
+  { id: "yoga", label: "Yoga" },
+  { id: "sports", label: "Sports" },
+  { id: "dancing", label: "Dancing" },
+  { id: "gardening", label: "Gardening" },
+  { id: "art", label: "Art" },
+  { id: "writing", label: "Writing" },
+];
+
+// Education qualifications (suggestions)
+export const EDUCATION_SUGGESTIONS = [
+  "Below 10th", "10th", "12th", "Diploma", "B.Sc", "B.Com", "B.A", "B.Tech", "B.E", "BBA", "BCA",
+  "MBBS", "BDS", "B.Pharm", "B.Ed", "M.Sc", "M.Com", "M.A", "M.Tech", "M.E", "MBA", "MCA",
+  "CA", "CS", "ICWA", "LLB", "LLM", "PhD", "Other"
+];

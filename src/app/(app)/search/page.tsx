@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import Image from "next/image";
-import { Search, SlidersHorizontal, MapPin, Briefcase, Heart } from "lucide-react";
+import { Search, SlidersHorizontal } from "lucide-react";
 import { mockProfiles } from "@/data/mock";
-import { getAge } from "@/lib/utils";
 import { Input } from "@/components/ui/Input";
+import { ProfileCard } from "@/components/ui/ProfileCard";
 
 export default function SearchPage() {
   const [query, setQuery] = useState("");
@@ -14,7 +12,7 @@ export default function SearchPage() {
   const [showFilters, setShowFilters] = useState(false);
 
   return (
-    <div className="max-w-lg mx-auto">
+    <div className="max-w-6xl mx-auto w-full">
       <header className="bg-white border-b border-[var(--border)] px-4 py-4 sticky top-0 z-10">
         <h1 className="text-xl font-bold text-[var(--foreground)] mb-4">Search</h1>
         <div className="flex gap-2">
@@ -70,75 +68,13 @@ export default function SearchPage() {
         {view === "list" ? (
           <div className="space-y-4">
             {mockProfiles.map((profile) => (
-              <Link
-                key={profile.id}
-                href={`/profile/${profile.id}`}
-                className="flex gap-4 bg-white rounded-2xl p-4 shadow-sm"
-              >
-                <div className="relative w-20 h-20 rounded-xl overflow-hidden flex-shrink-0">
-                  <Image
-                    src={profile.profilePhoto || "/placeholder.svg"}
-                    alt={profile.fullName}
-                    fill
-                    className="object-cover"
-                    unoptimized
-                  />
-                  {profile.verified && (
-                    <span className="absolute bottom-0 left-0 right-0 bg-[var(--success)]/90 text-white text-[10px] text-center py-0.5">
-                      ✓
-                    </span>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-[var(--foreground)]">{profile.fullName}</h3>
-                  <p className="text-sm text-gray-500">{getAge(profile.dateOfBirth)} yrs • {profile.height}&quot; • {profile.maritalStatus}</p>
-                  {profile.city && (
-                    <p className="text-sm text-gray-600 flex items-center gap-1 mt-1">
-                      <MapPin size={12} />
-                      {profile.city}
-                    </p>
-                  )}
-                  {profile.profession && (
-                    <p className="text-sm text-gray-600 flex items-center gap-1">
-                      <Briefcase size={12} />
-                      {profile.profession}
-                    </p>
-                  )}
-                </div>
-                <button className="p-2 rounded-full bg-[var(--primary)]/10 text-[var(--primary)] self-center">
-                  <Heart size={20} />
-                </button>
-              </Link>
+              <ProfileCard key={profile.id} profile={profile} variant="list" />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {mockProfiles.map((profile) => (
-              <Link
-                key={profile.id}
-                href={`/profile/${profile.id}`}
-                className="rounded-2xl overflow-hidden shadow-sm"
-              >
-                <div className="relative aspect-[3/4]">
-                  <Image
-                    src={profile.profilePhoto || "/placeholder.svg"}
-                    alt={profile.fullName}
-                    fill
-                    className="object-cover"
-                    unoptimized
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                  <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
-                    <h3 className="font-semibold">{profile.fullName}</h3>
-                    <p className="text-xs opacity-90">{getAge(profile.dateOfBirth)} yrs • {profile.city}</p>
-                  </div>
-                  {profile.verified && (
-                    <span className="absolute top-2 right-2 bg-[var(--success)] text-white text-xs px-1.5 py-0.5 rounded-full">
-                      ✓
-                    </span>
-                  )}
-                </div>
-              </Link>
+              <ProfileCard key={profile.id} profile={profile} />
             ))}
           </div>
         )}

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Heart, ChevronLeft, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { HobbiesSelector } from "@/components/ui/HobbiesSelector";
 import { useAuth } from "@/contexts/AuthContext";
 import { Profile } from "@/types";
 
@@ -43,6 +44,7 @@ const initialProfile: Partial<Profile> = {
   motherOccupation: "",
   foodHabits: "",
   siblingDetails: "",
+  hobbies: [],
   familyOtherDetails: "",
   address: "",
   city: "",
@@ -65,7 +67,15 @@ export default function ProfileCompletePage() {
     if (signupData && signupEmail) {
       try {
         const data = JSON.parse(signupData);
-        setProfile((p) => ({ ...p, fullName: data.fullName, dateOfBirth: data.dateOfBirth, gender: data.gender, email: signupEmail }));
+        setProfile((p) => ({
+          ...p,
+          fullName: data.fullName,
+          dateOfBirth: data.dateOfBirth,
+          gender: data.gender,
+          contact: data.mobile || undefined,
+          city: data.city || undefined,
+          email: signupEmail,
+        }));
       } catch {
         // ignore
       }
@@ -74,7 +84,7 @@ export default function ProfileCompletePage() {
     }
   }, [user]);
 
-  const update = (key: keyof Profile, value: string | boolean) => {
+  const update = (key: keyof Profile, value: string | boolean | string[]) => {
     setProfile((p) => ({ ...p, [key]: value }));
   };
 
@@ -145,17 +155,35 @@ export default function ProfileCompletePage() {
                 {profile.aboutMeVisible ? "Visible" : "Hidden"}
               </button>
             </div>
+            <HobbiesSelector
+              value={profile.hobbies || []}
+              onChange={(hobbies) => update("hobbies", hobbies)}
+            />
           </div>
         )}
 
         {step === 2 && (
           <div className="space-y-4">
             <Input label="Full Name" value={profile.fullName || ""} onChange={(e) => update("fullName", e.target.value)} />
-            <Input label="Marital Status" placeholder="e.g. Unmarried" value={profile.maritalStatus || ""} onChange={(e) => update("maritalStatus", e.target.value)} />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Marital Status</label>
+              <select
+                value={profile.maritalStatus || ""}
+                onChange={(e) => update("maritalStatus", e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent transition-all"
+              >
+                <option value="">Select marital status</option>
+                <option value="Never Married">Never Married</option>
+                <option value="Divorced">Divorced</option>
+                <option value="Widowed">Widowed</option>
+                <option value="Separated">Separated</option>
+                <option value="Awaiting Divorce">Awaiting Divorce</option>
+              </select>
+            </div>
+            <Input label="Date of Birth" type="date" value={profile.dateOfBirth || ""} onChange={(e) => update("dateOfBirth", e.target.value)} />
             <Input label="Caste" value={profile.caste || ""} onChange={(e) => update("caste", e.target.value)} />
             <Input label="Sub-Caste" value={profile.subCaste || ""} onChange={(e) => update("subCaste", e.target.value)} />
             <Input label="Height (ft)" placeholder="e.g. 5.8" value={profile.height || ""} onChange={(e) => update("height", e.target.value)} />
-            <Input label="Date of Birth" type="date" value={profile.dateOfBirth || ""} onChange={(e) => update("dateOfBirth", e.target.value)} />
           </div>
         )}
 

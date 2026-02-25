@@ -33,6 +33,7 @@ export interface Profile {
   height: string;
   aboutMe: string;
   aboutMeVisible: boolean;
+  hobbies?: string[];
   // Horoscope
   timeOfBirth?: string;
   placeOfBirth?: string;

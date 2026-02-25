@@ -1,11 +1,13 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 import Image from "next/image";
-import { Search, Heart, X, MapPin, Briefcase, ChevronRight, Quote } from "lucide-react";
+import { Search, ChevronRight, Quote } from "lucide-react";
 import { mockProfiles } from "@/data/mock";
-import { getAge } from "@/lib/utils";
+import { ProfileCard } from "@/components/ui/ProfileCard";
 
 const testimonials = [
   {
@@ -26,7 +28,19 @@ const testimonials = [
 ];
 
 export default function HomePage() {
-  const { user } = useAuth();
+  const router = useRouter();
+  const { user, isLoggedIn, profileComplete, loading } = useAuth();
+
+  useEffect(() => {
+    if (loading) return;
+    if (!isLoggedIn) {
+      router.replace("/login");
+      return;
+    }
+    if (!profileComplete) {
+      router.replace("/profile/complete");
+    }
+  }, [loading, isLoggedIn, profileComplete, router]);
   const matches = mockProfiles.slice(0, 6);
 
   return (
@@ -93,52 +107,9 @@ export default function HomePage() {
 
         <div>
           <h2 className="font-semibold text-[var(--foreground)] mb-3">Suggested Matches</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {matches.map((profile) => (
-              <div
-                key={profile.id}
-                className="bg-white rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition"
-              >
-                <div className="relative h-48 bg-gray-200">
-                  <Image
-                    src={profile.profilePhoto || "/placeholder.svg"}
-                    alt={profile.fullName}
-                    fill
-                    className="object-cover"
-                    unoptimized
-                  />
-                  {profile.verified && (
-                    <span className="absolute top-2 right-2 bg-[var(--success)] text-white text-xs px-2 py-0.5 rounded-full">
-                      Verified
-                    </span>
-                  )}
-                  <div className="absolute bottom-2 left-2 right-2 flex gap-2">
-                    <Link href={`/profile/${profile.id}`} className="flex-1 flex items-center justify-center gap-1 bg-white/90 backdrop-blur py-2 rounded-lg text-[var(--primary)] font-medium text-sm hover:bg-white transition">
-                      <Heart size={18} />
-                      Connect
-                    </Link>
-                    <button className="p-2 bg-white/90 backdrop-blur rounded-lg text-gray-600 hover:bg-white transition">
-                      <X size={20} />
-                    </button>
-                  </div>
-                </div>
-                <Link href={`/profile/${profile.id}`} className="block p-4">
-                  <h3 className="font-semibold text-[var(--foreground)]">{profile.fullName}</h3>
-                  <p className="text-sm text-gray-500">{getAge(profile.dateOfBirth)} yrs • {profile.height}&quot; • {profile.maritalStatus}</p>
-                  {profile.city && (
-                    <p className="text-sm text-gray-600 mt-1 flex items-center gap-1">
-                      <MapPin size={14} />
-                      {profile.city}, {profile.state}
-                    </p>
-                  )}
-                  {profile.profession && (
-                    <p className="text-sm text-gray-600 flex items-center gap-1">
-                      <Briefcase size={14} />
-                      {profile.profession}
-                    </p>
-                  )}
-                </Link>
-              </div>
+              <ProfileCard key={profile.id} profile={profile} />
             ))}
           </div>
         </div>

@@ -1,5 +1,7 @@
 "use client";
 
+// TODO: Replace with Supabase Auth (supabase.auth.signInWithPassword, signInWithOtp, getSession, onAuthStateChange)
+
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { Profile } from "@/types";
 import { currentUserProfile } from "@/data/mock";

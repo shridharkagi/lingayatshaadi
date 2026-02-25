@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { HobbiesSelector } from "@/components/ui/HobbiesSelector";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function EditProfilePage() {
@@ -40,9 +41,28 @@ export default function EditProfilePage() {
             {user.aboutMeVisible ? "Visible" : "Hidden"}
           </button>
         </div>
+        <HobbiesSelector
+          value={user.hobbies || []}
+          onChange={(hobbies) => updateProfile({ hobbies })}
+        />
         <Input label="Full Name" value={user.fullName} onChange={(e) => updateProfile({ fullName: e.target.value })} />
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Marital Status</label>
+          <select
+            value={user.maritalStatus || ""}
+            onChange={(e) => updateProfile({ maritalStatus: e.target.value })}
+            className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent transition-all"
+          >
+            <option value="">Select marital status</option>
+            <option value="Never Married">Never Married</option>
+            <option value="Divorced">Divorced</option>
+            <option value="Widowed">Widowed</option>
+            <option value="Separated">Separated</option>
+            <option value="Awaiting Divorce">Awaiting Divorce</option>
+          </select>
+        </div>
+        <Input label="Date of Birth" type="date" value={user.dateOfBirth || ""} onChange={(e) => updateProfile({ dateOfBirth: e.target.value })} />
         <Input label="Height" value={user.height} onChange={(e) => updateProfile({ height: e.target.value })} />
-        <Input label="Marital Status" value={user.maritalStatus} onChange={(e) => updateProfile({ maritalStatus: e.target.value })} />
         <Input label="Caste" value={user.caste} onChange={(e) => updateProfile({ caste: e.target.value })} />
         <Input label="Sub-Caste" value={user.subCaste} onChange={(e) => updateProfile({ subCaste: e.target.value })} />
         <Input label="Qualification" value={user.qualification} onChange={(e) => updateProfile({ qualification: e.target.value })} />
