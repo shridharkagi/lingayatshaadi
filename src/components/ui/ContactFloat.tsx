@@ -16,7 +16,11 @@ export function ContactFloat() {
   const hasWhatsApp = !!config.whatsappContactNumber?.trim();
   const hasWhatsAppGroup = !!config.whatsappGroupUrl?.trim();
 
+  // Hide on message/chat pages to avoid overlapping with message input
+  const isMessagePage = pathname && pathname.startsWith("/messages/");
+
   if (!hasCall && !hasWhatsApp && !hasWhatsAppGroup) return null;
+  if (isMessagePage) return null;
 
   const whatsappNumber = config.whatsappContactNumber?.replace(/\D/g, "");
 
@@ -42,7 +46,7 @@ export function ContactFloat() {
       <button
         type="button"
         onClick={() => setPopupOpen(true)}
-        className="fixed bottom-20 right-4 z-50 flex items-center justify-center w-12 h-12 rounded-full bg-[var(--primary)] text-white shadow-lg hover:scale-105 active:scale-95 transition-transform lg:bottom-6 lg:right-6"
+        className="fixed bottom-24 right-4 z-50 flex items-center justify-center w-14 h-14 rounded-full bg-[var(--primary)] text-white shadow-lg hover:scale-105 active:scale-95 transition-transform lg:bottom-6 lg:right-6"
         title="Contact us"
         aria-label="Contact us"
       >

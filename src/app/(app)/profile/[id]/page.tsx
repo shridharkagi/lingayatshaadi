@@ -614,7 +614,7 @@ export default function OtherProfilePage() {
         )}
       </div>
 
-      <div className="px-0 space-y-4">
+      <div className="space-y-4">
         {profile.aboutMeVisible && profile.aboutMe && (
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <h3 className="font-semibold text-base sm:text-lg text-[var(--foreground)] mb-2">About Me</h3>

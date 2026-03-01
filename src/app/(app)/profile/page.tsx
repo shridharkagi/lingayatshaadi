@@ -60,7 +60,7 @@ export default function MyProfilePage() {
   return (
     <div className="w-full max-w-2xl mx-auto min-h-screen bg-[var(--background)]">
       {/* Orange Header with rounded bottom corners */}
-      <header className="bg-[var(--primary)] text-white px-6 py-5 rounded-b-[20px] shadow-md">
+      <header className="bg-[var(--primary)] text-white px-6 py-3 rounded-b-[10px] shadow-md">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold">My Profile</h1>
           <div className="flex items-center gap-2">
