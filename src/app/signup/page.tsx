@@ -86,7 +86,7 @@ export default function SignupPage() {
           {step === 1 ? "Enter your details to get started" : "We sent a 6-digit code to your email"}
         </p>
 
-        <div className="flex-1 min-h-0 overflow-y-auto pb-4"
+        <div className="flex-1 min-h-0 overflow-y-auto pb-4">
           {step === 1 ? (
             <form onSubmit={handleStep1} className="space-y-1.5 md:space-y-4">
               <div>
