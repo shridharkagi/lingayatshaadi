@@ -62,11 +62,28 @@ src/
 └── types/
 ```
 
-## Future: Supabase Integration
+## Features
 
-The data types and structure are designed for easy Supabase migration:
+### Social Media Integration
+- **Open Graph Images** - Optimized preview images for WhatsApp, Facebook, Instagram
+- **Dynamic Profile Metadata** - Each profile has custom OG tags with photo, name, and details
+- **WhatsApp Profile Sharing** - Context-aware messaging with profile links
 
-- `profiles` - User profiles
+See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for deployment instructions and [TESTING_SOCIAL_PREVIEWS.md](TESTING_SOCIAL_PREVIEWS.md) for testing social media previews.
+
+## Documentation
+
+- **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - Complete deployment instructions for Vercel/Netlify/Custom server
+- **[TESTING_SOCIAL_PREVIEWS.md](TESTING_SOCIAL_PREVIEWS.md)** - Guide to test and troubleshoot social media link previews
+- **[SOCIAL_MEDIA_PREVIEW_FIX.md](SOCIAL_MEDIA_PREVIEW_FIX.md)** - Summary of social media preview implementation
+- **[OG_IMAGES_SETUP.md](OG_IMAGES_SETUP.md)** - Open Graph images setup and configuration
+- **[WHATSAPP_PROFILE_LINK.md](WHATSAPP_PROFILE_LINK.md)** - WhatsApp integration details
+
+## Supabase Integration
+
+The application uses Supabase for backend services:
+
+- `profiles` - User profiles with dynamic OG metadata
 - `interests` - Sent/received interests
 - `messages` - Chat messages
 - `notifications` - User notifications
