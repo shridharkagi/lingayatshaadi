@@ -134,7 +134,7 @@ export class RateLimiter {
 /**
  * Debounce function for search inputs
  */
-export function debounce<T extends (...args: unknown[]) => unknown>(
+export function debounce<T extends (...args: any[]) => any>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
@@ -156,7 +156,7 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
 /**
  * Throttle function for scroll events
  */
-export function throttle<T extends (...args: unknown[]) => unknown>(
+export function throttle<T extends (...args: any[]) => any>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
