@@ -22,6 +22,8 @@ import {
   Briefcase,
   Images,
   X,
+  Copy,
+  Check,
 } from "lucide-react";
 import { useProfiles } from "@/contexts/ProfilesContext";
 import { mockInterests } from "@/data/mock";
@@ -39,6 +41,7 @@ import { HobbyTag } from "@/components/ui/HobbyTag";
 import { LanguageTag } from "@/components/ui/LanguageTag";
 import { ProfileCard } from "@/components/ui/ProfileCard";
 import { Profile } from "@/types";
+import { trackContactView } from "@/lib/contactViewHistory";
 
 function ShareProfileButton({ profile }: { profile: Profile }) {
   const handleShare = async () => {
@@ -122,13 +125,16 @@ export default function OtherProfilePage() {
   const { config } = useAppConfig();
   const { profiles } = useProfiles();
   const [showContact, setShowContact] = useState(() => {
-    // Load contact visibility preference from localStorage
     if (typeof window !== "undefined") {
       return localStorage.getItem("show_contact_details") === "true";
     }
     return false;
   });
   const [showGallery, setShowGallery] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [hasShownInterest, setHasShownInterest] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [copiedMemberId, setCopiedMemberId] = useState(false);
 
   const slugFromParams = typeof params.id === "string" ? params.id : params.id?.[0] ?? "";
   const [displayedSlug, setDisplayedSlug] = useState(slugFromParams);
@@ -163,35 +169,39 @@ export default function OtherProfilePage() {
   const goPrev = useCallback(() => {
     if (currentIdx <= 0 || isTransitioning) return;
     setIsTransitioning(true);
-    setAnimClass("opacity-0 translate-x-4");
+    setAnimClass("opacity-0 scale-95");
     const prevProfile = profiles[currentIdx - 1];
     const prevSlug = getProfileSlug(prevProfile);
     setTimeout(() => {
       setDisplayedSlug(prevSlug);
-      router.replace(`/profile/${prevSlug}`);
-      setAnimClass("opacity-0 -translate-x-4");
-      setTimeout(() => {
-        setAnimClass("opacity-100 translate-x-0");
-        setIsTransitioning(false);
-      }, 50);
-    }, 180);
+      router.replace(`/profile/${prevSlug}`, { scroll: false });
+      requestAnimationFrame(() => {
+        setAnimClass("opacity-0 scale-105");
+        requestAnimationFrame(() => {
+          setAnimClass("opacity-100 scale-100");
+          setTimeout(() => setIsTransitioning(false), 300);
+        });
+      });
+    }, 200);
   }, [currentIdx, router, isTransitioning, profiles]);
 
   const goNext = useCallback(() => {
     if (currentIdx < 0 || currentIdx >= profiles.length - 1 || isTransitioning) return;
     setIsTransitioning(true);
-    setAnimClass("opacity-0 -translate-x-4");
+    setAnimClass("opacity-0 scale-95");
     const nextProfile = profiles[currentIdx + 1];
     const nextSlug = getProfileSlug(nextProfile);
     setTimeout(() => {
       setDisplayedSlug(nextSlug);
-      router.replace(`/profile/${nextSlug}`);
-      setAnimClass("opacity-0 translate-x-4");
-      setTimeout(() => {
-        setAnimClass("opacity-100 translate-x-0");
-        setIsTransitioning(false);
-      }, 50);
-    }, 180);
+      router.replace(`/profile/${nextSlug}`, { scroll: false });
+      requestAnimationFrame(() => {
+        setAnimClass("opacity-0 scale-105");
+        requestAnimationFrame(() => {
+          setAnimClass("opacity-100 scale-100");
+          setTimeout(() => setIsTransitioning(false), 300);
+        });
+      });
+    }, 200);
   }, [currentIdx, router, isTransitioning, profiles]);
 
   /* Swipe support for mobile */
@@ -230,6 +240,27 @@ export default function OtherProfilePage() {
   const interestAccepted = profile ? canMessage(profile.id) : false;
   const whatsappUrl = config.whatsappGroupUrl?.trim() || "";
 
+  const handleCopyMemberId = async () => {
+    if (!profile) return;
+    const memberId = getMemberIdDisplay(profile);
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(memberId);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = memberId;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+      }
+      setCopiedMemberId(true);
+      setTimeout(() => setCopiedMemberId(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
   if (!profile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -263,8 +294,7 @@ export default function OtherProfilePage() {
     <div className="max-w-2xl mx-auto pb-6">
       {showGallery && hasMultiplePhotos && (
         <div
-          className="fixed inset-0 z-50 bg-black/90 flex flex-col"
-          onClick={() => setShowGallery(false)}
+          className="fixed inset-0 z-50 bg-black flex flex-col"
         >
           <button
             onClick={() => setShowGallery(false)}
@@ -276,27 +306,85 @@ export default function OtherProfilePage() {
           
           {/* Image counter */}
           <div className="absolute top-4 left-4 z-10 px-3 py-1.5 rounded-full bg-black/50 text-white text-sm font-medium">
-            {allPhotos.length} Photos
+            {currentImageIndex + 1} / {allPhotos.length}
           </div>
           
-          <div className="flex-1 overflow-auto p-4 pt-16" onClick={(e) => e.stopPropagation()}>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-w-4xl mx-auto">
+          {/* Main image display */}
+          <div className="flex-1 flex items-center justify-center relative">
+            {/* Previous button */}
+            <button
+              onClick={() => setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : allPhotos.length - 1))}
+              className="absolute left-4 z-10 p-3 rounded-full bg-white/20 hover:bg-white/30 text-white transition"
+              aria-label="Previous image"
+            >
+              <ChevronLeft size={28} strokeWidth={2.5} />
+            </button>
+            
+            {/* Current image */}
+            <div 
+              className="relative w-full h-full flex items-center justify-center px-16"
+              onTouchStart={(e) => {
+                const touch = e.touches[0];
+                (e.currentTarget as HTMLElement).dataset.touchStartX = String(touch.clientX);
+              }}
+              onTouchEnd={(e) => {
+                const startX = parseFloat((e.currentTarget as HTMLElement).dataset.touchStartX || "0");
+                const endX = e.changedTouches[0].clientX;
+                const diff = startX - endX;
+                if (Math.abs(diff) > 50) {
+                  if (diff > 0) {
+                    // Swipe left - next image
+                    setCurrentImageIndex((prev) => (prev < allPhotos.length - 1 ? prev + 1 : 0));
+                  } else {
+                    // Swipe right - previous image
+                    setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : allPhotos.length - 1));
+                  }
+                }
+              }}
+            >
+              <div className="relative max-w-4xl max-h-[80vh] w-full h-full">
+                <Image
+                  src={allPhotos[currentImageIndex]}
+                  alt={`${profile.fullName} photo ${currentImageIndex + 1}`}
+                  fill
+                  className={`object-contain ${!isLoggedIn ? "select-none pointer-events-none" : ""}`}
+                  style={!isLoggedIn ? { filter: "blur(var(--blur-md))" } : undefined}
+                  unoptimized
+                  sizes="100vw"
+                />
+              </div>
+            </div>
+            
+            {/* Next button */}
+            <button
+              onClick={() => setCurrentImageIndex((prev) => (prev < allPhotos.length - 1 ? prev + 1 : 0))}
+              className="absolute right-4 z-10 p-3 rounded-full bg-white/20 hover:bg-white/30 text-white transition"
+              aria-label="Next image"
+            >
+              <ChevronRight size={28} strokeWidth={2.5} />
+            </button>
+          </div>
+          
+          {/* Thumbnail strip at bottom */}
+          <div className="p-4 bg-black/50 backdrop-blur-sm">
+            <div className="flex gap-2 justify-center overflow-x-auto max-w-4xl mx-auto">
               {allPhotos.map((src, i) => (
-                <div key={i} className="relative aspect-square rounded-lg overflow-hidden">
-                  {/* Individual photo counter */}
-                  <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded bg-black/50 text-white text-xs font-medium">
-                    {i + 1}
-                  </div>
+                <button
+                  key={i}
+                  onClick={() => setCurrentImageIndex(i)}
+                  className={`relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden transition ${
+                    i === currentImageIndex ? "ring-2 ring-white scale-110" : "opacity-60 hover:opacity-100"
+                  }`}
+                >
                   <Image
                     src={src}
-                    alt={`${profile.fullName} photo ${i + 1}`}
+                    alt={`Thumbnail ${i + 1}`}
                     fill
-                    className={`object-contain ${!isLoggedIn ? "select-none pointer-events-none" : ""}`}
-                    style={!isLoggedIn ? { filter: "blur(var(--blur-md))" } : undefined}
+                    className="object-cover"
                     unoptimized
-                    sizes="50vw"
+                    sizes="64px"
                   />
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -340,8 +428,8 @@ export default function OtherProfilePage() {
 
       <div
         key={profile.id}
-        className={`relative transition-all duration-200 ease-out ${
-          animClass || "opacity-100 translate-x-0"
+        className={`relative transition-all duration-300 ease-in-out ${
+          animClass || "opacity-100 scale-100"
         }`}
       >
         <div
@@ -411,67 +499,92 @@ export default function OtherProfilePage() {
       </div>
 
       {/* Action buttons - improved mobile responsiveness */}
-      <div className="p-4">
-        <div className="grid grid-cols-3 sm:flex sm:flex-wrap gap-2 sm:gap-3">
-          <button className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 py-3 sm:py-2.5 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition min-h-[44px] border border-transparent hover:border-gray-200">
-            <Heart size={20} className="flex-shrink-0" />
-            <span className="text-xs sm:text-sm font-medium truncate">Interest</span>
+      <div className="px-3 py-2">
+        <div className="grid grid-cols-4 gap-1 sm:gap-1.5">
+          <button 
+            onClick={() => setHasShownInterest(!hasShownInterest)}
+            className={`flex flex-col items-center justify-center gap-1 px-2 py-3 sm:py-2.5 rounded-xl transition min-h-[44px] border ${
+              hasShownInterest 
+                ? 'bg-red-50 border-red-200 text-red-600' 
+                : 'hover:bg-gray-100 active:bg-gray-200 border-transparent hover:border-gray-200'
+            }`}
+          >
+            <Heart size={20} className={`flex-shrink-0 ${hasShownInterest ? 'fill-red-600' : ''}`} />
+            <span className="text-xs font-medium truncate">Interest</span>
           </button>
           {interestAccepted ? (
             <Link href={`/messages/${profile.id}`} className="min-h-[44px]">
-              <button className="w-full h-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 py-3 sm:py-2.5 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition border border-transparent hover:border-gray-200">
+              <button className="w-full h-full flex flex-col items-center justify-center gap-1 px-2 py-3 sm:py-2.5 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition border border-transparent hover:border-gray-200">
                 <MessageCircle size={20} className="flex-shrink-0" />
-                <span className="text-xs sm:text-sm font-medium truncate">Message</span>
+                <span className="text-xs font-medium truncate">Message</span>
               </button>
             </Link>
           ) : (
             <button
               disabled
               title="Accept interest request first to message"
-              className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 py-3 sm:py-2.5 rounded-xl opacity-50 cursor-not-allowed min-h-[44px] border border-gray-200"
+              className="flex flex-col items-center justify-center gap-1 px-2 py-3 sm:py-2.5 rounded-xl opacity-50 cursor-not-allowed min-h-[44px] border border-gray-200"
             >
               <MessageCircle size={20} className="flex-shrink-0" />
-              <span className="text-xs sm:text-sm font-medium truncate">Message</span>
+              <span className="text-xs font-medium truncate">Message</span>
             </button>
           )}
           {!isLoggedIn ? (
             <a
               href={`tel:${(config.callContactNumber || "6360130905").replace(/\D/g, "")}`}
-              className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 py-3 sm:py-2.5 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition min-h-[44px] border border-transparent hover:border-gray-200"
+              className="flex flex-col items-center justify-center gap-1 px-2 py-3 sm:py-2.5 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition min-h-[44px] border border-transparent hover:border-gray-200"
             >
               <Phone size={20} className="flex-shrink-0" />
-              <span className="text-xs sm:text-sm font-medium truncate">Contact</span>
+              <span className="text-xs font-medium truncate">Contact</span>
             </a>
           ) : (
             <button
-              onClick={() => setShowContact(!showContact)}
-              className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 py-3 sm:py-2.5 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition min-h-[44px] border border-transparent hover:border-gray-200"
+              onClick={() => {
+                const newShowContact = !showContact;
+                setShowContact(newShowContact);
+                if (newShowContact && profile) {
+                  trackContactView(profile);
+                }
+              }}
+              className={`flex flex-col items-center justify-center gap-1 px-2 py-3 sm:py-2.5 rounded-xl transition min-h-[44px] border ${
+                showContact 
+                  ? 'bg-blue-50 border-blue-200 text-blue-600' 
+                  : 'hover:bg-gray-100 active:bg-gray-200 border-transparent hover:border-gray-200'
+              }`}
             >
               <Phone size={20} className="flex-shrink-0" />
-              <span className="text-xs sm:text-sm font-medium truncate">Contact</span>
+              <span className="text-xs font-medium truncate">Contact</span>
             </button>
           )}
-          {whatsappUrl && (
+          <button 
+            onClick={() => setIsSaved(!isSaved)}
+            className={`flex flex-col items-center justify-center gap-1 px-2 py-3 sm:py-2.5 rounded-xl transition min-h-[44px] border ${
+              isSaved 
+                ? 'bg-yellow-50 border-yellow-200 text-yellow-700' 
+                : 'hover:bg-gray-100 active:bg-gray-200 border-transparent hover:border-gray-200'
+            }`}
+            aria-label="Save to shortlist"
+          >
+            <Bookmark size={20} className={`flex-shrink-0 ${isSaved ? 'fill-yellow-700' : ''}`} />
+            <span className="text-xs font-medium truncate">Save</span>
+          </button>
+        </div>
+        
+        {whatsappUrl && (
+          <div className="mt-2">
             <a
               href={whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="col-span-2 sm:col-span-1 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 py-3 sm:py-2.5 rounded-xl hover:bg-green-50 active:bg-green-100 transition text-[#25D366] min-h-[44px] border border-transparent hover:border-green-200"
+              className="flex flex-row items-center justify-center gap-2 px-4 py-3 rounded-xl hover:bg-green-50 active:bg-green-100 transition text-[#25D366] min-h-[44px] border border-transparent hover:border-green-200 w-full font-medium"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="flex-shrink-0">
                 <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
               </svg>
-              <span className="text-xs sm:text-sm font-medium truncate">WhatsApp</span>
+              <span className="text-sm font-medium">Join WhatsApp Group</span>
             </a>
-          )}
-          <button 
-            className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 py-3 sm:py-2.5 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition min-h-[44px] border border-transparent hover:border-gray-200" 
-            aria-label="Save to shortlist"
-          >
-            <Bookmark size={20} className="flex-shrink-0" />
-            <span className="text-xs sm:text-sm font-medium truncate sm:hidden">Save</span>
-          </button>
-        </div>
+          </div>
+        )}
 
         {showContact && (
           <div className="mt-4 p-4 rounded-2xl bg-[var(--primary)]/5 border border-[var(--primary)]/20">
@@ -536,7 +649,21 @@ export default function OtherProfilePage() {
               {(profile.managedBy === "parent" || profile.managedBy === "guardian") && (
                 <p className="text-[var(--primary)] font-medium">This profile is managed by a parent/guardian{profile.accountHolderName ? ` (${profile.accountHolderName})` : ""}</p>
               )}
-              <p>Member ID: {getMemberIdDisplay(profile)}</p>
+              <p className="flex items-center gap-2">
+                <span>Member ID:</span>
+                <button
+                  onClick={handleCopyMemberId}
+                  className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gray-100 hover:bg-gray-200 rounded transition-colors cursor-pointer font-medium"
+                  title="Click to copy"
+                >
+                  <span>{getMemberIdDisplay(profile)}</span>
+                  {copiedMemberId ? (
+                    <Check size={14} className="text-green-600" />
+                  ) : (
+                    <Copy size={14} className="text-gray-500" />
+                  )}
+                </button>
+              </p>
               <p>Full Name: {displayName}</p>
               <p>Birth Date: {displayDateOfBirth}</p>
               <p>Marital Status: {profile.maritalStatus}</p>
@@ -619,35 +746,82 @@ export default function OtherProfilePage() {
             <p>Country: {profile.country || "—"}</p>
           </DetailSection>
           <DetailSection icon={Phone} heading="Contact">
-            <button
-              onClick={() => setShowContact(!showContact)}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors text-[var(--primary)] font-medium"
-            >
-              <Phone size={18} />
-              {showContact ? "Hide Contact" : "View Contact"}
-            </button>
-            {showContact && (
-              <div className="mt-3 p-4 rounded-xl bg-[var(--primary)]/5 border border-[var(--primary)]/20 space-y-2">
-                {profile.contact ? (
-                  <a
-                    href={`tel:${profile.contact.replace(/\D/g, "")}`}
-                    className="flex items-center gap-3 p-3 rounded-xl bg-white hover:bg-white/90 transition text-[var(--primary)] font-medium"
+            {!isLoggedIn ? (
+              <div className="space-y-3">
+                <div className="p-4 rounded-xl bg-[var(--primary)]/5 border border-[var(--primary)]/20">
+                  <p className="text-sm text-gray-600 mb-3">Login to view contact details</p>
+                  <Link
+                    href="/login"
+                    className="inline-flex items-center justify-center w-full px-4 py-2.5 rounded-lg bg-[var(--primary)] text-white font-medium hover:bg-[var(--primary)]/90 transition"
                   >
-                    <Phone size={18} />
-                    <span>{profile.contact}</span>
-                    <span className="text-xs px-2 py-0.5 bg-[var(--primary)]/20 rounded">Call</span>
-                  </a>
-                ) : null}
-                {profile.address && (
-                  <p className="flex items-center gap-3 p-3 rounded-xl bg-white/60">
-                    <MapPin size={18} className="text-gray-500" />
-                    <span>{profile.address}, {profile.city}, {profile.state}</span>
-                  </p>
-                )}
-                {!profile.contact && !profile.address && (
-                  <p className="text-gray-500 text-sm">No contact details available.</p>
-                )}
+                    Login to View Contact
+                  </Link>
+                </div>
+                <div className="p-4 rounded-xl bg-gray-50 border border-gray-200">
+                  <p className="text-xs text-gray-500 mb-3">Need help? Contact our support</p>
+                  <div className="space-y-2">
+                    <a
+                      href={`tel:${(config.callContactNumber || "6360130905").replace(/\D/g, "")}`}
+                      className="flex items-center gap-3 p-3 rounded-xl bg-white hover:bg-gray-50 transition text-[var(--primary)] font-medium"
+                    >
+                      <Phone size={18} />
+                      <span>{config.callContactNumber || "6360130905"}</span>
+                      <span className="text-xs px-2 py-0.5 bg-[var(--primary)]/20 rounded ml-auto">Call Support</span>
+                    </a>
+                    <a
+                      href={`https://wa.me/${(config.whatsappContactNumber || config.callContactNumber || "6360130905").replace(/\D/g, "")}?text=${encodeURIComponent("I need assistance with profile contact details")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 p-3 rounded-xl bg-white hover:bg-gray-50 transition text-[#25D366] font-medium"
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="flex-shrink-0">
+                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                      </svg>
+                      <span>{config.whatsappContactNumber || config.callContactNumber || "6360130905"}</span>
+                      <span className="text-xs px-2 py-0.5 bg-[#25D366]/20 rounded ml-auto">WhatsApp Support</span>
+                    </a>
+                  </div>
+                </div>
               </div>
+            ) : (
+              <>
+                <button
+                  onClick={() => {
+                    const newShowContact = !showContact;
+                    setShowContact(newShowContact);
+                    if (newShowContact && profile) {
+                      trackContactView(profile);
+                    }
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors text-[var(--primary)] font-medium"
+                >
+                  <Phone size={18} />
+                  {showContact ? "Hide Contact" : "View Contact"}
+                </button>
+                {showContact && (
+                  <div className="mt-3 p-4 rounded-xl bg-[var(--primary)]/5 border border-[var(--primary)]/20 space-y-2">
+                    {profile.contact ? (
+                      <a
+                        href={`tel:${profile.contact.replace(/\D/g, "")}`}
+                        className="flex items-center gap-3 p-3 rounded-xl bg-white hover:bg-white/90 transition text-[var(--primary)] font-medium"
+                      >
+                        <Phone size={18} />
+                        <span>{profile.contact}</span>
+                        <span className="text-xs px-2 py-0.5 bg-[var(--primary)]/20 rounded">Call</span>
+                      </a>
+                    ) : null}
+                    {profile.address && (
+                      <p className="flex items-center gap-3 p-3 rounded-xl bg-white/60">
+                        <MapPin size={18} className="text-gray-500" />
+                        <span>{profile.address}, {profile.city}, {profile.state}</span>
+                      </p>
+                    )}
+                    {!profile.contact && !profile.address && (
+                      <p className="text-gray-500 text-sm">No contact details available.</p>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </DetailSection>
         </div>
@@ -671,26 +845,59 @@ export default function OtherProfilePage() {
 
         {hasMultiplePhotos && (
           <div className="bg-white rounded-2xl p-4 shadow-sm">
-            <h3 className="font-semibold text-[var(--foreground)] mb-3">Gallery</h3>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-              {allPhotos.map((src, i) => (
-                <button
-                  key={i}
-                  onClick={() => isLoggedIn && setShowGallery(true)}
-                  className={`relative aspect-square rounded-lg overflow-hidden bg-gray-200 ${!isLoggedIn ? "cursor-default" : ""}`}
-                >
-                  <Image
-                    src={src}
-                    alt={`${profile.fullName} photo ${i + 1}`}
-                    fill
-                    className="object-cover"
-                    style={!isLoggedIn ? { filter: "blur(var(--blur-md))" } : undefined}
-                    unoptimized
-                    sizes="(max-width: 640px) 33vw, 25vw"
-                  />
-                </button>
-              ))}
-            </div>
+            <h3 className="font-semibold text-[var(--foreground)] mb-3">More Photos</h3>
+            {!isLoggedIn ? (
+              <div className="relative">
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  {allPhotos.slice(0, 4).map((src, i) => (
+                    <div
+                      key={i}
+                      className="relative aspect-square rounded-lg overflow-hidden bg-gray-200"
+                    >
+                      <Image
+                        src={src}
+                        alt={`${profile.fullName} photo ${i + 1}`}
+                        fill
+                        className="object-cover"
+                        style={{ filter: "blur(var(--blur-md))" }}
+                        unoptimized
+                        sizes="(max-width: 640px) 33vw, 25vw"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg backdrop-blur-sm">
+                  <Link
+                    href="/login"
+                    className="px-6 py-3 rounded-xl bg-[var(--primary)] text-white font-semibold hover:bg-[var(--primary-hover)] transition shadow-lg"
+                  >
+                    Login to View Photos
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {allPhotos.map((src, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      setCurrentImageIndex(i);
+                      setShowGallery(true);
+                    }}
+                    className="relative aspect-square rounded-lg overflow-hidden bg-gray-200 hover:opacity-90 transition"
+                  >
+                    <Image
+                      src={src}
+                      alt={`${profile.fullName} photo ${i + 1}`}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                      sizes="(max-width: 640px) 33vw, 25vw"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -705,9 +912,9 @@ export default function OtherProfilePage() {
           </button>
         </div>
 
-        {/* Similar Profiles */}
+        {/* Results */}
         <div className="pt-6">
-          <h3 className="font-semibold text-[var(--foreground)] mb-3 text-lg sm:text-xl text-center">Similar Profiles</h3>
+          <h3 className="font-semibold text-[var(--foreground)] mb-3 text-lg sm:text-xl text-center">Results</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {profiles
               .filter((p) => p.id !== profile.id)

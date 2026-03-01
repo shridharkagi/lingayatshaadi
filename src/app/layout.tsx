@@ -33,6 +33,53 @@ export const metadata: Metadata = {
   title: "LingayatShaadi - Find Your Perfect Match",
   description: seo.description,
   keywords: seo.keywords,
+  authors: [{ name: "LingayatShaadi" }],
+  creator: "LingayatShaadi",
+  publisher: "LingayatShaadi",
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://test.ligayatshaadi.in",
+    siteName: "LingayatShaadi",
+    title: "LingayatShaadi - Find Your Perfect Match",
+    description: seo.description,
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "LingayatShaadi - Premium Matrimonial Platform",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "LingayatShaadi - Find Your Perfect Match",
+    description: seo.description,
+    images: ["/og-image.png"],
+  },
+  metadataBase: new URL("https://test.ligayatshaadi.in"),
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 5,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
 };
 
 export default function RootLayout({

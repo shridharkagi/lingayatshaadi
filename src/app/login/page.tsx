@@ -137,6 +137,7 @@ export default function LoginPage() {
             className="object-cover"
             priority
             sizes="(max-width: 1024px) 100vw, 50vw"
+            unoptimized
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
           <div className="absolute bottom-4 left-4 right-4 text-white">
@@ -290,14 +291,6 @@ export default function LoginPage() {
                 className="text-[var(--primary)] font-semibold hover:underline"
               >
                 Create Account
-              </Link>
-            </p>
-            <p className="text-center text-gray-500 text-sm mt-4">
-              <Link
-                href="/superadmin"
-                className="text-gray-400 hover:text-[var(--primary)] transition"
-              >
-                Super Admin →
               </Link>
             </p>
           </div>

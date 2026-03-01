@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/Input";
 import { HobbiesSelector } from "@/components/ui/HobbiesSelector";
 import { SubCasteSelector } from "@/components/ui/SubCasteSelector";
 import { useAuth } from "@/contexts/AuthContext";
-import { PROFESSION_TYPES } from "@/data/constants";
+import { PROFESSION_TYPES, FOOD_HABITS_OPTIONS } from "@/data/constants";
 import { sanitizeText } from "@/lib/security";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -153,7 +153,21 @@ export default function EditProfilePage() {
           <Input label="Father's Occupation" value={user.fatherOccupation} onChange={(e) => handleUpdate("fatherOccupation", e.target.value)} maxLength={100} />
           <Input label="Mother's Name" value={user.motherName} onChange={(e) => handleUpdate("motherName", e.target.value)} maxLength={100} />
           <Input label="Mother's Occupation" value={user.motherOccupation} onChange={(e) => handleUpdate("motherOccupation", e.target.value)} maxLength={100} />
-          <Input label="Food Habits" placeholder="e.g. Vegetarian" value={user.foodHabits} onChange={(e) => handleUpdate("foodHabits", e.target.value)} maxLength={50} />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Food Habits</label>
+            <select
+              value={user.foodHabits || ""}
+              onChange={(e) => updateProfile({ foodHabits: e.target.value })}
+              className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent transition-all"
+            >
+              <option value="">Select food habits</option>
+              {FOOD_HABITS_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </div>
           <Input label="Sibling Details" value={user.siblingDetails} onChange={(e) => handleUpdate("siblingDetails", e.target.value)} maxLength={200} />
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Family Other Details</label>

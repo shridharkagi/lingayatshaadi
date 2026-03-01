@@ -7,12 +7,17 @@ import { ProfileCard } from "@/components/ui/ProfileCard";
 import { SearchFilters, defaultFilters, type SearchFiltersState } from "@/components/SearchFilters";
 import { useProfiles } from "@/contexts/ProfilesContext";
 import { useFilteredProfiles } from "@/hooks/useFilteredProfiles";
+import { useAuth } from "@/contexts/AuthContext";
+import { BottomNav } from "@/components/ui/BottomNav";
+import Link from "next/link";
+import { Heart } from "lucide-react";
 
 const HERO_IMAGE =
   "https://images.unsplash.com/photo-1605649487212-47bdab064df7?w=1920&q=80";
 
 export default function ProfilesPage() {
   const { profiles } = useProfiles();
+  const { isLoggedIn } = useAuth();
   const [filters, setFilters] = useState<SearchFiltersState>(defaultFilters);
   const filteredProfiles = useFilteredProfiles(profiles, filters);
 
@@ -51,6 +56,7 @@ export default function ProfilesPage() {
               filters={filters}
               onChange={setFilters}
               showCta
+              collapsible
             />
           </div>
         </div>
@@ -61,10 +67,10 @@ export default function ProfilesPage() {
       </section>
 
       {/* Profile listing */}
-      <section className="py-12 md:py-16 px-4 bg-white">
+      <section className="py-12 md:py-16 px-4 bg-white pb-24 lg:pb-12">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[var(--color-text-primary)] mb-6 sm:mb-8">
-            Similar Profiles
+            Results
           </h2>
           <p className="text-[var(--color-text-muted)] mb-8 max-w-2xl">
             Browse verified Lingayat profiles. Use the filters above to narrow your search.
@@ -88,6 +94,36 @@ export default function ProfilesPage() {
           )}
         </div>
       </section>
+
+      {/* Show bottom nav if logged in, otherwise show footer */}
+      {isLoggedIn ? (
+        <BottomNav />
+      ) : (
+        <footer className="bg-[var(--color-secondary-dark)] text-white py-10 sm:py-12 px-4">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 sm:gap-6 mb-6 sm:mb-8">
+              <Link href="/" className="flex items-center gap-2">
+                <Heart className="w-6 h-6 text-[var(--primary)] fill-[var(--primary)]" />
+                <span className="font-bold text-lg">LingayatShaadi</span>
+              </Link>
+              <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-sm">
+                <Link href="/contact" className="hover:text-[var(--primary)] transition">
+                  Contact Us
+                </Link>
+                <Link href="/privacy" className="hover:text-[var(--primary)] transition">
+                  Privacy Policy
+                </Link>
+                <Link href="/terms" className="hover:text-[var(--primary)] transition">
+                  Terms of Use
+                </Link>
+              </div>
+            </div>
+            <p className="text-center text-sm text-white/70">
+              © {new Date().getFullYear()} LingayatShaadi. All rights reserved.
+            </p>
+          </div>
+        </footer>
+      )}
     </div>
   );
 }

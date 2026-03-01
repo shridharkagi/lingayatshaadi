@@ -10,7 +10,7 @@ import { HobbiesSelector } from "@/components/ui/HobbiesSelector";
 import { PhotoUpload } from "@/components/PhotoUpload";
 import { useAuth } from "@/contexts/AuthContext";
 import { Profile } from "@/types";
-import { PROFESSION_TYPES } from "@/data/constants";
+import { PROFESSION_TYPES, FOOD_HABITS_OPTIONS } from "@/data/constants";
 import { SubCasteSelector } from "@/components/ui/SubCasteSelector";
 
 const steps = [
@@ -267,7 +267,21 @@ export default function ProfileCompletePage() {
             <Input label="Father's Occupation" value={profile.fatherOccupation || ""} onChange={(e) => update("fatherOccupation", e.target.value)} />
             <Input label="Mother's Name" value={profile.motherName || ""} onChange={(e) => update("motherName", e.target.value)} />
             <Input label="Mother's Occupation" value={profile.motherOccupation || ""} onChange={(e) => update("motherOccupation", e.target.value)} />
-            <Input label="Food Habits" placeholder="e.g. Vegetarian" value={profile.foodHabits || ""} onChange={(e) => update("foodHabits", e.target.value)} />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Food Habits</label>
+              <select
+                value={profile.foodHabits || ""}
+                onChange={(e) => update("foodHabits", e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent transition-all"
+              >
+                <option value="">Select food habits</option>
+                {FOOD_HABITS_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </div>
             <Input label="Sibling Details" value={profile.siblingDetails || ""} onChange={(e) => update("siblingDetails", e.target.value)} />
             <Input label="Address" value={profile.address || ""} onChange={(e) => update("address", e.target.value)} />
             <Input label="City" value={profile.city || ""} onChange={(e) => update("city", e.target.value)} />

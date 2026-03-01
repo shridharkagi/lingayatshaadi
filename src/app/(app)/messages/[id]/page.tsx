@@ -67,16 +67,19 @@ export default function ChatPage() {
         ))}
       </div>
 
-      <div className="p-4 border-t border-[var(--border)] bg-white">
-        <div className="flex gap-2">
+      <div className="p-4 border-t border-[var(--border)] bg-white sticky bottom-0">
+        <div className="flex gap-2 items-end">
           <input
             type="text"
             placeholder="Type a message..."
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            className="flex-1 px-4 py-3 rounded-xl border border-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+            className="flex-1 px-4 py-3 rounded-xl border border-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] min-h-[44px]"
           />
-          <button className="p-3 rounded-xl bg-[var(--primary)] text-white">
+          <button 
+            className="flex-shrink-0 p-3 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] transition min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="Send message"
+          >
             <Send size={20} />
           </button>
         </div>

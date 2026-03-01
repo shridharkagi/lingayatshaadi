@@ -58,98 +58,136 @@ export default function MyProfilePage() {
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto">
-      <header className="bg-[var(--primary)] text-white px-4 py-6 rounded-b-3xl">
+    <div className="w-full max-w-2xl mx-auto min-h-screen bg-[var(--background)]">
+      {/* Orange Header with rounded bottom corners */}
+      <header className="bg-[var(--primary)] text-white px-6 py-6 rounded-b-[32px] shadow-lg">
         <div className="flex items-center justify-between">
-          <h1 className="text-lg sm:text-xl font-bold">My Profile</h1>
-          <div className="flex items-center gap-1">
+          <h1 className="text-xl font-bold">My Profile</h1>
+          <div className="flex items-center gap-2">
             <button
               onClick={() => handleShareProfile(user)}
-              className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition"
+              className="p-2.5 rounded-full bg-white/20 hover:bg-white/30 transition"
               aria-label="Share my profile"
             >
               <Share2 size={20} />
             </button>
-            <Link href="/settings" className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition">
+            <Link href="/settings" className="p-2.5 rounded-full bg-white/20 hover:bg-white/30 transition">
               <Settings size={20} />
             </Link>
           </div>
         </div>
       </header>
 
-      <div className="px-0 -mt-4 space-y-6">
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-          <div className="relative h-48 lg:h-64 bg-gray-200">
+      <div className="px-4 -mt-2">
+        {/* Profile Picture Card */}
+        <div className="bg-white rounded-3xl shadow-lg overflow-hidden mb-6">
+          <div className="relative h-64 bg-gradient-to-br from-gray-100 to-gray-200">
             <Image
               src={user.profilePhoto || "/placeholder.svg"}
               alt={user.fullName}
               fill
               className="object-cover"
               unoptimized
+              priority
             />
-            <Link href="/profile/edit" className="absolute bottom-2 right-2 p-2 rounded-full bg-white/90 hover:bg-white transition">
-              <Camera size={20} className="text-[var(--primary)]" />
-            </Link>
-            <div className="absolute bottom-2 left-2 right-14 flex justify-between items-center">
-              <div>
-                <h2 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">{user.fullName}</h2>
-                <p className="text-white/90 text-sm">{getAge(user.dateOfBirth)} yrs • {user.height}&quot;</p>
-                {user.profession && (
-                  <p className="text-white/90 text-sm mt-1 flex items-center gap-1.5">
-                    <Briefcase size={14} className="flex-shrink-0" />
-                    {user.profession}
-                  </p>
-                )}
-              </div>
-              {user.verified && (
-                <span className="bg-[var(--success)] text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
-                  <Shield size={12} /> Verified
-                </span>
+            {/* Profile Info Overlay */}
+            <div className="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-black/80 via-black/50 to-transparent">
+              <h2 className="text-xl font-bold text-white mb-1">{user.fullName}</h2>
+              <p className="text-white/90 text-sm mb-1.5">
+                {getAge(user.dateOfBirth)} yrs • {user.height}&quot;
+              </p>
+              {user.profession && (
+                <p className="text-white/90 text-sm flex items-center gap-1.5">
+                  <Briefcase size={14} className="flex-shrink-0" />
+                  {user.profession}
+                </p>
               )}
             </div>
-          </div>
-          <div className="p-4 space-y-2">
-            <Link href="/profile/edit" className="flex items-center justify-between p-3 rounded-xl bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 transition">
-              <span className="font-medium flex items-center gap-2">
-                <Edit2 size={18} />
-                Edit Profile
-              </span>
-              <ChevronRight size={20} className="text-gray-400" />
-            </Link>
-            <Link href="/profile/preferences" className="flex items-center justify-between p-3 rounded-xl bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 transition">
-              <span className="font-medium flex items-center gap-2">
-                <Heart size={18} />
-                Match Preferences
-              </span>
-              <ChevronRight size={20} className="text-gray-400" />
-            </Link>
-            <Link href="/profile/photos" className="flex items-center justify-between p-3 rounded-xl bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 transition">
-              <span className="font-medium flex items-center gap-2">
-                <Images size={18} />
-                Photo Gallery
-              </span>
-              <ChevronRight size={20} className="text-gray-400" />
-            </Link>
-            <Link href="/membership" className="flex items-center justify-between p-3 rounded-xl bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10 transition">
-              <span className="font-medium flex items-center gap-2">
-                <Shield size={18} />
-                Trust Badge & Membership
-              </span>
-              <ChevronRight size={20} className="text-gray-400" />
+            {/* Verification Badge */}
+            {user.verified && (
+              <div className="absolute top-3 right-3 bg-[var(--color-accent-gold)] text-[var(--color-secondary-dark)] text-xs px-3 py-1.5 rounded-full flex items-center gap-1 font-semibold shadow-md">
+                <Shield size={14} fill="currentColor" />
+                Verified
+              </div>
+            )}
+            {/* Camera Button - Orange Circular */}
+            <Link 
+              href="/profile/photos" 
+              className="absolute bottom-3 right-3 p-3.5 rounded-full bg-[var(--primary)] hover:bg-[var(--primary-hover)] transition shadow-lg"
+            >
+              <Camera size={22} className="text-white" />
             </Link>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm p-4 lg:p-6">
-          <h3 className="font-semibold text-base sm:text-lg text-[var(--foreground)] mb-3">Profile Details</h3>
+        {/* Menu Options - Clean White Cards */}
+        <div className="space-y-3 mb-6">
+          <Link 
+            href="/profile/edit" 
+            className="flex items-center justify-between p-4 rounded-2xl bg-white hover:bg-gray-50 transition shadow-sm border border-gray-100"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-[var(--primary)]/10">
+                <Edit2 size={20} className="text-[var(--primary)]" />
+              </div>
+              <span className="font-medium text-[var(--foreground)]">Edit Profile</span>
+            </div>
+            <ChevronRight size={20} className="text-gray-400" />
+          </Link>
+
+          <Link 
+            href="/profile/preferences" 
+            className="flex items-center justify-between p-4 rounded-2xl bg-white hover:bg-gray-50 transition shadow-sm border border-gray-100"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-[var(--primary)]/10">
+                <Heart size={20} className="text-[var(--primary)]" />
+              </div>
+              <span className="font-medium text-[var(--foreground)]">Match Preferences</span>
+            </div>
+            <ChevronRight size={20} className="text-gray-400" />
+          </Link>
+
+          <Link 
+            href="/profile/photos" 
+            className="flex items-center justify-between p-4 rounded-2xl bg-white hover:bg-gray-50 transition shadow-sm border border-gray-100"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-[var(--primary)]/10">
+                <Images size={20} className="text-[var(--primary)]" />
+              </div>
+              <span className="font-medium text-[var(--foreground)]">Photo Gallery</span>
+            </div>
+            <ChevronRight size={20} className="text-gray-400" />
+          </Link>
+
+          <Link 
+            href="/membership" 
+            className="flex items-center justify-between p-4 rounded-2xl bg-white hover:bg-gray-50 transition shadow-sm border border-gray-100"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-[var(--primary)]/10">
+                <Shield size={20} className="text-[var(--primary)]" />
+              </div>
+              <span className="font-medium text-[var(--foreground)]">Trust Badge & Membership</span>
+            </div>
+            <ChevronRight size={20} className="text-gray-400" />
+          </Link>
+        </div>
+
+        {/* Profile Details Section */}
+        <div className="bg-white rounded-2xl shadow-sm p-5 mb-6">
+          <h3 className="font-semibold text-lg text-[var(--foreground)] mb-4">Profile Details</h3>
+          
           {user.aboutMeVisible && user.aboutMe && (
-            <div className="mb-4">
-              <h4 className="text-sm font-medium text-gray-500 mb-1">About Me</h4>
-              <p className="text-sm sm:text-base text-gray-700">{user.aboutMe}</p>
+            <div className="mb-4 pb-4 border-b border-gray-100">
+              <h4 className="text-sm font-medium text-gray-500 mb-2">About Me</h4>
+              <p className="text-sm text-gray-700 leading-relaxed">{user.aboutMe}</p>
             </div>
           )}
+          
           {user.hobbies && user.hobbies.length > 0 && (
-            <div className="mb-4">
+            <div className="mb-4 pb-4 border-b border-gray-100">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-sm font-medium text-gray-500">Hobbies and Interests</h4>
                 <Link href="/profile/edit" className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
@@ -163,8 +201,9 @@ export default function MyProfilePage() {
               </div>
             </div>
           )}
+          
           {((user.languagesKnown && user.languagesKnown.trim()) || user.motherTongue) && (
-            <div className="mb-4">
+            <div className="mb-4 pb-4 border-b border-gray-100">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-sm font-medium text-gray-500">Languages</h4>
                 <Link href="/profile/edit" className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
@@ -201,30 +240,31 @@ export default function MyProfilePage() {
               </div>
             </div>
           )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm sm:text-base">
-            <div className="flex justify-between py-2 border-b border-gray-100">
+          
+          <div className="grid grid-cols-1 gap-3 text-sm">
+            <div className="flex justify-between py-2">
               <span className="text-gray-500">Member ID</span>
-              <span>{getMemberIdDisplay(user)}</span>
+              <span className="font-medium text-[var(--foreground)]">{getMemberIdDisplay(user)}</span>
             </div>
-            <div className="flex justify-between py-2 border-b border-gray-100">
+            <div className="flex justify-between py-2">
               <span className="text-gray-500">Caste</span>
-              <span>{user.caste} {user.subCaste && `• ${user.subCaste}`}</span>
+              <span className="font-medium text-[var(--foreground)]">{user.caste} {user.subCaste && `• ${user.subCaste}`}</span>
             </div>
-            <div className="flex justify-between py-2 border-b border-gray-100">
+            <div className="flex justify-between py-2">
               <span className="text-gray-500">Education</span>
-              <span>{user.qualification || "-"}</span>
+              <span className="font-medium text-[var(--foreground)]">{user.qualification || "-"}</span>
             </div>
-            <div className="flex justify-between py-2 border-b border-gray-100">
+            <div className="flex justify-between py-2">
               <span className="text-gray-500">Profession</span>
-              <span>{user.profession || "-"}</span>
+              <span className="font-medium text-[var(--foreground)]">{user.profession || "-"}</span>
             </div>
-            <div className="flex justify-between py-2 border-b border-gray-100">
+            <div className="flex justify-between py-2">
               <span className="text-gray-500">Location</span>
-              <span>{user.city}, {user.state}</span>
+              <span className="font-medium text-[var(--foreground)]">{user.city}, {user.state}</span>
             </div>
-            <div className="flex justify-between py-2 border-b border-gray-100">
+            <div className="flex justify-between py-2">
               <span className="text-gray-500">Contact</span>
-              <span>{user.contact || "-"}</span>
+              <span className="font-medium text-[var(--foreground)]">{user.contact || "-"}</span>
             </div>
           </div>
         </div>

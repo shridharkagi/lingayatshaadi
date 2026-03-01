@@ -81,6 +81,8 @@ export interface Profile {
   // Profile ownership (who manages this profile)
   managedBy?: "self" | "parent" | "guardian";
   accountHolderName?: string;
+  // User role (for access control)
+  role?: "user" | "superadmin";
   createdAt: string;
   updatedAt: string;
   // Partner preferences (stored with profile)

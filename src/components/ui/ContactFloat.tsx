@@ -42,11 +42,11 @@ export function ContactFloat() {
       <button
         type="button"
         onClick={() => setPopupOpen(true)}
-        className="fixed bottom-20 right-4 z-50 flex items-center justify-center w-14 h-14 rounded-full bg-[var(--primary)] text-white shadow-lg hover:scale-105 active:scale-95 transition-transform lg:bottom-6 lg:right-6"
+        className="fixed bottom-20 right-4 z-50 flex items-center justify-center w-12 h-12 rounded-full bg-[var(--primary)] text-white shadow-lg hover:scale-105 active:scale-95 transition-transform lg:bottom-6 lg:right-6"
         title="Contact us"
         aria-label="Contact us"
       >
-        <Phone size={24} />
+        <Phone size={20} />
       </button>
 
       {popupOpen && (
