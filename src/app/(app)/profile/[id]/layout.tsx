@@ -4,12 +4,13 @@ import { parseProfileSlug } from "@/lib/memberId";
 import { getAge } from "@/lib/utils";
 
 type Props = {
-  params: { id: string };
+  params: Promise<{ id: string }>;
   children: React.ReactNode;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const publicId = parseProfileSlug(params.id);
+  const { id } = await params;
+  const publicId = parseProfileSlug(id);
   const supabase = createSupabaseClient();
   
   let profile = null;
@@ -33,7 +34,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const title = `${profile.full_name || "Profile"} - ${age} yrs, ${profile.profession || "Profession"} | LingayatShaadi`;
   const description = `${profile.full_name || "Profile"} - ${age} years old, ${profile.height || "N/A"}" tall, ${profile.profession || "Profession"} from ${profile.city || "City"}, ${profile.state || "State"}. ${profile.qualification || "Education"}. Find your perfect match on LingayatShaadi.`;
 
-  const profileUrl = `https://test.ligayatshaadi.in/profile/${params.id}`;
+  const profileUrl = `https://test.ligayatshaadi.in/profile/${id}`;
 
   return {
     title,

@@ -241,6 +241,7 @@ export default function OtherProfilePage() {
   const whatsappUrl = config.whatsappGroupUrl?.trim() || "";
 
   const handleCopyMemberId = async () => {
+    if (!profile) return;
     const memberId = getMemberIdDisplay(profile);
     try {
       if (navigator.clipboard) {
