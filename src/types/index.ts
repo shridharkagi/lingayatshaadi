@@ -21,8 +21,12 @@ export interface PartnerPreference {
 }
 
 export interface Profile {
+  /** Internal ID (database primary key) - never exposed in URLs */
   id: string;
-  memberId: string;
+  /** Public ID / Member ID - LS26010001 format, displayed to users */
+  publicId?: string;
+  /** @deprecated Use publicId. Kept for backward compatibility. */
+  memberId?: string;
   email: string;
   fullName: string;
   dateOfBirth: string;
@@ -31,6 +35,10 @@ export interface Profile {
   caste: string;
   subCaste: string;
   height: string;
+  /** Languages known (comma-separated or array) */
+  languagesKnown?: string;
+  /** Mother tongue */
+  motherTongue?: string;
   aboutMe: string;
   aboutMeVisible: boolean;
   hobbies?: string[];
@@ -65,7 +73,14 @@ export interface Profile {
   profilePhoto?: string;
   photos?: string[];
   verified?: boolean;
+  /** Admin profile status - when set, overrides verified for display/filter */
+  profileStatus?: "verified" | "pending" | "rejected" | "suspended";
+  /** Free or Premium subscription type */
+  profileType?: "free" | "premium";
   trustScore?: number;
+  // Profile ownership (who manages this profile)
+  managedBy?: "self" | "parent" | "guardian";
+  accountHolderName?: string;
   createdAt: string;
   updatedAt: string;
   // Partner preferences (stored with profile)
@@ -114,4 +129,5 @@ export interface MembershipPlan {
   price: number;
   features: string[];
   popular?: boolean;
+  isFree?: boolean; // true when price === 0
 }

@@ -4,9 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Heart, Eye, Bookmark, UserX, FileText } from "lucide-react";
-import { mockProfiles } from "@/data/mock";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { useProfiles } from "@/contexts/ProfilesContext";
 import { mockInterests } from "@/data/mock";
 import { getAge } from "@/lib/utils";
+import { getProfileSlug } from "@/lib/memberId";
 
 const tabs = [
   { id: "interests", label: "Interests", icon: Heart },
@@ -17,15 +19,16 @@ const tabs = [
 ];
 
 export default function ActivitiesPage() {
+  const { profiles } = useProfiles();
   const [activeTab, setActiveTab] = useState("interests");
 
   const receivedInterests = mockInterests
     .filter((i) => i.toId === "current" && i.status === "pending")
-    .map((i) => ({ ...i, profile: mockProfiles.find((p) => p.id === i.fromId) }))
+    .map((i) => ({ ...i, profile: profiles.find((p) => p.id === i.fromId) }))
     .filter((i) => i.profile);
 
   return (
-    <div className="max-w-lg mx-auto">
+    <div className="max-w-lg mx-auto pb-6">
       <header className="bg-white border-b border-[var(--border)] px-4 py-4">
         <h1 className="text-xl font-bold text-[var(--foreground)] mb-4">Activities</h1>
         <div className="flex gap-2 overflow-x-auto pb-2">
@@ -49,14 +52,18 @@ export default function ActivitiesPage() {
           <div className="space-y-4">
             <h3 className="font-semibold text-[var(--foreground)]">Received</h3>
             {receivedInterests.length === 0 ? (
-              <p className="text-gray-500 py-8 text-center">No interests received yet</p>
+              <EmptyState
+                icon={Heart}
+                title="No interests received yet"
+                description="When someone sends you an interest, it will appear here"
+              />
             ) : (
               receivedInterests.map(({ profile, message }) => (
                 <div
                   key={profile!.id}
                   className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm"
                 >
-                  <Link href={`/profile/${profile!.id}`} className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0">
+                  <Link href={`/profile/${getProfileSlug(profile!)}`} className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0">
                     <Image
                       src={profile!.profilePhoto || "/placeholder.svg"}
                       alt={profile!.fullName}
@@ -67,7 +74,7 @@ export default function ActivitiesPage() {
                     />
                   </Link>
                   <div className="flex-1 min-w-0">
-                    <Link href={`/profile/${profile!.id}`}>
+                    <Link href={`/profile/${getProfileSlug(profile!)}`}>
                       <h4 className="font-semibold text-[var(--foreground)]">{profile!.fullName}</h4>
                     </Link>
                     <p className="text-sm text-gray-500">{getAge(profile!.dateOfBirth)} yrs • {profile!.profession}</p>
@@ -88,36 +95,52 @@ export default function ActivitiesPage() {
               ))
             )}
             <h3 className="font-semibold text-[var(--foreground)] mt-8">Sent</h3>
-            <p className="text-gray-500 py-4">No interests sent yet</p>
+            <EmptyState
+              icon={Heart}
+              title="No interests sent yet"
+              description="Start connecting with profiles you like"
+              action={{
+                label: "Browse Profiles",
+                href: "/search",
+              }}
+            />
           </div>
         )}
 
         {activeTab === "views" && (
-          <div className="text-center py-16">
-            <Eye size={48} className="mx-auto text-gray-300 mb-4" />
-            <p className="text-gray-500">No profile views yet</p>
-          </div>
+          <EmptyState
+            icon={Eye}
+            title="No profile views yet"
+            description="When someone views your profile, you'll see them here"
+          />
         )}
 
         {activeTab === "shortlist" && (
-          <div className="text-center py-16">
-            <Bookmark size={48} className="mx-auto text-gray-300 mb-4" />
-            <p className="text-gray-500">No shortlisted profiles</p>
-          </div>
+          <EmptyState
+            icon={Bookmark}
+            title="No shortlisted profiles"
+            description="Save profiles you're interested in for quick access later"
+            action={{
+              label: "Browse Profiles",
+              href: "/search",
+            }}
+          />
         )}
 
         {activeTab === "blocked" && (
-          <div className="text-center py-16">
-            <UserX size={48} className="mx-auto text-gray-300 mb-4" />
-            <p className="text-gray-500">No blocked users</p>
-          </div>
+          <EmptyState
+            icon={UserX}
+            title="No blocked users"
+            description="Users you block will appear here"
+          />
         )}
 
         {activeTab === "notes" && (
-          <div className="text-center py-16">
-            <FileText size={48} className="mx-auto text-gray-300 mb-4" />
-            <p className="text-gray-500">No notes saved</p>
-          </div>
+          <EmptyState
+            icon={FileText}
+            title="No notes saved"
+            description="Add personal notes to profiles to remember important details"
+          />
         )}
       </div>
     </div>

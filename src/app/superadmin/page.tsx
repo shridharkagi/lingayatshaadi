@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { Users, MessageSquare, CreditCard, TrendingUp, UserPlus, Eye, Heart } from "lucide-react";
-import { mockProfiles } from "@/data/mock";
+import { useProfiles } from "@/contexts/ProfilesContext";
+import { getMemberIdDisplay } from "@/lib/memberId";
 
 const stats = [
   { label: "Total Users", value: "1,247", icon: Users, color: "bg-blue-500", change: "+12%" },
@@ -14,7 +15,8 @@ const stats = [
 ];
 
 export default function SuperAdminDashboard() {
-  const recentProfiles = mockProfiles.slice(0, 5);
+  const { profiles } = useProfiles();
+  const recentProfiles = profiles.slice(0, 5);
 
   return (
     <div className="space-y-8">
@@ -47,11 +49,11 @@ export default function SuperAdminDashboard() {
             {recentProfiles.map((p) => (
               <div key={p.id} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
                 <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
-                  <img src={p.profilePhoto} alt="" className="w-full h-full object-cover" />
+                  <img src={p.profilePhoto} alt={`Profile photo of ${p.fullName}`} className="w-full h-full object-cover" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{p.fullName}</p>
-                  <p className="text-sm text-gray-500">{p.memberId}</p>
+                  <p className="text-sm text-gray-500">{getMemberIdDisplay(p)}</p>
                 </div>
                 <span className="text-xs text-gray-500">2 days ago</span>
               </div>

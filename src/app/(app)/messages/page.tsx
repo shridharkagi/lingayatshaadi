@@ -1,29 +1,32 @@
-"use client";
-
-import Link from "next/link";
-import Image from "next/image";
-import { mockProfiles } from "@/data/mock";
+import { MessageCircle } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { useProfiles } from "@/contexts/ProfilesContext";
 import { mockMessages } from "@/data/mock";
 
 export default function MessagesPage() {
-  const conversations = [
-    { profile: mockProfiles[1], lastMessage: mockMessages[2], unread: 1 },
-  ];
+  const { profiles } = useProfiles();
+  const profile2 = profiles.find((p) => p.id === "2");
+  const conversations = profile2
+    ? [{ profile: profile2, lastMessage: mockMessages[2], unread: 1 }]
+    : [];
 
   return (
-    <div className="max-w-lg mx-auto">
+    <div className="max-w-lg mx-auto pb-6">
       <header className="bg-white border-b border-[var(--border)] px-4 py-4">
         <h1 className="text-xl font-bold text-[var(--foreground)]">Messages</h1>
       </header>
 
       <div className="p-4">
         {conversations.length === 0 ? (
-          <div className="text-center py-16">
-            <p className="text-gray-500 mb-4">No messages yet</p>
-            <Link href="/search" className="text-[var(--primary)] font-medium">
-              Find matches to start chatting
-            </Link>
-          </div>
+          <EmptyState
+            icon={MessageCircle}
+            title="No messages yet"
+            description="Start connecting with matches to begin conversations"
+            action={{
+              label: "Find Matches",
+              href: "/search",
+            }}
+          />
         ) : (
           <div className="space-y-2">
             {conversations.map(({ profile, lastMessage, unread }) => (

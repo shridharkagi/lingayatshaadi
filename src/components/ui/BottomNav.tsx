@@ -39,7 +39,7 @@ export function BottomNav() {
                   </span>
                 )}
               </div>
-              <span className="text-xs mt-0.5">{label}</span>
+              <span className="text-xs sm:text-sm mt-0.5">{label}</span>
             </Link>
           );
         })}

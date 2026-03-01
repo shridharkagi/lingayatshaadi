@@ -14,7 +14,57 @@ const defaultPartnerPref: PartnerPreference = {
 
 export const mockProfiles: Profile[] = [
   {
+    id: "deeksha-parent",
+    publicId: "LS26010001",
+    memberId: "LS-2499",
+    email: "deepak.parent@example.com",
+    fullName: "Deeksha",
+    dateOfBirth: "1998-06-12",
+    gender: "female",
+    maritalStatus: "Never Married",
+    caste: "Lingayat",
+    subCaste: "Banajiga",
+    height: "5.3",
+    aboutMe: "Engineering graduate with a passion for classical dance. Profile managed by father. Looking for a compatible life partner.",
+    aboutMeVisible: true,
+    timeOfBirth: "09:15",
+    placeOfBirth: "Belgaum",
+    rashi: "Mithuna",
+    nakshatra: "Ardra",
+    qualification: "B.E. Computer Science",
+    professionType: "Engineer",
+    profession: "Software Engineer",
+    companyName: "IT Firm",
+    annualIncome: "8-10 Lakhs",
+    fatherName: "Deepak",
+    fatherOccupation: "Business",
+    motherName: "Sunita",
+    motherOccupation: "Home Maker",
+    foodHabits: "Vegetarian",
+    siblingDetails: "1 Brother",
+    city: "Belgaum",
+    district: "Belgaum",
+    state: "Karnataka",
+    country: "India",
+    contact: "9876543200",
+    contactType: "Personal",
+    profilePhoto: "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400&h=400&fit=crop",
+    verified: true,
+    profileStatus: "verified",
+    profileType: "premium",
+    trustScore: 80,
+    managedBy: "parent",
+    accountHolderName: "Deepak",
+    hobbies: ["Classical Dance", "Reading", "Music", "Cooking"],
+    languagesKnown: "Kannada, Hindi, English",
+    motherTongue: "Kannada",
+    partnerPreference: { ...defaultPartnerPref, ageMin: 26, ageMax: 34 },
+    createdAt: "2025-02-20",
+    updatedAt: "2025-02-28",
+  },
+  {
     id: "1",
+    publicId: "LS26010002",
     memberId: "LS-2501",
     email: "user1@example.com",
     fullName: "Priya Sharma",
@@ -48,15 +98,26 @@ export const mockProfiles: Profile[] = [
     contact: "9876543210",
     contactType: "Personal",
     profilePhoto: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop",
+    photos: [
+      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop",
+      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop",
+      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop",
+      "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400&h=400&fit=crop",
+    ],
     verified: true,
+    profileStatus: "verified",
+    profileType: "premium",
     trustScore: 85,
     hobbies: ["Working out", "Foodie", "Trekking", "Movies", "Travelling"],
+    languagesKnown: "Kannada, Hindi, English",
+    motherTongue: "Kannada",
     partnerPreference: { ...defaultPartnerPref, ageMin: 28, ageMax: 38, profession: "Engineer/Doctor" },
     createdAt: "2025-01-15",
     updatedAt: "2025-02-20",
   },
   {
     id: "2",
+    publicId: "LS26010003",
     memberId: "LS-2502",
     email: "user2@example.com",
     fullName: "Rahul Kulkarni",
@@ -91,8 +152,18 @@ export const mockProfiles: Profile[] = [
     contact: "9876543211",
     contactType: "Office",
     profilePhoto: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop",
+    photos: [
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop",
+      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop",
+      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop",
+      "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&h=400&fit=crop",
+    ],
     hobbies: ["Sports", "Music", "Cooking", "Cricket", "Reading"],
+    languagesKnown: "Marathi, Hindi, English, Kannada",
+    motherTongue: "Marathi",
     verified: true,
+    profileStatus: "verified",
+    profileType: "premium",
     trustScore: 90,
     partnerPreference: { ...defaultPartnerPref, ageMin: 24, ageMax: 32, profession: "Professional" },
     createdAt: "2025-01-10",
@@ -100,6 +171,7 @@ export const mockProfiles: Profile[] = [
   },
   {
     id: "3",
+    publicId: "LS26010004",
     memberId: "LS-2503",
     email: "user3@example.com",
     fullName: "Ananya Reddy",
@@ -134,8 +206,18 @@ export const mockProfiles: Profile[] = [
     contact: "9876543212",
     contactType: "Personal",
     profilePhoto: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop",
+    photos: [
+      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop",
+      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop",
+      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&h=400&fit=crop",
+      "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=400&h=400&fit=crop",
+    ],
     hobbies: ["Reading", "Music", "Photography", "Yoga", "Painting"],
+    languagesKnown: "Telugu, Hindi, English",
+    motherTongue: "Telugu",
     verified: false,
+    profileStatus: "pending",
+    profileType: "free",
     trustScore: 70,
     partnerPreference: { ...defaultPartnerPref, ageMin: 28, ageMax: 40 },
     createdAt: "2025-02-01",
@@ -143,6 +225,7 @@ export const mockProfiles: Profile[] = [
   },
   {
     id: "4",
+    publicId: "LS26010005",
     memberId: "LS-2504",
     email: "user4@example.com",
     fullName: "Vikram Joshi",
@@ -178,6 +261,8 @@ export const mockProfiles: Profile[] = [
     contactType: "Office",
     profilePhoto: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop",
     hobbies: ["Reading", "Cricket", "Travel", "Music"],
+    languagesKnown: "Kannada, Hindi, English",
+    motherTongue: "Kannada",
     verified: true,
     trustScore: 88,
     partnerPreference: { ...defaultPartnerPref, ageMin: 24, ageMax: 32, education: "Graduate" },
@@ -186,6 +271,7 @@ export const mockProfiles: Profile[] = [
   },
   {
     id: "5",
+    publicId: "LS26010006",
     memberId: "LS-2505",
     email: "user5@example.com",
     fullName: "Meera Patil",
@@ -222,6 +308,8 @@ export const mockProfiles: Profile[] = [
     profilePhoto: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop",
     hobbies: ["Yoga", "Reading", "Classical Dance", "Cooking"],
     verified: false,
+    profileStatus: "rejected",
+    profileType: "free",
     trustScore: 65,
     partnerPreference: { ...defaultPartnerPref, ageMin: 26, ageMax: 36 },
     createdAt: "2025-02-10",
@@ -230,6 +318,7 @@ export const mockProfiles: Profile[] = [
   // 10 more profiles
   {
     id: "6",
+    publicId: "LS26010007",
     memberId: "LS-2506",
     email: "user6@example.com",
     fullName: "Sneha Desai",
@@ -273,6 +362,7 @@ export const mockProfiles: Profile[] = [
   },
   {
     id: "7",
+    publicId: "LS26010008",
     memberId: "LS-2507",
     email: "user7@example.com",
     fullName: "Arjun Bhat",
@@ -316,6 +406,7 @@ export const mockProfiles: Profile[] = [
   },
   {
     id: "8",
+    publicId: "LS26010009",
     memberId: "LS-2508",
     email: "user8@example.com",
     fullName: "Kavya Nair",
@@ -352,6 +443,8 @@ export const mockProfiles: Profile[] = [
     profilePhoto: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&h=400&fit=crop",
     hobbies: ["Photography", "Travel", "Music", "Dancing"],
     verified: false,
+    profileStatus: "suspended",
+    profileType: "free",
     trustScore: 72,
     partnerPreference: { ...defaultPartnerPref, ageMin: 26, ageMax: 36 },
     createdAt: "2025-02-12",
@@ -359,6 +452,7 @@ export const mockProfiles: Profile[] = [
   },
   {
     id: "9",
+    publicId: "LS26010010",
     memberId: "LS-2509",
     email: "user9@example.com",
     fullName: "Rohan Shetty",
@@ -402,6 +496,7 @@ export const mockProfiles: Profile[] = [
   },
   {
     id: "10",
+    publicId: "LS26010011",
     memberId: "LS-2510",
     email: "user10@example.com",
     fullName: "Divya Rao",
@@ -444,6 +539,7 @@ export const mockProfiles: Profile[] = [
   },
   {
     id: "11",
+    publicId: "LS26010012",
     memberId: "LS-2511",
     email: "user11@example.com",
     fullName: "Lingaraj D",
@@ -487,6 +583,7 @@ export const mockProfiles: Profile[] = [
   },
   {
     id: "12",
+    publicId: "LS26010013",
     memberId: "LS-2512",
     email: "user12@example.com",
     fullName: "Pooja Gowda",
@@ -530,6 +627,7 @@ export const mockProfiles: Profile[] = [
   },
   {
     id: "13",
+    publicId: "LS26010014",
     memberId: "LS-2513",
     email: "user13@example.com",
     fullName: "Manish Kumar",
@@ -573,6 +671,7 @@ export const mockProfiles: Profile[] = [
   },
   {
     id: "14",
+    publicId: "LS26010015",
     memberId: "LS-2514",
     email: "user14@example.com",
     fullName: "Shruti Iyer",
@@ -616,6 +715,7 @@ export const mockProfiles: Profile[] = [
   },
   {
     id: "15",
+    publicId: "LS26010016",
     memberId: "LS-2515",
     email: "user15@example.com",
     fullName: "Vishal Malhotra",
@@ -660,6 +760,7 @@ export const mockProfiles: Profile[] = [
   // 5 brides
   {
     id: "16",
+    publicId: "LS26010017",
     memberId: "LS-2516",
     email: "user16@example.com",
     fullName: "Nisha Hegde",
@@ -703,6 +804,7 @@ export const mockProfiles: Profile[] = [
   },
   {
     id: "17",
+    publicId: "LS26010018",
     memberId: "LS-2517",
     email: "user17@example.com",
     fullName: "Swati Murthy",
@@ -746,6 +848,7 @@ export const mockProfiles: Profile[] = [
   },
   {
     id: "18",
+    publicId: "LS26010019",
     memberId: "LS-2518",
     email: "user18@example.com",
     fullName: "Akshatha Bhandari",
@@ -789,6 +892,7 @@ export const mockProfiles: Profile[] = [
   },
   {
     id: "19",
+    publicId: "LS26010020",
     memberId: "LS-2519",
     email: "user19@example.com",
     fullName: "Kriti Suresh",
@@ -832,6 +936,7 @@ export const mockProfiles: Profile[] = [
   },
   {
     id: "20",
+    publicId: "LS26010021",
     memberId: "LS-2520",
     email: "user20@example.com",
     fullName: "Radhika Adiga",
@@ -876,6 +981,7 @@ export const mockProfiles: Profile[] = [
   // 5 grooms
   {
     id: "21",
+    publicId: "LS26010022",
     memberId: "LS-2521",
     email: "user21@example.com",
     fullName: "Aditya Hiremath",
@@ -919,6 +1025,7 @@ export const mockProfiles: Profile[] = [
   },
   {
     id: "22",
+    publicId: "LS26010023",
     memberId: "LS-2522",
     email: "user22@example.com",
     fullName: "Varun Channappagoudar",
@@ -962,6 +1069,7 @@ export const mockProfiles: Profile[] = [
   },
   {
     id: "23",
+    publicId: "LS26010024",
     memberId: "LS-2523",
     email: "user23@example.com",
     fullName: "Prateek Lingayat",
@@ -1005,6 +1113,7 @@ export const mockProfiles: Profile[] = [
   },
   {
     id: "24",
+    publicId: "LS26010025",
     memberId: "LS-2524",
     email: "user24@example.com",
     fullName: "Siddharth Gowda",
@@ -1048,6 +1157,7 @@ export const mockProfiles: Profile[] = [
   },
   {
     id: "25",
+    publicId: "LS26010026",
     memberId: "LS-2525",
     email: "user25@example.com",
     fullName: "Nikhil Badiger",
@@ -1093,6 +1203,7 @@ export const mockProfiles: Profile[] = [
 
 export const currentUserProfile: Profile = {
   id: "current",
+  publicId: "LS26010000",
   memberId: "LS-2500",
   email: "shridhar@example.com",
   fullName: "Shridhar Kagi",
@@ -1129,7 +1240,10 @@ export const currentUserProfile: Profile = {
   profilePhoto: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop",
   verified: true,
   trustScore: 82,
+  managedBy: "self",
   hobbies: ["Trekking", "Photography", "Reading", "Music"],
+  languagesKnown: "Kannada, Hindi, English",
+  motherTongue: "Kannada",
   partnerPreference: { ...defaultPartnerPref },
   createdAt: "2025-01-01",
   updatedAt: "2025-02-24",
@@ -1154,6 +1268,7 @@ export const mockNotifications: Notification[] = [
 ];
 
 export const mockMembershipPlans: MembershipPlan[] = [
+  { id: "p0", name: "Free", duration: 1, price: 0, features: ["View 3 profiles/day", "Send 1 interest/month", "Basic search"], isFree: true },
   { id: "p1", name: "Basic", duration: 1, price: 999, features: ["View 5 profiles/day", "Send 3 interests/month", "Basic search"] },
   { id: "p2", name: "Premium", duration: 3, price: 2499, features: ["Unlimited profile views", "Unlimited interests", "Advanced search", "Priority support", "View contact details"], popular: true },
   { id: "p3", name: "Platinum", duration: 6, price: 4499, features: ["All Premium features", "Profile boost", "Verified badge", "Chat with verified members", "Matchmaking assistance"] },

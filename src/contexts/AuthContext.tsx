@@ -64,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ...currentUserProfile,
       ...profileData,
       id: "current",
-      memberId: `LS-${Date.now().toString().slice(-4)}`,
+      publicId: currentUserProfile.publicId || `LS${String(new Date().getFullYear()).slice(-2)}${String(new Date().getMonth() + 1).padStart(2, "0")}0001`,
       email: profileData.email,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

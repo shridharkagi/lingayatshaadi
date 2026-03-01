@@ -2,13 +2,38 @@
 
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import Image from "next/image";
-import { ChevronLeft, Plus } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
+import { PhotoUpload } from "@/components/PhotoUpload";
 
 export default function PhotoGalleryPage() {
   const router = useRouter();
-  const { user } = useAuth();
-  const photos = user?.profilePhoto ? [user.profilePhoto] : [];
+  const { user, updateProfile } = useAuth();
+
+  const currentPhotos = [
+    ...(user?.profilePhoto ? [user.profilePhoto] : []),
+    ...(user?.photos || []).filter((p) => p !== user?.profilePhoto),
+  ];
+
+  const handleAdd = (url: string) => {
+    if (!user) return;
+    const isFirst = currentPhotos.length === 0;
+    updateProfile({
+      profilePhoto: isFirst ? url : user.profilePhoto,
+      photos: isFirst ? [] : [...(user.photos || []).filter((p) => p !== user.profilePhoto), url],
+    });
+  };
+
+  const handleRemove = (url: string) => {
+    if (!user) return;
+    const wasProfilePhoto = url === user.profilePhoto;
+    const newPhotos = (user.photos || []).filter((p) => p !== url);
+    updateProfile({
+      profilePhoto: wasProfilePhoto ? newPhotos[0] : user.profilePhoto,
+      photos: wasProfilePhoto ? newPhotos.slice(1) : newPhotos,
+    });
+  };
+
+  const userId = user?.id || user?.memberId || "current";
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -19,16 +44,12 @@ export default function PhotoGalleryPage() {
         <h1 className="text-lg font-semibold">Photo Gallery</h1>
       </header>
       <div className="p-4">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {photos.map((url, i) => (
-            <div key={i} className="relative aspect-square rounded-xl overflow-hidden bg-gray-200">
-              <Image src={url} alt="" fill className="object-cover" unoptimized />
-            </div>
-          ))}
-          <button className="aspect-square rounded-xl border-2 border-dashed border-[var(--border)] flex items-center justify-center hover:bg-gray-50 transition">
-            <Plus size={32} className="text-gray-400" />
-          </button>
-        </div>
+        <PhotoUpload
+          currentPhotos={currentPhotos}
+          onAdd={handleAdd}
+          onRemove={handleRemove}
+          userId={userId}
+        />
       </div>
     </div>
   );

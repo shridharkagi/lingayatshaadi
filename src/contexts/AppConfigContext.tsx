@@ -1,19 +1,43 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
+import type { MembershipPlan } from "@/types";
 
 const CONFIG_KEY = "lingayat_shaadi_config";
 
-interface AppConfig {
+const ALL_PLAN_IDS = ["p0", "p1", "p2", "p3"];
+
+export interface AppConfig {
   whatsappGroupUrl: string;
   whatsappContactNumber: string;
   callContactNumber: string;
+  whatsappDefaultMessage: string;
+  enabledPlanIds: string[];
+  planOverrides: Record<string, Partial<MembershipPlan>>;
+  /** Favicon URL - if set, overrides default favicon */
+  faviconUrl: string;
+  /** External scripts (chatbot, analytics) - raw HTML script tags or URLs */
+  externalScripts: string;
+  /** robots.txt content */
+  robotsTxt: string;
+  /** SEO meta description */
+  seoDescription: string;
+  /** SEO meta keywords */
+  seoKeywords: string;
 }
 
 const defaultConfig: AppConfig = {
   whatsappGroupUrl: "",
-  whatsappContactNumber: "",
-  callContactNumber: "",
+  whatsappContactNumber: "6360130905",
+  callContactNumber: "6360130905",
+  whatsappDefaultMessage: "I need assistance, my name: ",
+  enabledPlanIds: ALL_PLAN_IDS,
+  planOverrides: {},
+  faviconUrl: "",
+  externalScripts: "",
+  robotsTxt: "User-agent: *\nAllow: /",
+  seoDescription: "Premium matrimonial platform for the Lingayat community",
+  seoKeywords: "Lingayat matrimony, Lingayat shaadi, Lingayat marriage",
 };
 
 const AppConfigContext = createContext<{
@@ -30,7 +54,17 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
       const stored = localStorage.getItem(CONFIG_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        setConfig((prev) => ({ ...prev, ...parsed }));
+        setConfig((prev) => ({
+          ...prev,
+          ...parsed,
+          enabledPlanIds: Array.isArray(parsed.enabledPlanIds) ? parsed.enabledPlanIds : ALL_PLAN_IDS,
+          planOverrides: parsed.planOverrides && typeof parsed.planOverrides === "object" ? parsed.planOverrides : {},
+          faviconUrl: typeof parsed.faviconUrl === "string" ? parsed.faviconUrl : "",
+          externalScripts: typeof parsed.externalScripts === "string" ? parsed.externalScripts : "",
+          robotsTxt: typeof parsed.robotsTxt === "string" ? parsed.robotsTxt : defaultConfig.robotsTxt,
+          seoDescription: typeof parsed.seoDescription === "string" ? parsed.seoDescription : defaultConfig.seoDescription,
+          seoKeywords: typeof parsed.seoKeywords === "string" ? parsed.seoKeywords : defaultConfig.seoKeywords,
+        }));
       }
     } catch {
       // ignore

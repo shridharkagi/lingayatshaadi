@@ -1,9 +1,10 @@
 "use client";
 
-import { mockProfiles } from "@/data/mock";
+import { useProfiles } from "@/contexts/ProfilesContext";
 
 export default function SuperAdminVerificationsPage() {
-  const pending = mockProfiles.filter((p) => !p.verified);
+  const { profiles } = useProfiles();
+  const pending = profiles.filter((p) => !p.verified);
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900">Verifications</h1>

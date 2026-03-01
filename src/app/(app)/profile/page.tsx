@@ -5,9 +5,41 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Edit2, Shield, Heart, Settings, ChevronRight, Camera, Images } from "lucide-react";
+import { Edit2, Shield, Heart, Settings, ChevronRight, Camera, Images, Briefcase, Share2 } from "lucide-react";
 import { getAge } from "@/lib/utils";
 import { HobbyTag } from "@/components/ui/HobbyTag";
+import { LanguageTag } from "@/components/ui/LanguageTag";
+import { getMemberIdDisplay, getProfileSlug } from "@/lib/memberId";
+import { Profile } from "@/types";
+
+async function handleShareProfile(user: Profile) {
+  const url = typeof window !== "undefined" ? `${window.location.origin}/profile/${getProfileSlug(user)}` : "";
+  const title = `${user.fullName} - LingayatShaadi Profile`;
+  const text = `Check out my profile on LingayatShaadi`;
+
+  if (typeof navigator !== "undefined" && navigator.share) {
+    try {
+      await navigator.share({ title, text, url });
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") copyToClipboard(url);
+    }
+  } else {
+    copyToClipboard(url);
+  }
+}
+
+function copyToClipboard(text: string) {
+  if (typeof navigator === "undefined" || !navigator.clipboard) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+  } else {
+    navigator.clipboard.writeText(text);
+  }
+}
 
 export default function MyProfilePage() {
   const { user, isLoggedIn, loading } = useAuth();
@@ -29,10 +61,19 @@ export default function MyProfilePage() {
     <div className="w-full max-w-2xl mx-auto">
       <header className="bg-[var(--primary)] text-white px-4 py-6 rounded-b-3xl">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold">My Profile</h1>
-          <Link href="/settings" className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition">
-            <Settings size={20} />
-          </Link>
+          <h1 className="text-lg sm:text-xl font-bold">My Profile</h1>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => handleShareProfile(user)}
+              className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition"
+              aria-label="Share my profile"
+            >
+              <Share2 size={20} />
+            </button>
+            <Link href="/settings" className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition">
+              <Settings size={20} />
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -51,8 +92,14 @@ export default function MyProfilePage() {
             </Link>
             <div className="absolute bottom-2 left-2 right-14 flex justify-between items-center">
               <div>
-                <h2 className="text-xl font-bold text-white drop-shadow-lg">{user.fullName}</h2>
-                <p className="text-white/90 text-sm">{getAge(user.dateOfBirth)} yrs • {user.height}&quot; • {user.maritalStatus}</p>
+                <h2 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">{user.fullName}</h2>
+                <p className="text-white/90 text-sm">{getAge(user.dateOfBirth)} yrs • {user.height}&quot;</p>
+                {user.profession && (
+                  <p className="text-white/90 text-sm mt-1 flex items-center gap-1.5">
+                    <Briefcase size={14} className="flex-shrink-0" />
+                    {user.profession}
+                  </p>
+                )}
               </div>
               {user.verified && (
                 <span className="bg-[var(--success)] text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
@@ -94,11 +141,11 @@ export default function MyProfilePage() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm p-4 lg:p-6">
-          <h3 className="font-semibold text-[var(--foreground)] mb-3">Profile Details</h3>
+          <h3 className="font-semibold text-base sm:text-lg text-[var(--foreground)] mb-3">Profile Details</h3>
           {user.aboutMeVisible && user.aboutMe && (
             <div className="mb-4">
               <h4 className="text-sm font-medium text-gray-500 mb-1">About Me</h4>
-              <p className="text-gray-700">{user.aboutMe}</p>
+              <p className="text-sm sm:text-base text-gray-700">{user.aboutMe}</p>
             </div>
           )}
           {user.hobbies && user.hobbies.length > 0 && (
@@ -116,10 +163,48 @@ export default function MyProfilePage() {
               </div>
             </div>
           )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+          {((user.languagesKnown && user.languagesKnown.trim()) || user.motherTongue) && (
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-medium text-gray-500">Languages</h4>
+                <Link href="/profile/edit" className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+                  <Edit2 size={16} />
+                </Link>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {(() => {
+                  const langs = (user.languagesKnown || "")
+                    .split(",")
+                    .map((l) => l.trim())
+                    .filter(Boolean);
+                  const motherTongue = user.motherTongue?.trim();
+                  const seen = new Set<string>();
+                  const tags: { label: string; isMotherTongue: boolean }[] = [];
+                  if (motherTongue && !seen.has(motherTongue)) {
+                    tags.push({ label: motherTongue, isMotherTongue: true });
+                    seen.add(motherTongue);
+                  }
+                  langs.forEach((l) => {
+                    if (!seen.has(l)) {
+                      tags.push({ label: l, isMotherTongue: l === motherTongue });
+                      seen.add(l);
+                    }
+                  });
+                  return tags.map((t) => (
+                    <LanguageTag
+                      key={t.label}
+                      label={t.label}
+                      isMotherTongue={t.isMotherTongue}
+                    />
+                  ));
+                })()}
+              </div>
+            </div>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm sm:text-base">
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-gray-500">Member ID</span>
-              <span>{user.memberId}</span>
+              <span>{getMemberIdDisplay(user)}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-gray-500">Caste</span>

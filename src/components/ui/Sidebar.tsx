@@ -6,6 +6,7 @@ import Image from "next/image";
 import { Home, Search, MessageCircle, User, Bell, Heart } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { mockNotifications } from "@/data/mock";
+import { getMemberIdDisplay } from "@/lib/memberId";
 
 const navItems = [
   { href: "/home", icon: Home, label: "Home" },
@@ -58,7 +59,7 @@ export function Sidebar() {
         >
           <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200">
             {user?.profilePhoto ? (
-              <Image src={user.profilePhoto} alt="" width={40} height={40} className="object-cover" unoptimized />
+              <Image src={user.profilePhoto} alt={`Profile photo of ${user?.fullName || "user"}`} width={40} height={40} className="object-cover" unoptimized />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-[var(--primary)] font-semibold">
                 {user?.fullName?.[0] || "?"}
@@ -67,7 +68,7 @@ export function Sidebar() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-medium text-sm truncate">{user?.fullName || "Profile"}</p>
-            <p className="text-xs text-gray-500 truncate">{user?.memberId}</p>
+            <p className="text-xs text-gray-500 truncate">{user ? getMemberIdDisplay(user) : ""}</p>
           </div>
         </Link>
       </div>

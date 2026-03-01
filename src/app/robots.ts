@@ -1,0 +1,47 @@
+import { MetadataRoute } from "next";
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
+
+export default function robots(): MetadataRoute.Robots {
+  const configPath = join(process.cwd(), "data", "site-config.json");
+  try {
+    if (existsSync(configPath)) {
+      const data = JSON.parse(readFileSync(configPath, "utf-8"));
+      const content = (data.robotsTxt || "User-agent: *\nAllow: /").trim();
+      const lines = content.split("\n");
+      const rules: Record<string, { allow?: string[]; disallow?: string[] }> = {};
+      let currentAgent = "*";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        const colonIdx = trimmed.indexOf(":");
+        const key = colonIdx >= 0 ? trimmed.slice(0, colonIdx).trim().toLowerCase() : "";
+        const value = colonIdx >= 0 ? trimmed.slice(colonIdx + 1).trim() : "";
+
+        if (key === "user-agent") {
+          currentAgent = value || "*";
+          if (!rules[currentAgent]) rules[currentAgent] = {};
+        } else if (key === "allow" && rules[currentAgent]) {
+          rules[currentAgent].allow = rules[currentAgent].allow || [];
+          rules[currentAgent].allow!.push(value);
+        } else if (key === "disallow" && rules[currentAgent]) {
+          rules[currentAgent].disallow = rules[currentAgent].disallow || [];
+          rules[currentAgent].disallow!.push(value);
+        }
+      }
+
+      const rulesArray = Object.entries(rules).map(([ua, r]) => ({
+        userAgent: ua,
+        allow: r.allow?.length ? r.allow : undefined,
+        disallow: r.disallow?.length ? r.disallow : undefined,
+      }));
+      if (rulesArray.length > 0) {
+        return { rules: rulesArray };
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return { rules: [{ userAgent: "*", allow: "/" }] };
+}

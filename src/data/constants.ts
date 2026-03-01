@@ -16,6 +16,15 @@ export const MAHARASHTRA_DISTRICTS = [
 
 export const KA_MA_DISTRICTS = [...new Set([...KARNATAKA_DISTRICTS, ...MAHARASHTRA_DISTRICTS])].sort();
 
+// State → Cities (from mock data, expand as needed)
+export const STATE_CITIES: Record<string, string[]> = {
+  Karnataka: ["Bangalore", "Belgaum", "Mysore", "Mangalore", "Hubli", "Davanagere", "Shimoga", "Gadag", "Dharwad"],
+  Maharashtra: ["Mumbai", "Pune"],
+  Telangana: ["Hyderabad"],
+  "Tamil Nadu": ["Chennai"],
+  Delhi: ["Delhi"],
+};
+
 // Indian states
 export const INDIAN_STATES = [
   "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat",
@@ -56,6 +65,41 @@ export const HOBBY_SUGGESTIONS: { id: string; label: string }[] = [
   { id: "art", label: "Art" },
   { id: "writing", label: "Writing" },
 ];
+
+// Profile photo limits
+export const MAX_PROFILE_IMAGES = 5;
+
+// Profession type/category - single select when creating profile, multiselect when searching
+export const PROFESSION_TYPES = [
+  "IT / Software",
+  "Government Job",
+  "Business",
+  "Doctor",
+  "Engineer",
+  "Teacher",
+  "Private Job",
+  "Self Employed",
+  "Not Working",
+] as const;
+
+// Sub-caste options (alphabetically ordered, Others at end)
+export const SUB_CASTE_OPTIONS = [
+  "Agasa", "Akkasali", "Aradhya", "Balegala", "Banagar", "Banajiga", "Bhandari", "Bilijedaru",
+  "Bilimagga", "Chaturtha", "Dikshwant", "Ganiga", "Gowda (Gowdike)", "Gowli", "Gurav", "Hadapada",
+  "Hatgar", "Hugar/Hoogara", "Jadaru", "Jangama", "Kudu Vokkaliga", "Kumbar/Kumbara", "Kumbhar",
+  "Kuruhina", "Lolagonda", "Madivala", "Malgar", "Mali", "Neelagar", "Neygi", "Nolamba",
+  "Panchamasali", "Pattasali", "Reddy/Reddi", "Sadar", "Sajjan/Sajjanaganigar", "Setty", "Shilwant",
+  "Shiva", "Simpi", "Vani", "Others",
+] as const;
+
+// Marital status options (matches profile creation)
+export const MARITAL_STATUS_OPTIONS = [
+  "Never Married",
+  "Divorced",
+  "Widowed",
+  "Awaiting Divorce",
+  "Separated",
+] as const;
 
 // Education qualifications (suggestions)
 export const EDUCATION_SUGGESTIONS = [

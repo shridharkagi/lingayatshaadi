@@ -38,23 +38,23 @@ const EXPERIENCE_IMG_3 =
 const experienceCards = [
   {
     icon: Shield,
-    title: "20 Day Money Back Guarantee",
+    title: "Verified & Authentic Profiles",
     description:
-      "Not satisfied? Get a full refund within 20 days. We believe in our service and your peace of mind.",
+      "Every profile is verified so you connect with genuine Lingayat families. We prioritize trust and transparency in every match.",
     image: EXPERIENCE_IMG_1,
   },
   {
     icon: CheckCircle2,
-    title: "More Matches Guaranteed",
+    title: "Values-Based Matching",
     description:
-      "Connect with thousands of verified Lingayat profiles. Find your perfect match from our growing community.",
+      "Our matching considers Lingayat traditions, family expectations, and life goals—helping you find partners who share your worldview.",
     image: EXPERIENCE_IMG_2,
   },
   {
     icon: Handshake,
-    title: "Most Trusted Lingayat Matrimony",
+    title: "Family-Involved Matchmaking",
     description:
-      "Trusted by lakhs of families. The leading platform for Lingayat community matchmaking across India.",
+      "Designed for families who want to be part of the journey. Share profiles, discuss preferences, and make decisions together.",
     image: EXPERIENCE_IMG_3,
   },
 ];
@@ -68,11 +68,11 @@ const LATEST_PROFILE_IMAGES = [
 ];
 
 const latestProfiles = [
-  { name: "Priya K.", age: 28, location: "Bangalore", profession: "Software Engineer", image: LATEST_PROFILE_IMAGES[0] },
-  { name: "Rahul M.", age: 30, location: "Mumbai", profession: "Chartered Accountant", image: LATEST_PROFILE_IMAGES[1] },
-  { name: "Divya S.", age: 27, location: "Hyderabad", profession: "Doctor", image: LATEST_PROFILE_IMAGES[2] },
-  { name: "Arjun P.", age: 32, location: "Pune", profession: "Business Analyst", image: LATEST_PROFILE_IMAGES[3] },
-  { name: "Sneha R.", age: 29, location: "Chennai", profession: "Architect", image: LATEST_PROFILE_IMAGES[4] },
+  { name: "Kavya B.", age: 27, location: "Belgaum", profession: "Engineer", image: LATEST_PROFILE_IMAGES[0] },
+  { name: "Suresh G.", age: 31, location: "Hubli", profession: "Entrepreneur", image: LATEST_PROFILE_IMAGES[1] },
+  { name: "Anita J.", age: 26, location: "Dharwad", profession: "Teacher", image: LATEST_PROFILE_IMAGES[2] },
+  { name: "Mahesh K.", age: 29, location: "Gadag", profession: "Doctor", image: LATEST_PROFILE_IMAGES[3] },
+  { name: "Lakshmi P.", age: 28, location: "Bidar", profession: "Architect", image: LATEST_PROFILE_IMAGES[4] },
 ];
 
 const COMMUNITY_IMG =
@@ -81,52 +81,52 @@ const COMMUNITY_IMG =
 const successStories = [
   {
     image: COUPLE_1,
-    names: "Ravi & Shobha",
-    story: "Found each other through LingayatShaadi. Our shared values brought us together.",
+    names: "Ganesh & Meera",
+    story: "Both our families wanted a Lingayat match. This platform made it easy to find someone who understood our traditions.",
   },
   {
     image: COUPLE_2,
-    names: "Aditya & Sanjana",
-    story: "We connected within a month. The verification process gave our families confidence.",
+    names: "Basavaraj & Sunita",
+    story: "We met through a mutual community connection here. Our wedding was in Dharwad, surrounded by family.",
   },
   {
     image: COUPLE_3,
-    names: "Vikram & Priya",
-    story: "From first interest to marriage in 8 months. Truly grateful for this platform.",
+    names: "Shankar & Kavitha",
+    story: "Shared faith and similar upbringing mattered most. We found that here and married within a year.",
   },
 ];
 
 const faqs = [
   {
-    q: "Why is LingayatShaadi better compared to other matrimony websites?",
-    a: "LingayatShaadi is exclusively built for the Lingayat community, ensuring culturally relevant matches. We offer verified profiles, 20-day money-back guarantee, and a privacy-first approach. Our AI-powered matching considers community values, education, and family preferences.",
+    q: "What makes LingayatShaadi different for Lingayat matrimony?",
+    a: "We focus solely on the Lingayat community. Our platform understands Lingayat traditions, sub-castes, and family expectations. Profiles are verified, and matching prioritizes shared values, education, and lifestyle—so you meet people who truly align with your background.",
   },
   {
-    q: "How do I create my profile on LingayatShaadi?",
-    a: "Creating a profile is simple. Click Register, fill in your basic details, verify your email and mobile, and complete your profile with photos and preferences. Our team can help you at every step.",
+    q: "How do I register and create my profile?",
+    a: "Click Register, enter your basic details, and verify your email and phone. Then complete your profile with photos, education, profession, and preferences. You can add family details and what you're looking for in a partner. Our team is available if you need help.",
   },
   {
-    q: "Is my information safe and private?",
-    a: "Yes. We use industry-standard encryption and never share your contact details without your consent. You control who sees your profile and can block or report any user.",
+    q: "How is my privacy protected?",
+    a: "Your contact details are never shared without your permission. You decide who can view your profile and contact you. We use encryption and follow strict data practices. You can block or report anyone at any time.",
   },
   {
-    q: "What is the VIP LingayatShaadi service?",
-    a: "VIP LingayatShaadi offers priority support, featured profile placement, personalized matchmaking assistance, and exclusive access to verified high-interest profiles. Contact us to learn more.",
+    q: "What does Premium Matchmaking include?",
+    a: "Premium members get dedicated support, featured placement in search results, personalized match suggestions, and priority access to new profiles. Ideal for families who want extra assistance in finding the right match.",
   },
   {
-    q: "How can I contact support?",
-    a: "You can reach us via the Help section, call our toll-free number, or WhatsApp. Our support team is available 9 AM–9 PM, 7 days a week.",
+    q: "How can I get in touch with support?",
+    a: "Use the Help section, call our support line, or message us on WhatsApp. We're available 9 AM–9 PM, seven days a week, to assist with registration, matching, or any questions.",
   },
 ];
 
 const communityLinks = [
-  "Lingayat Matrimony",
-  "Kannada Matrimony",
-  "Karnataka Matrimony",
-  "Telugu Matrimony",
-  "Marwari Matrimony",
-  "Brahmin Matrimony",
-  "Jain Matrimony",
+  "Lingayat Brides",
+  "Lingayat Grooms",
+  "Karnataka Lingayat",
+  "Lingayat Professionals",
+  "Lingayat NRIs",
+  "Lingayat Sub-castes",
+  "Lingayat Families",
 ];
 
 export default function LandingPage() {
@@ -143,7 +143,7 @@ export default function LandingPage() {
   }, [loading, isLoggedIn, profileComplete, router]);
 
   return (
-    <div className="min-h-screen bg-[var(--color-bg)]">
+    <div className="min-h-screen" style={{ background: "var(--gradient-bg-warm)" }}>
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-[var(--color-border)] shadow-[var(--shadow-soft)]">
         <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-14 sm:h-16">
@@ -155,7 +155,13 @@ export default function LandingPage() {
           </Link>
           <nav className="hidden md:flex items-center gap-6">
             <Link
-              href="/login#help"
+              href="/profiles"
+              className="text-[var(--color-text-muted)] hover:text-[var(--primary)] transition"
+            >
+              Profiles
+            </Link>
+            <Link
+              href="/contact"
               className="text-[var(--color-text-muted)] hover:text-[var(--primary)] transition"
             >
               Help
@@ -186,7 +192,10 @@ export default function LandingPage() {
         </div>
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-[var(--color-border)] bg-white p-4 flex flex-col gap-2 shadow-lg relative z-[60]">
-            <Link href="/login#help" onClick={() => setMobileMenuOpen(false)}>
+            <Link href="/profiles" onClick={() => setMobileMenuOpen(false)}>
+              Profiles
+            </Link>
+            <Link href="/contact" onClick={() => setMobileMenuOpen(false)}>
               Help
             </Link>
             <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
@@ -215,31 +224,35 @@ export default function LandingPage() {
         </div>
         <div className="relative z-10 text-center text-white px-4 max-w-2xl mx-auto">
           <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-3 sm:mb-4 drop-shadow-lg">
-            Find your forever ❤️
+            Where Lingayat Values Meet Lasting Love
           </h1>
           <p className="text-lg sm:text-xl md:text-2xl text-white/95 mb-6 sm:mb-8">
-            Discover your #AlwaysTogether story in the Lingayat community
+            Connect with compatible life partners rooted in shared faith, tradition, and community
           </p>
           <Link href="/signup">
             <Button
               size="lg"
-              className="bg-[var(--primary)] hover:bg-[var(--primary-light)] border-0 text-white text-lg px-10 py-4 rounded-full shadow-lg"
+              className="border-0 text-white text-lg px-10 py-4 rounded-full shadow-lg hover:opacity-95 transition-opacity"
+              style={{ background: "var(--gradient-primary)" }}
             >
-              Join LingayatShaadi
+              Create Free Profile
             </Button>
           </Link>
         </div>
         <div className="absolute bottom-4 left-0 right-0 text-center text-white/80 text-xs sm:text-sm px-4">
-          Trust of millions • ★★★★★ 4.8 • 5 lakh+ success stories
+          Built for Lingayat families • Verified profiles • Community-first matchmaking
         </div>
       </section>
 
       {/* The LingayatShaadi Experience */}
       <section className="py-12 sm:py-16 md:py-24 px-4">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[var(--color-text-primary)] mb-8 sm:mb-12 text-center">
-            The LingayatShaadi Experience
-          </h2>
+          <div className="mb-8 sm:mb-12 text-center">
+            <div className="inline-block h-1 w-24 rounded-full mb-4" style={{ background: "var(--gradient-primary)" }} />
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[var(--color-text-primary)]">
+              Why Families Choose Us
+            </h2>
+          </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
             {experienceCards.map((card) => {
               const Icon = card.icon;
@@ -284,7 +297,7 @@ export default function LandingPage() {
             Latest Profiles
           </h2>
           <p className="text-[var(--color-text-muted)] text-center max-w-2xl mx-auto mb-8 sm:mb-10">
-            New members joining every day. Be the first to connect with these verified profiles.
+            New Lingayat members register daily. Browse verified profiles from across Karnataka and beyond.
           </p>
           <div className="overflow-x-auto pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible">
             <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-5 min-w-max sm:min-w-0">
@@ -332,25 +345,24 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* VIP Banner */}
+      {/* Premium Banner */}
       <section className="px-4 py-10 sm:py-12">
         <div className="max-w-6xl mx-auto">
-          <div className="bg-gradient-to-r from-violet-600 to-purple-700 rounded-2xl p-5 sm:p-6 md:p-8 shadow-[var(--shadow-card)] flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6">
+          <div className="rounded-2xl p-5 sm:p-6 md:p-8 shadow-[var(--shadow-card)] flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6" style={{ background: "var(--gradient-premium)" }}>
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center">
                 <span className="text-2xl">💎</span>
               </div>
               <div>
-                <h3 className="text-xl font-bold text-white">VIP LingayatShaadi</h3>
+                <h3 className="text-xl font-bold text-white">Premium Matchmaking</h3>
                 <p className="text-white/90 text-sm mt-1 max-w-md">
-                  Experience our best service & get personal matchmaking without
-                  compromising your privacy.
+                  Get dedicated support, priority profile visibility, and personalized introductions—all while keeping your data secure.
                 </p>
               </div>
             </div>
             <Link href="/login">
               <button className="bg-[var(--color-secondary-dark)] text-white px-6 py-3 rounded-full font-medium hover:bg-black transition shadow-lg whitespace-nowrap">
-                Know More
+                Learn More
               </button>
             </Link>
           </div>
@@ -366,11 +378,9 @@ export default function LandingPage() {
                 &ldquo;
               </span>
               <p className="text-xl md:text-2xl font-semibold text-[var(--color-text-primary)] -mt-4 mb-4">
-                At LingayatShaadi, it is our mission to use technology for good
-                and bring back deep, meaningful relationships within our
-                community.
+                We believe every Lingayat family deserves a dignified, respectful way to find compatible life partners—honoring our heritage while embracing modern matchmaking.
               </p>
-              <p className="text-[var(--color-text-muted)]">— LingayatShaadi Team</p>
+              <p className="text-[var(--color-text-muted)]">— The LingayatShaadi Team</p>
             </div>
             <div className="lg:w-1/2 relative aspect-[4/3] min-h-[300px]">
               <Image
@@ -392,16 +402,14 @@ export default function LandingPage() {
           <div className="flex flex-col lg:flex-row gap-8 sm:gap-12 items-start">
             <div className="lg:w-1/3">
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[var(--color-text-primary)] mb-3 sm:mb-4">
-                Real Stories, True Connections
+                Couples Who Found Love Here
               </h2>
               <p className="text-[var(--color-text-muted)] mb-6">
-                Thousands of couples have found their life partners through
-                LingayatShaadi. Read how our platform helped create meaningful
-                connections.
+                Lingayat families across Karnataka and India have found compatible partners through our platform. Here are a few of their journeys.
               </p>
               <Link href="/login">
                 <Button variant="outline" className="rounded-full">
-                  VIEW ALL
+                  Read More Stories
                 </Button>
               </Link>
             </div>
@@ -497,11 +505,10 @@ export default function LandingPage() {
             </div>
             <div className="p-6 md:p-8 flex-1">
             <h2 className="text-xl sm:text-2xl font-bold text-[var(--color-text-primary)] mb-4">
-              Community Matrimony Services
+              Serving the Lingayat Community
             </h2>
             <p className="text-[var(--color-text-muted)] mb-6 text-sm sm:text-base">
-              We specialize in community-specific matchmaking. Explore our
-              services for{" "}
+              We connect Lingayat brides and grooms across Karnataka, India, and the diaspora. Whether you're looking for{" "}
               {communityLinks.slice(0, 3).map((c, i) => (
                 <span key={c}>
                   <Link href="/signup" className="text-[var(--primary)] hover:underline">
@@ -510,7 +517,7 @@ export default function LandingPage() {
                   {i < 2 && ", "}
                 </span>
               ))}{" "}
-              and many more communities across India.
+              —we're here to help you find the right match.
             </p>
             <div className="flex flex-wrap gap-2">
               {communityLinks.map((c) => (
@@ -537,13 +544,13 @@ export default function LandingPage() {
               <span className="font-bold text-lg">LingayatShaadi</span>
             </Link>
             <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-sm">
-              <Link href="/login#help" className="hover:text-[var(--primary)] transition">
+              <Link href="/contact" className="hover:text-[var(--primary)] transition">
                 Contact Us
               </Link>
-              <Link href="/login#privacy" className="hover:text-[var(--primary)] transition">
+              <Link href="/privacy" className="hover:text-[var(--primary)] transition">
                 Privacy Policy
               </Link>
-              <Link href="/login#terms" className="hover:text-[var(--primary)] transition">
+              <Link href="/terms" className="hover:text-[var(--primary)] transition">
                 Terms of Use
               </Link>
             </div>

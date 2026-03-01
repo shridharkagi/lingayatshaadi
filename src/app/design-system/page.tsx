@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, Check, AlertCircle, Info, AlertTriangle } from "lucide-react";
+import { ChevronLeft, Check, AlertCircle, Info, AlertTriangle, Briefcase, MapPin } from "lucide-react";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -19,6 +19,16 @@ function ColorSwatch({ name, value, className }: { name: string; value: string; 
   return (
     <div className="flex flex-col">
       <div className={`w-full h-20 rounded-[10px] mb-2 ${className} border border-[var(--color-border)]`} />
+      <p className="font-medium text-sm text-[var(--color-text-primary)]">{name}</p>
+      <p className="text-xs text-[var(--color-text-muted)]">{value}</p>
+    </div>
+  );
+}
+
+function GradientSwatch({ name, value, style }: { name: string; value: string; style: React.CSSProperties }) {
+  return (
+    <div className="flex flex-col">
+      <div className="w-full h-20 rounded-[10px] mb-2 border border-[var(--color-border)]" style={style} />
       <p className="font-medium text-sm text-[var(--color-text-primary)]">{name}</p>
       <p className="text-xs text-[var(--color-text-muted)]">{value}</p>
     </div>
@@ -94,7 +104,8 @@ export default function DesignSystemPage() {
 
         {/* 2. Color Palette */}
         <Section title="2. Color Palette">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6">
+          <p className="text-sm text-[var(--color-text-muted)] mb-4">Solid colors for typography, forms, and semantic UI.</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6 mb-10">
             <ColorSwatch name="Primary" value="#E67300" className="bg-[var(--color-primary)]" />
             <ColorSwatch name="Primary Hover" value="#CC6600" className="bg-[var(--color-primary-hover)]" />
             <ColorSwatch name="Gold Accent" value="#D4AF37" className="bg-[var(--color-accent-gold)]" />
@@ -104,6 +115,13 @@ export default function DesignSystemPage() {
             <ColorSwatch name="Charcoal" value="#1C1C1C" className="bg-[var(--color-secondary-dark)]" />
             <ColorSwatch name="White" value="#FFFFFF" className="bg-[var(--color-white)]" />
           </div>
+          <p className="text-sm text-[var(--color-text-muted)] mb-4">Gradients for hero CTAs, premium sections, and visual depth.</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
+            <GradientSwatch name="Primary (Saffron → Gold)" value="135deg" style={{ background: "var(--gradient-primary)" }} />
+            <GradientSwatch name="Primary Hover" value="135deg, darker" style={{ background: "var(--gradient-primary-hover)" }} />
+            <GradientSwatch name="Premium (Gold → Saffron)" value="135deg" style={{ background: "var(--gradient-premium)" }} />
+            <GradientSwatch name="Warm Background" value="180deg, subtle" style={{ background: "var(--gradient-bg-warm)" }} />
+          </div>
         </Section>
 
         {/* 3. Buttons */}
@@ -111,7 +129,10 @@ export default function DesignSystemPage() {
           <div className="space-y-6 bg-[var(--color-bg-card)] rounded-[10px] p-8 shadow-[var(--shadow-card)]">
             <div className="flex flex-wrap gap-4 items-center">
               <button className="px-6 py-3 rounded-[10px] font-medium bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] transition-colors shadow-[var(--shadow-soft)]">
-                Primary
+                Primary (Solid)
+              </button>
+              <button className="px-6 py-3 rounded-[10px] font-medium text-white shadow-[var(--shadow-soft)] transition-all hover:opacity-95" style={{ background: "var(--gradient-primary)" }}>
+                Primary (Gradient)
               </button>
               <button className="px-6 py-3 rounded-[10px] font-medium bg-[var(--color-primary-hover)] text-white shadow-[var(--shadow-soft)]">
                 Primary Hover
@@ -129,8 +150,8 @@ export default function DesignSystemPage() {
               <button disabled className="px-6 py-3 rounded-[10px] font-medium bg-[var(--color-primary)]/50 text-white cursor-not-allowed opacity-60">
                 Disabled
               </button>
-              <button className="px-6 py-3 rounded-[10px] font-medium bg-[var(--color-accent-gold)] text-[var(--color-secondary-dark)] hover:opacity-90 transition-opacity shadow-[var(--shadow-soft)]">
-                Gold Badge (Premium)
+              <button className="px-6 py-3 rounded-[10px] font-medium text-[var(--color-secondary-dark)] hover:opacity-95 transition-opacity shadow-[var(--shadow-soft)]" style={{ background: "var(--gradient-premium)" }}>
+                Premium (Gradient)
               </button>
             </div>
             <div className="flex flex-wrap gap-4 items-center">
@@ -242,9 +263,15 @@ export default function DesignSystemPage() {
               </div>
               <div className="p-4">
                 <h3 className="font-semibold text-[var(--color-secondary-dark)]">Rajesh K.</h3>
-                <p className="text-sm text-[var(--color-text-muted)] mt-0.5">28 yrs • 5.8" • Never Married</p>
-                <p className="text-sm text-[var(--color-text-muted)] mt-1">Bangalore, Karnataka</p>
-                <p className="text-sm text-[var(--color-text-muted)]">Software Engineer</p>
+                <p className="text-sm text-[var(--color-text-muted)] mt-0.5">28 yrs • 5.8"</p>
+                <p className="text-sm text-[var(--color-text-muted)] mt-1 flex items-center gap-1">
+                  <Briefcase size={12} className="flex-shrink-0" />
+                  Software Engineer
+                </p>
+                <p className="text-sm text-[var(--color-text-muted)] mt-1 flex items-center gap-1">
+                  <MapPin size={12} className="flex-shrink-0" />
+                  Bangalore, Karnataka
+                </p>
                 <button className="mt-4 w-full py-2.5 rounded-[10px] font-medium text-sm bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] transition-colors">
                   View Profile
                 </button>
@@ -262,7 +289,7 @@ export default function DesignSystemPage() {
 
             {/* Premium Card */}
             <div className="bg-[var(--color-bg-card)] rounded-[10px] p-6 shadow-[var(--shadow-card)] border-2 border-[var(--color-accent-gold)] relative overflow-hidden">
-              <div className="absolute top-0 right-0 px-4 py-1 rounded-bl-[10px] bg-[var(--color-accent-gold)] text-[var(--color-secondary-dark)] text-xs font-bold">
+              <div className="absolute top-0 right-0 px-4 py-1 rounded-bl-[10px] text-[var(--color-secondary-dark)] text-xs font-bold" style={{ background: "var(--gradient-premium)" }}>
                 PREMIUM
               </div>
               <h3 className="font-semibold text-lg text-[var(--color-secondary-dark)] mb-2 pt-4">Premium Card</h3>
@@ -479,6 +506,7 @@ export default function DesignSystemPage() {
               <li>• Soft shadow only — avoid harsh shadows</li>
               <li>• No harsh black backgrounds — use charcoal sparingly</li>
               <li>• Background should remain warm white (#FFF8F2)</li>
+              <li>• Gradients: hero CTAs, premium badges, VIP banners — keep forms and alerts solid</li>
               <li>• Gold must be used sparingly for premium/verified</li>
               <li>• Primary saffron is main action color</li>
               <li>• Maintain strong hierarchy and clean spacing</li>

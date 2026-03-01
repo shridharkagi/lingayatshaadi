@@ -23,6 +23,16 @@ export function wordCount(text: string | undefined): number {
 }
 
 /**
+ * Get current photo count for a profile (profilePhoto + photos, deduplicated)
+ */
+export function getCurrentPhotoCount(profile: { profilePhoto?: string; photos?: string[] }): number {
+  const profilePhoto = profile.profilePhoto?.trim();
+  const photos = (profile.photos || []).filter((p) => p?.trim());
+  const unique = new Set([...(profilePhoto ? [profilePhoto] : []), ...photos]);
+  return unique.size;
+}
+
+/**
  * Format date to dd/mm/yyyy
  */
 export function formatDateDDMMYYYY(dateStr: string | undefined): string {

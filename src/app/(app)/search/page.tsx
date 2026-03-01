@@ -1,26 +1,74 @@
 "use client";
 
-import { useState } from "react";
-import { Search, SlidersHorizontal } from "lucide-react";
-import { mockProfiles } from "@/data/mock";
-import { Input } from "@/components/ui/Input";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { Search, SlidersHorizontal, LayoutGrid, List, ChevronDown, ChevronUp } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { useProfiles } from "@/contexts/ProfilesContext";
 import { ProfileCard } from "@/components/ui/ProfileCard";
+import { SearchFilters, defaultFilters, type SearchFiltersState } from "@/components/SearchFilters";
+import { useFilteredProfiles } from "@/hooks/useFilteredProfiles";
+import { debounce } from "@/lib/security";
 
 export default function SearchPage() {
+  const { profiles } = useProfiles();
   const [query, setQuery] = useState("");
-  const [view, setView] = useState<"list" | "grid">("list");
-  const [showFilters, setShowFilters] = useState(false);
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [view, setView] = useState<"list" | "grid">("grid");
+  const [showFilters, setShowFilters] = useState(false); // Default to collapsed on mobile
+  const [filters, setFilters] = useState<SearchFiltersState>(defaultFilters);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  // Debounced search query
+  const debouncedSetQuery = useMemo(
+    () => debounce((value: string) => setDebouncedQuery(value), 300),
+    []
+  );
+
+  useEffect(() => {
+    debouncedSetQuery(query);
+  }, [query, debouncedSetQuery]);
+
+  // Check if desktop on mount
+  useEffect(() => {
+    const checkDesktop = () => {
+      setIsDesktop(window.innerWidth >= 1024);
+      setShowFilters(window.innerWidth >= 1024); // Show filters by default on desktop
+    };
+    checkDesktop();
+    window.addEventListener("resize", checkDesktop);
+    return () => window.removeEventListener("resize", checkDesktop);
+  }, []);
+
+  // Memoized filtered profiles
+  const filteredProfiles = useFilteredProfiles(profiles, filters, debouncedQuery);
+
+  // Count active filters - memoized
+  const activeFiltersCount = useMemo(() => {
+    return (
+      (filters.profileType ? 1 : 0) +
+      (filters.ageRange[0] !== 18 || filters.ageRange[1] !== 60 ? 1 : 0) +
+      filters.maritalStatuses.length +
+      filters.professionTypes.length
+    );
+  }, [filters]);
+
+  // Memoized clear filters callback
+  const handleClearFilters = useCallback(() => {
+    setQuery("");
+    setDebouncedQuery("");
+    setFilters(defaultFilters);
+  }, []);
 
   return (
-    <div className="max-w-6xl mx-auto w-full">
+    <div className="max-w-6xl mx-auto w-full pb-6">
       <header className="bg-white border-b border-[var(--border)] px-4 py-4 sticky top-0 z-10">
-        <h1 className="text-xl font-bold text-[var(--foreground)] mb-4">Search</h1>
+        <h1 className="text-lg sm:text-xl font-bold text-[var(--foreground)] mb-4">Search</h1>
         <div className="flex gap-2">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} aria-hidden />
             <input
               type="text"
-              placeholder="Search by name, profession..."
+              placeholder="Search by name, profession, city..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
@@ -28,52 +76,67 @@ export default function SearchPage() {
           </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`p-2.5 rounded-xl border ${showFilters ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}
+            className={`relative p-2.5 rounded-xl border flex items-center gap-1 min-w-[44px] transition ${
+              showFilters ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"
+            }`}
+            aria-label={showFilters ? "Hide filters" : "Show filters"}
+            aria-expanded={showFilters}
           >
             <SlidersHorizontal size={20} />
+            <span className="hidden sm:inline text-sm">Filters</span>
+            {!showFilters && activeFiltersCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-[var(--primary)] text-white text-xs rounded-full flex items-center justify-center font-bold">
+                {activeFiltersCount}
+              </span>
+            )}
+            <span className="hidden lg:inline">
+              {showFilters ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </span>
           </button>
           <button
             onClick={() => setView(view === "list" ? "grid" : "list")}
-            className="p-2.5 rounded-xl border border-[var(--border)]"
+            className="p-2.5 rounded-xl border border-[var(--border)] flex items-center gap-1 min-w-[44px]"
+            aria-label={view === "list" ? "Switch to grid view" : "Switch to list view"}
           >
-            {view === "list" ? "⊞" : "≡"}
+            {view === "list" ? <LayoutGrid size={20} /> : <List size={20} />}
           </button>
         </div>
+
         {showFilters && (
-          <div className="mt-4 p-4 bg-gray-50 rounded-xl space-y-3">
-            <Input label="Age" placeholder="e.g. 25-35" />
-            <Input label="Height" placeholder="e.g. 5.5 - 6.0" />
-            <Input label="Religion" placeholder="Lingayat" />
-            <Input label="Education" placeholder="Any" />
-            <Input label="Profession" placeholder="Any" />
-            <Input label="City" placeholder="Any" />
+          <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-[var(--color-border)] animate-slideDown">
+            <SearchFilters
+              filters={filters}
+              onChange={setFilters}
+              compact
+            />
           </div>
         )}
       </header>
 
       <div className="p-4">
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-          {["All", "Recommended", "New", "Premium", "Nearby"].map((tab) => (
-            <button
-              key={tab}
-              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${
-                tab === "All" ? "bg-[var(--primary)] text-white" : "bg-gray-100 text-gray-600"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
+        <p className="text-sm sm:text-base text-[var(--color-text-muted)] mb-4">
+          {filteredProfiles.length} profile{filteredProfiles.length !== 1 ? "s" : ""} found
+        </p>
 
-        {view === "list" ? (
+        {filteredProfiles.length === 0 ? (
+          <EmptyState
+            icon={Search}
+            title="No profiles found"
+            description="Try adjusting your search query or filters to see more results"
+            action={{
+              label: "Clear Filters",
+              onClick: handleClearFilters,
+            }}
+          />
+        ) : view === "list" ? (
           <div className="space-y-4">
-            {mockProfiles.map((profile) => (
+            {filteredProfiles.map((profile) => (
               <ProfileCard key={profile.id} profile={profile} variant="list" />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            {mockProfiles.map((profile) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
+            {filteredProfiles.map((profile) => (
               <ProfileCard key={profile.id} profile={profile} />
             ))}
           </div>

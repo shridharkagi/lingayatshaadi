@@ -7,8 +7,11 @@ import { Heart, ChevronLeft, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { HobbiesSelector } from "@/components/ui/HobbiesSelector";
+import { PhotoUpload } from "@/components/PhotoUpload";
 import { useAuth } from "@/contexts/AuthContext";
 import { Profile } from "@/types";
+import { PROFESSION_TYPES } from "@/data/constants";
+import { SubCasteSelector } from "@/components/ui/SubCasteSelector";
 
 const steps = [
   { id: 1, title: "About Me" },
@@ -27,6 +30,8 @@ const initialProfile: Partial<Profile> = {
   caste: "Lingayat",
   subCaste: "",
   height: "",
+  languagesKnown: "",
+  motherTongue: "",
   dateOfBirth: "",
   timeOfBirth: "",
   placeOfBirth: "",
@@ -67,15 +72,28 @@ export default function ProfileCompletePage() {
     if (signupData && signupEmail) {
       try {
         const data = JSON.parse(signupData);
-        setProfile((p) => ({
-          ...p,
-          fullName: data.fullName,
-          dateOfBirth: data.dateOfBirth,
-          gender: data.gender,
-          contact: data.mobile || undefined,
-          city: data.city || undefined,
-          email: signupEmail,
-        }));
+        const profileFor = data.profileFor as "self" | "parent" | undefined;
+        if (profileFor === "parent") {
+          setProfile((p) => ({
+            ...p,
+            contact: data.mobile || undefined,
+            city: data.city || undefined,
+            email: signupEmail,
+            managedBy: "parent",
+            accountHolderName: data.fullName,
+          }));
+        } else {
+          setProfile((p) => ({
+            ...p,
+            fullName: data.fullName,
+            dateOfBirth: data.dateOfBirth,
+            gender: data.gender,
+            contact: data.mobile || undefined,
+            city: data.city || undefined,
+            email: signupEmail,
+            managedBy: "self",
+          }));
+        }
       } catch {
         // ignore
       }
@@ -164,7 +182,20 @@ export default function ProfileCompletePage() {
 
         {step === 2 && (
           <div className="space-y-4">
-            <Input label="Full Name" value={profile.fullName || ""} onChange={(e) => update("fullName", e.target.value)} />
+            <Input label="Full Name" value={profile.fullName || ""} onChange={(e) => update("fullName", e.target.value)} placeholder="Profile holder's name" />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+              <select
+                value={profile.gender || ""}
+                onChange={(e) => update("gender", e.target.value as "male" | "female" | "other")}
+                className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent transition-all"
+              >
+                <option value="">Select gender</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Marital Status</label>
               <select
@@ -182,8 +213,10 @@ export default function ProfileCompletePage() {
             </div>
             <Input label="Date of Birth" type="date" value={profile.dateOfBirth || ""} onChange={(e) => update("dateOfBirth", e.target.value)} />
             <Input label="Caste" value={profile.caste || ""} onChange={(e) => update("caste", e.target.value)} />
-            <Input label="Sub-Caste" value={profile.subCaste || ""} onChange={(e) => update("subCaste", e.target.value)} />
+            <SubCasteSelector value={profile.subCaste || ""} onChange={(v) => update("subCaste", v)} />
             <Input label="Height (ft)" placeholder="e.g. 5.8" value={profile.height || ""} onChange={(e) => update("height", e.target.value)} />
+            <Input label="Languages Known" placeholder="e.g. Kannada, Hindi, English" value={profile.languagesKnown || ""} onChange={(e) => update("languagesKnown", e.target.value)} />
+            <Input label="Mother Tongue" placeholder="e.g. Kannada" value={profile.motherTongue || ""} onChange={(e) => update("motherTongue", e.target.value)} />
           </div>
         )}
 
@@ -207,8 +240,22 @@ export default function ProfileCompletePage() {
         {step === 4 && (
           <div className="space-y-4">
             <Input label="Qualification" placeholder="e.g. B.Tech, M.Sc" value={profile.qualification || ""} onChange={(e) => update("qualification", e.target.value)} />
-            <Input label="Profession Type" placeholder="e.g. Engineer, Doctor" value={profile.professionType || ""} onChange={(e) => update("professionType", e.target.value)} />
-            <Input label="Profession" value={profile.profession || ""} onChange={(e) => update("profession", e.target.value)} />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Profession Type</label>
+              <select
+                value={profile.professionType || ""}
+                onChange={(e) => update("professionType", e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent transition-all"
+              >
+                <option value="">Select profession type</option>
+                {PROFESSION_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Input label="Profession" placeholder="e.g. Software Engineer, Senior CA" value={profile.profession || ""} onChange={(e) => update("profession", e.target.value)} />
             <Input label="Company Name" value={profile.companyName || ""} onChange={(e) => update("companyName", e.target.value)} />
             <Input label="Annual Income" placeholder="e.g. 10-12 Lakhs" value={profile.annualIncome || ""} onChange={(e) => update("annualIncome", e.target.value)} />
           </div>
@@ -234,14 +281,33 @@ export default function ProfileCompletePage() {
 
         {step === 6 && (
           <div className="space-y-4">
-            <div className="border-2 border-dashed border-[var(--border)] rounded-xl h-48 flex flex-col items-center justify-center gap-2">
-              <div className="w-16 h-16 rounded-full bg-[var(--primary)]/10 flex items-center justify-center">
-                <span className="text-2xl">📷</span>
-              </div>
-              <p className="text-gray-600 text-sm">Add your profile photo</p>
-              <Button variant="outline" size="sm">Upload Photo</Button>
-            </div>
-            <p className="text-gray-500 text-sm">Add multiple photos (optional)</p>
+            <p className="text-gray-600 text-sm">Add up to 5 photos. First photo will be your profile photo. Images are compressed and converted to WebP.</p>
+            <PhotoUpload
+              currentPhotos={[
+                ...(profile.profilePhoto ? [profile.profilePhoto] : []),
+                ...(profile.photos || []).filter((p) => p !== profile.profilePhoto),
+              ]}
+              onAdd={(url) => {
+                const isFirst = !profile.profilePhoto && (profile.photos?.length ?? 0) === 0;
+                if (isFirst) {
+                  setProfile((prev) => ({ ...prev, profilePhoto: url, photos: [] }));
+                } else {
+                  setProfile((prev) => ({
+                    ...prev,
+                    photos: [...(prev.photos || []).filter((p) => p !== prev.profilePhoto), url],
+                  }));
+                }
+              }}
+              onRemove={(url) => {
+                if (url === profile.profilePhoto) {
+                  const rest = (profile.photos || []).filter((p) => p !== url);
+                  setProfile((prev) => ({ ...prev, profilePhoto: rest[0], photos: rest.slice(1) }));
+                } else {
+                  setProfile((prev) => ({ ...prev, photos: (prev.photos || []).filter((p) => p !== url) }));
+                }
+              }}
+              userId={user?.id || user?.memberId || "new-user"}
+            />
           </div>
         )}
 

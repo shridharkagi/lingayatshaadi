@@ -5,14 +5,17 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Send } from "lucide-react";
-import { mockProfiles } from "@/data/mock";
+import { useProfiles } from "@/contexts/ProfilesContext";
 import { mockMessages } from "@/data/mock";
+import { getProfileSlug } from "@/lib/memberId";
 
 export default function ChatPage() {
   const params = useParams();
   const router = useRouter();
+  const { profiles } = useProfiles();
   const [message, setMessage] = useState("");
-  const profile = mockProfiles.find((p) => p.id === params.id);
+  const id = typeof params.id === "string" ? params.id : params.id?.[0];
+  const profile = profiles.find((p) => p.id === id);
   const messages = mockMessages.filter(
     (m) =>
       (m.senderId === params.id && m.receiverId === "current") ||
@@ -27,7 +30,7 @@ export default function ChatPage() {
         <button onClick={() => router.back()} className="p-2 -ml-2 rounded-lg">
           ←
         </button>
-        <Link href={`/profile/${profile.id}`} className="flex items-center gap-3 flex-1">
+        <Link href={`/profile/${getProfileSlug(profile)}`} className="flex items-center gap-3 flex-1">
           <div className="w-10 h-10 rounded-full overflow-hidden">
             <Image
               src={profile.profilePhoto || "/placeholder.svg"}

@@ -15,7 +15,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="max-w-lg mx-auto">
+    <div className="max-w-lg mx-auto pb-6">
       <header className="bg-white border-b border-[var(--border)] px-4 py-4">
         <h1 className="text-xl font-bold text-[var(--foreground)]">Settings</h1>
       </header>
