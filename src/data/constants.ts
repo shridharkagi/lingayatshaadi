@@ -107,3 +107,12 @@ export const EDUCATION_SUGGESTIONS = [
   "MBBS", "BDS", "B.Pharm", "B.Ed", "M.Sc", "M.Com", "M.A", "M.Tech", "M.E", "MBA", "MCA",
   "CA", "CS", "ICWA", "LLB", "LLM", "PhD", "Other"
 ];
+
+// Food habits options
+export const FOOD_HABITS_OPTIONS = [
+  "Vegetarian",
+  "Non-Vegetarian",
+  "Eggetarian",
+  "Vegan",
+  "Jain",
+] as const;

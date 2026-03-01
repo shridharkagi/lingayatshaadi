@@ -7,7 +7,8 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  const isSuperAdmin = user?.role === "superadmin";
 
   const handleLogout = () => {
     logout();
@@ -47,11 +48,13 @@ export default function SettingsPage() {
             <span className="flex-1 font-medium">Help & Support</span>
             <ChevronRight size={20} className="text-gray-400" />
           </Link>
-          <Link href="/superadmin" className="flex items-center gap-3 p-4">
-            <LayoutDashboard size={20} className="text-gray-500" />
-            <span className="flex-1 font-medium">Super Admin</span>
-            <ChevronRight size={20} className="text-gray-400" />
-          </Link>
+          {isSuperAdmin && (
+            <Link href="/superadmin" className="flex items-center gap-3 p-4">
+              <LayoutDashboard size={20} className="text-gray-500" />
+              <span className="flex-1 font-medium">Super Admin</span>
+              <ChevronRight size={20} className="text-gray-400" />
+            </Link>
+          )}
         </div>
 
         <button
