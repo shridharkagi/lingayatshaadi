@@ -75,6 +75,7 @@
 
 /* Spacing Scale (8px base) */
 :root {
+  --spacing: 0.25rem;   /* 4px base unit */
   --space-1: 0.25rem;   /* 4px */
   --space-2: 0.5rem;    /* 8px */
   --space-3: 0.75rem;   /* 12px */
@@ -92,6 +93,11 @@
   --blur-md: 6px;
   --shadow-soft: 0 2px 12px rgba(0, 0, 0, 0.06);
   --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+/* Custom bottom positioning for floating button */
+.bottom-24 {
+  bottom: calc(var(--spacing) * 18);
 }
 
 /* Responsive base font - scales better on mobile (min 14px, max 16px) */

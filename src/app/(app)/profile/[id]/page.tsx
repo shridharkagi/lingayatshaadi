@@ -124,12 +124,7 @@ export default function OtherProfilePage() {
   const { isLoggedIn } = useAuth();
   const { config } = useAppConfig();
   const { profiles } = useProfiles();
-  const [showContact, setShowContact] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("show_contact_details") === "true";
-    }
-    return false;
-  });
+  const [showContact, setShowContact] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [hasShownInterest, setHasShownInterest] = useState(false);
@@ -142,13 +137,6 @@ export default function OtherProfilePage() {
   useEffect(() => {
     setDisplayedSlug(slugFromParams);
   }, [slugFromParams]);
-
-  // Save contact visibility preference
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("show_contact_details", showContact.toString());
-    }
-  }, [showContact]);
 
   const profile = (() => {
     const publicId = parseProfileSlug(slugFromParams);
@@ -165,6 +153,11 @@ export default function OtherProfilePage() {
   const displayedId = profile?.id ?? displayedSlug;
   const [animClass, setAnimClass] = useState("");
   const [isTransitioning, setIsTransitioning] = useState(false);
+
+  // Reset showContact when profile changes
+  useEffect(() => {
+    setShowContact(false);
+  }, [profile?.id]);
 
   const goPrev = useCallback(() => {
     if (currentIdx <= 0 || isTransitioning) return;
