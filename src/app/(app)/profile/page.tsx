@@ -60,7 +60,7 @@ export default function MyProfilePage() {
   return (
     <div className="w-full max-w-2xl mx-auto min-h-screen bg-[var(--background)]">
       {/* Orange Header with rounded bottom corners */}
-      <header className="bg-[var(--primary)] text-white px-6 py-6 rounded-b-[32px] shadow-lg">
+      <header className="bg-[var(--primary)] text-white px-6 py-5 rounded-b-[20px] shadow-md">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold">My Profile</h1>
           <div className="flex items-center gap-2">
@@ -78,26 +78,26 @@ export default function MyProfilePage() {
         </div>
       </header>
 
-      <div className="px-4 -mt-2">
+      <div className="px-4 mt-4">
         {/* Profile Picture Card */}
-        <div className="bg-white rounded-3xl shadow-lg overflow-hidden mb-6">
+        <div className="bg-white rounded-2xl shadow-md overflow-hidden mb-4">
           <div className="relative h-64 bg-gradient-to-br from-gray-100 to-gray-200">
             <Image
               src={user.profilePhoto || "/placeholder.svg"}
               alt={user.fullName}
               fill
-              className="object-cover"
+              className="object-cover rounded-t-2xl"
               unoptimized
               priority
             />
             {/* Profile Info Overlay */}
-            <div className="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-black/80 via-black/50 to-transparent">
+            <div className="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-black/70 via-black/40 to-transparent">
               <h2 className="text-xl font-bold text-white mb-1">{user.fullName}</h2>
-              <p className="text-white/90 text-sm mb-1.5">
+              <p className="text-white/95 text-sm mb-1.5">
                 {getAge(user.dateOfBirth)} yrs • {user.height}&quot;
               </p>
               {user.profession && (
-                <p className="text-white/90 text-sm flex items-center gap-1.5">
+                <p className="text-white/95 text-sm flex items-center gap-1.5">
                   <Briefcase size={14} className="flex-shrink-0" />
                   {user.profession}
                 </p>
@@ -105,7 +105,7 @@ export default function MyProfilePage() {
             </div>
             {/* Verification Badge */}
             {user.verified && (
-              <div className="absolute top-3 right-3 bg-[var(--color-accent-gold)] text-[var(--color-secondary-dark)] text-xs px-3 py-1.5 rounded-full flex items-center gap-1 font-semibold shadow-md">
+              <div className="absolute top-3 right-3 bg-[var(--color-accent-gold)] text-[var(--color-secondary-dark)] text-xs px-3 py-1.5 rounded-full flex items-center gap-1 font-semibold shadow-sm">
                 <Shield size={14} fill="currentColor" />
                 Verified
               </div>
@@ -113,21 +113,21 @@ export default function MyProfilePage() {
             {/* Camera Button - Orange Circular */}
             <Link 
               href="/profile/photos" 
-              className="absolute bottom-3 right-3 p-3.5 rounded-full bg-[var(--primary)] hover:bg-[var(--primary-hover)] transition shadow-lg"
+              className="absolute bottom-3 right-3 p-3 rounded-full bg-[var(--primary)] hover:bg-[var(--primary-hover)] transition shadow-md"
             >
-              <Camera size={22} className="text-white" />
+              <Camera size={20} className="text-white" />
             </Link>
           </div>
         </div>
 
         {/* Menu Options - Clean White Cards */}
-        <div className="space-y-3 mb-6">
+        <div className="space-y-3 mb-4">
           <Link 
             href="/profile/edit" 
-            className="flex items-center justify-between p-4 rounded-2xl bg-white hover:bg-gray-50 transition shadow-sm border border-gray-100"
+            className="flex items-center justify-between p-4 rounded-xl bg-white hover:bg-gray-50 transition shadow-sm"
           >
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-[var(--primary)]/10">
+              <div className="p-2 rounded-lg bg-[var(--primary)]/10">
                 <Edit2 size={20} className="text-[var(--primary)]" />
               </div>
               <span className="font-medium text-[var(--foreground)]">Edit Profile</span>
@@ -137,10 +137,10 @@ export default function MyProfilePage() {
 
           <Link 
             href="/profile/preferences" 
-            className="flex items-center justify-between p-4 rounded-2xl bg-white hover:bg-gray-50 transition shadow-sm border border-gray-100"
+            className="flex items-center justify-between p-4 rounded-xl bg-white hover:bg-gray-50 transition shadow-sm"
           >
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-[var(--primary)]/10">
+              <div className="p-2 rounded-lg bg-[var(--primary)]/10">
                 <Heart size={20} className="text-[var(--primary)]" />
               </div>
               <span className="font-medium text-[var(--foreground)]">Match Preferences</span>
@@ -150,10 +150,10 @@ export default function MyProfilePage() {
 
           <Link 
             href="/profile/photos" 
-            className="flex items-center justify-between p-4 rounded-2xl bg-white hover:bg-gray-50 transition shadow-sm border border-gray-100"
+            className="flex items-center justify-between p-4 rounded-xl bg-white hover:bg-gray-50 transition shadow-sm"
           >
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-[var(--primary)]/10">
+              <div className="p-2 rounded-lg bg-[var(--primary)]/10">
                 <Images size={20} className="text-[var(--primary)]" />
               </div>
               <span className="font-medium text-[var(--foreground)]">Photo Gallery</span>
@@ -163,10 +163,10 @@ export default function MyProfilePage() {
 
           <Link 
             href="/membership" 
-            className="flex items-center justify-between p-4 rounded-2xl bg-white hover:bg-gray-50 transition shadow-sm border border-gray-100"
+            className="flex items-center justify-between p-4 rounded-xl bg-white hover:bg-gray-50 transition shadow-sm"
           >
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-[var(--primary)]/10">
+              <div className="p-2 rounded-lg bg-[var(--primary)]/10">
                 <Shield size={20} className="text-[var(--primary)]" />
               </div>
               <span className="font-medium text-[var(--foreground)]">Trust Badge & Membership</span>
@@ -176,7 +176,7 @@ export default function MyProfilePage() {
         </div>
 
         {/* Profile Details Section */}
-        <div className="bg-white rounded-2xl shadow-sm p-5 mb-6">
+        <div className="bg-white rounded-xl shadow-sm p-5 mb-6">
           <h3 className="font-semibold text-lg text-[var(--foreground)] mb-4">Profile Details</h3>
           
           {user.aboutMeVisible && user.aboutMe && (
