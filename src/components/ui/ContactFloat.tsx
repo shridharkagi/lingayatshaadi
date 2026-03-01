@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Phone, MessageCircle, Users2, X } from "lucide-react";
 import { useAppConfig } from "@/contexts/AppConfigContext";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 export function ContactFloat() {
   const { config } = useAppConfig();
+  const pathname = usePathname();
   const [popupOpen, setPopupOpen] = useState(false);
+  const [whatsappUrl, setWhatsappUrl] = useState("");
 
   const hasCall = !!config.callContactNumber?.trim();
   const hasWhatsApp = !!config.whatsappContactNumber?.trim();
@@ -16,8 +19,23 @@ export function ContactFloat() {
   if (!hasCall && !hasWhatsApp && !hasWhatsAppGroup) return null;
 
   const whatsappNumber = config.whatsappContactNumber?.replace(/\D/g, "");
-  const whatsappMessage = (config.whatsappDefaultMessage || "I need assistance, my name: ").trim();
-  const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`;
+
+  // Update WhatsApp URL based on current page
+  useEffect(() => {
+    if (!whatsappNumber) return;
+
+    let message = "";
+    const currentUrl = typeof window !== "undefined" ? window.location.href : "";
+
+    // Check if we're on a profile page
+    if (pathname && pathname.startsWith("/profile/") && pathname !== "/profile/complete") {
+      message = `I need more information about the profile ${currentUrl}.\n\nMy name is: `;
+    } else {
+      message = config.whatsappDefaultMessage || "I need assistance, my name: ";
+    }
+
+    setWhatsappUrl(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`);
+  }, [pathname, whatsappNumber, config.whatsappDefaultMessage]);
 
   return (
     <>
