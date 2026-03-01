@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import { createSupabaseClient } from "@/lib/supabase";
+import { createSupabaseClientSafe } from "@/lib/supabase";
 import { parseProfileSlug } from "@/lib/memberId";
 import { getAge } from "@/lib/utils";
 
@@ -11,17 +11,14 @@ type Props = {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   
-  // Check if Supabase is configured before attempting connection
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  
   let profile = null;
   
-  // Only attempt Supabase query if credentials are configured
-  if (supabaseUrl && supabaseKey) {
-    try {
+  // Try to fetch profile data from Supabase if configured
+  try {
+    const supabase = createSupabaseClientSafe();
+    
+    if (supabase) {
       const publicId = parseProfileSlug(id);
-      const supabase = createSupabaseClient();
       
       if (publicId) {
         const { data } = await supabase
@@ -31,9 +28,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
           .single();
         profile = data;
       }
-    } catch (error) {
-      console.log("Supabase not configured, using default metadata");
     }
+  } catch (error) {
+    console.log("Error fetching profile metadata, using defaults:", error);
   }
 
   // Return default metadata when Supabase isn't connected or profile not found

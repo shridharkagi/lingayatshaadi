@@ -6,13 +6,23 @@ import { MessageCircle } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useProfiles } from "@/contexts/ProfilesContext";
 import { mockMessages } from "@/data/mock";
+import { useState, useEffect } from "react";
 
 export default function MessagesPage() {
+  const [mounted, setMounted] = useState(false);
   const { profiles } = useProfiles();
+  
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  
   const profile2 = profiles.find((p) => p.id === "2");
   const conversations = profile2
     ? [{ profile: profile2, lastMessage: mockMessages[2], unread: 1 }]
     : [];
+
+  // Don't render until mounted on client side
+  if (!mounted) return null;
 
   return (
     <div className="max-w-lg mx-auto pb-6">

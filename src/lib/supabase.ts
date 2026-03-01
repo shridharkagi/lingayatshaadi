@@ -12,6 +12,18 @@ export function createSupabaseClient() {
   return createClient(supabaseUrl, supabaseAnonKey);
 }
 
+/** Safe client creation that returns null if not configured */
+export function createSupabaseClientSafe() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return null;
+  }
+  
+  return createClient(supabaseUrl, supabaseAnonKey);
+}
+
 /** Server-only client with service role (bypasses RLS) */
 export function createSupabaseAdmin() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
