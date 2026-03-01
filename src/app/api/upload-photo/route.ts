@@ -6,16 +6,6 @@ const MAX_FILE_SIZE = 1024 * 1024; // 1MB
 
 export async function POST(request: NextRequest) {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !serviceRoleKey) {
-      return NextResponse.json(
-        { error: "Supabase is not configured" },
-        { status: 500 }
-      );
-    }
-
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
     const userId = formData.get("userId") as string | null;
@@ -41,7 +31,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createSupabaseAdmin();
+    let supabase;
+    try {
+      supabase = createSupabaseAdmin();
+    } catch (err) {
+      return NextResponse.json(
+        { error: "Supabase is not configured" },
+        { status: 500 }
+      );
+    }
     const sanitizedUserId = userId.replace(/[^a-zA-Z0-9_-]/g, "_");
     const timestamp = Date.now();
     const randomId = Math.random().toString(36).slice(2, 10);
