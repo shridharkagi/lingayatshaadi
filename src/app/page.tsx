@@ -16,24 +16,24 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
-// Indian traditional couple images from Unsplash
+// Indian traditional couple and matrimony images
 const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1605649487212-47bdab064df7?w=1920&q=80";
+  "https://images.unsplash.com/photo-1587271407850-8d438ca9fdf2?w=1920&q=80&fit=crop";
 const CEO_IMAGE =
-  "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=600&q=80";
+  "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?w=600&q=80&fit=crop";
 const COUPLE_1 =
-  "https://images.unsplash.com/photo-1591604466107-ec97de577aff?w=400&q=80";
+  "https://images.unsplash.com/photo-1519741497674-611481863552?w=400&q=80&fit=crop";
 const COUPLE_2 =
-  "https://images.unsplash.com/photo-1583939003579-730e3918a45a?w=400&q=80";
+  "https://images.unsplash.com/photo-1583939003579-730e3918a45a?w=400&q=80&fit=crop";
 const COUPLE_3 =
-  "https://images.unsplash.com/photo-1519741497674-611481863552?w=400&q=80";
+  "https://images.unsplash.com/photo-1591604466107-ec97de577aff?w=400&q=80&fit=crop";
 
 const EXPERIENCE_IMG_1 =
-  "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=400&q=80";
+  "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?w=400&q=80&fit=crop";
 const EXPERIENCE_IMG_2 =
-  "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=400&q=80";
+  "https://images.unsplash.com/photo-1519741497674-611481863552?w=400&q=80&fit=crop";
 const EXPERIENCE_IMG_3 =
-  "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=400&q=80";
+  "https://images.unsplash.com/photo-1609151162377-794faf68b02f?w=400&q=80&fit=crop";
 
 const experienceCards = [
   {
@@ -60,11 +60,11 @@ const experienceCards = [
 ];
 
 const LATEST_PROFILE_IMAGES = [
-  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80",
-  "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80",
-  "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&q=80",
-  "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&q=80",
-  "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=400&q=80",
+  "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&q=80&fit=crop",
+  "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&q=80&fit=crop",
+  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80&fit=crop",
+  "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80&fit=crop",
+  "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&q=80&fit=crop",
 ];
 
 const latestProfiles = [
@@ -76,7 +76,7 @@ const latestProfiles = [
 ];
 
 const COMMUNITY_IMG =
-  "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?w=800&q=80";
+  "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?w=800&q=80&fit=crop";
 
 const successStories = [
   {
@@ -304,7 +304,7 @@ export default function LandingPage() {
               {latestProfiles.map((profile, i) => (
                 <Link
                   key={i}
-                  href="/signup"
+                  href="/profiles"
                   className="flex-shrink-0 w-[260px] sm:w-auto bg-[var(--color-bg)] rounded-2xl overflow-hidden shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-card)] transition-all border border-[var(--color-border)]/50 group"
                 >
                   <div className="relative aspect-[3/4]">
@@ -336,7 +336,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="text-center mt-8">
-            <Link href="/signup">
+            <Link href="/profiles">
               <Button variant="outline" className="rounded-full">
                 View All Profiles
               </Button>
@@ -360,7 +360,7 @@ export default function LandingPage() {
                 </p>
               </div>
             </div>
-            <Link href="/login">
+            <Link href="/contact">
               <button className="bg-[var(--color-secondary-dark)] text-white px-6 py-3 rounded-full font-medium hover:bg-black transition shadow-lg whitespace-nowrap">
                 Learn More
               </button>
@@ -414,11 +414,11 @@ export default function LandingPage() {
               </Link>
             </div>
             <div className="lg:w-2/3 overflow-x-auto pb-4 -mx-4 px-4 sm:overflow-visible sm:mx-0 sm:px-0">
-              <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 min-w-max sm:min-w-0">
+              <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 {successStories.map((story, i) => (
                   <div
                     key={i}
-                    className="w-72 sm:w-auto flex-shrink-0 bg-[var(--color-bg)] rounded-2xl overflow-hidden shadow-[var(--shadow-soft)] border border-[var(--color-border)]/50"
+                    className="w-[280px] sm:w-auto flex-shrink-0 bg-[var(--color-bg)] rounded-2xl overflow-hidden shadow-[var(--shadow-soft)] border border-[var(--color-border)]/50"
                   >
                     <div className="relative aspect-[4/3]">
                       <Image
@@ -426,7 +426,7 @@ export default function LandingPage() {
                         alt={story.names}
                         fill
                         className="object-cover"
-                        sizes="(max-width: 1024px) 288px, 33vw"
+                        sizes="(max-width: 1024px) 280px, 33vw"
                         unoptimized
                       />
                     </div>
