@@ -50,7 +50,7 @@ export const metadata: Metadata = {
     description: seo.description,
     images: [
       {
-        url: "/og-image.png",
+        url: "/og-image.jpg",
         width: 1200,
         height: 630,
         alt: "LingayatShaadi - Premium Matrimonial Platform",
@@ -61,7 +61,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "LingayatShaadi - Find Your Perfect Match",
     description: seo.description,
-    images: ["/og-image.png"],
+    images: ["/og-image.jpg"],
   },
   metadataBase: new URL("https://test.ligayatshaadi.in"),
   viewport: {

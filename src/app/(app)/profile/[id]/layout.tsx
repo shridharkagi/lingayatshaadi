@@ -65,7 +65,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description,
       images: [
         {
-          url: profile.profile_photo || "/og-image.png",
+          url: profile.profile_photo || "/og-image.jpg",
           width: 1200,
           height: 630,
           alt: `${profile.full_name || "Profile"} - LingayatShaadi`,
@@ -77,7 +77,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       card: "summary_large_image",
       title,
       description,
-      images: [profile.profile_photo || "/og-image.png"],
+      images: [profile.profile_photo || "/og-image.jpg"],
     },
   };
 }
