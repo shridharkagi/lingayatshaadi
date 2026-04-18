@@ -20,6 +20,24 @@ export interface PartnerPreference {
   foodHabits?: string;
 }
 
+/** A single contact entry on a profile (primary or alternate). */
+export interface ProfileContact {
+  /** E.164 / national number entered by the user, e.g. "+91 9876543210" or "9876543210". */
+  number: string;
+  /**
+   * Who this contact belongs to. Suggested values come from
+   * `CONTACT_OWNER_RELATIONS` in `data/constants.ts` but free text is allowed
+   * (e.g., "Maternal Uncle").
+   */
+  belongsTo?: string;
+  /** When `belongsTo === "Other"`, the free-text label entered by the user. */
+  belongsToOther?: string;
+  /** Show this number on the public profile. Defaults to true for the primary. */
+  showOnProfile?: boolean;
+  /** Preferred contact channels (Call / WhatsApp / SMS). */
+  methods?: string[];
+}
+
 export interface Profile {
   /** Internal ID (database primary key) - never exposed in URLs */
   id: string;
@@ -30,7 +48,7 @@ export interface Profile {
   email: string;
   fullName: string;
   dateOfBirth: string;
-  gender: "male" | "female" | "other";
+  gender: "male" | "female";
   maritalStatus: string;
   caste: string;
   subCaste: string;
@@ -69,6 +87,13 @@ export interface Profile {
   country?: string;
   contact?: string;
   contactType?: string;
+  /**
+   * Structured list of contact numbers with per-entry visibility and preferred
+   * channels. The first entry is treated as the primary/default account
+   * contact. Stored as JSONB column `contacts` in Supabase. The legacy `contact`
+   * field stays in sync with `contacts[0].number` for backwards compatibility.
+   */
+  contacts?: ProfileContact[];
   // Meta
   profilePhoto?: string;
   photos?: string[];
@@ -79,8 +104,12 @@ export interface Profile {
   profileType?: "free" | "premium";
   trustScore?: number;
   // Profile ownership (who manages this profile)
-  managedBy?: "self" | "parent" | "guardian";
+  managedBy?: "self" | "parent" | "guardian" | "admin";
   accountHolderName?: string;
+  /** Relationship of this profile to the account holder. */
+  relationship?: "self" | "son" | "daughter" | "brother" | "sister" | "other";
+  /** Optional short nickname/label for the account holder to identify this profile. */
+  nickname?: string;
   // User role (for access control)
   role?: "user" | "superadmin";
   createdAt: string;
@@ -93,6 +122,20 @@ export interface User {
   id: string;
   email: string;
   profile: Profile;
+}
+
+/**
+ * Minimal account holder details collected at signup.
+ * Stored on `auth.users.user_metadata` (not in the profiles table).
+ */
+export interface AccountMeta {
+  firstName: string;
+  lastName?: string;
+  fullName: string;
+  gender: "male" | "female";
+  city: string;
+  /** ISO date (YYYY-MM-DD); optional because legacy users may not have it */
+  dateOfBirth?: string;
 }
 
 export interface Interest {

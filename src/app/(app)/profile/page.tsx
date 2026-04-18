@@ -49,6 +49,12 @@ export default function MyProfilePage() {
     if (!loading && !isLoggedIn) router.replace("/login");
   }, [loading, isLoggedIn, router]);
 
+  useEffect(() => {
+    if (!loading && isLoggedIn && !user) {
+      router.replace("/account");
+    }
+  }, [loading, isLoggedIn, user, router]);
+
   if (loading || !user) {
     return (
       <div className="min-h-[400px] flex items-center justify-center">

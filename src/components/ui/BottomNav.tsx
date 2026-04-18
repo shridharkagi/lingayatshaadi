@@ -2,16 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Search, MessageCircle, User, Bell, Users2 } from "lucide-react";
+import { Search, MessageCircle, User, Bell, Users2 } from "lucide-react";
 import { mockNotifications } from "@/data/mock";
 
 const navItems = [
-  { href: "/home", icon: Home, label: "Home" },
   { href: "/profiles", icon: Users2, label: "Profiles" },
   { href: "/search", icon: Search, label: "Search" },
   { href: "/messages", icon: MessageCircle, label: "Messages" },
   { href: "/activities", icon: Bell, label: "Activities" },
-  { href: "/profile", icon: User, label: "Profile" },
+  { href: "/account", icon: User, label: "Account" },
 ];
 
 export function BottomNav() {

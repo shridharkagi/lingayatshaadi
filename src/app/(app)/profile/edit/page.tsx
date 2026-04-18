@@ -81,13 +81,12 @@ export default function EditProfilePage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
             <select
               value={user.gender || ""}
-              onChange={(e) => updateProfile({ gender: e.target.value as "male" | "female" | "other" })}
+              onChange={(e) => updateProfile({ gender: e.target.value as "male" | "female" })}
               className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent transition-all"
             >
               <option value="">Select gender</option>
               <option value="male">Male</option>
               <option value="female">Female</option>
-              <option value="other">Other</option>
             </select>
           </div>
           <div>

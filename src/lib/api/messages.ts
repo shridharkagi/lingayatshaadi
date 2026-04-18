@@ -53,7 +53,6 @@ export async function getConversations(myProfileId: string): Promise<{
       { lastMessage: Message; unreadCount: number }
     >();
     for (const row of (messages || []) as MessageRow[]) {
-      const convId = row.conversation_id;
       const otherId =
         row.sender_id === myProfileId ? row.receiver_id : row.sender_id;
       const key = otherId;

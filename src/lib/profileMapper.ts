@@ -46,6 +46,15 @@ export function toProfileRow(p: Partial<Profile>): ProfileRow {
   if (p.country != null) row.country = p.country;
   if (p.contact != null) row.contact = p.contact;
   if (p.contactType != null) row.contact_type = p.contactType;
+  if (p.contacts != null) {
+    row.contacts = p.contacts;
+    // Keep the legacy single `contact` column in sync with the primary entry
+    // so older code paths and SQL queries keep working.
+    const primary = p.contacts[0];
+    if (primary?.number && row.contact == null) {
+      row.contact = primary.number;
+    }
+  }
   if (p.profilePhoto != null) row.profile_photo = p.profilePhoto;
   if (p.photos != null) row.photos = p.photos;
   if (p.verified != null) row.verified = p.verified;
@@ -54,6 +63,8 @@ export function toProfileRow(p: Partial<Profile>): ProfileRow {
   if (p.trustScore != null) row.trust_score = p.trustScore;
   if (p.managedBy != null) row.managed_by = p.managedBy;
   if (p.accountHolderName != null) row.account_holder_name = p.accountHolderName;
+  if (p.relationship != null) row.relationship = p.relationship;
+  if (p.nickname != null) row.nickname = p.nickname;
   if (p.role != null) row.role = p.role;
   if (p.partnerPreference != null) row.partner_preference = p.partnerPreference;
   if (p.publicId != null) row.public_id = p.publicId;
@@ -75,7 +86,7 @@ export function fromProfileRow(row: ProfileRow): Profile {
     email: String(row.email ?? ""),
     fullName: String(row.full_name ?? ""),
     dateOfBirth: formatDate(row.date_of_birth),
-    gender: (row.gender as "male" | "female" | "other") || "male",
+    gender: (row.gender === "female" ? "female" : "male"),
     maritalStatus: String(row.marital_status ?? ""),
     caste: String(row.caste ?? "Lingayat"),
     subCaste: String(row.sub_caste ?? ""),
@@ -109,6 +120,9 @@ export function fromProfileRow(row: ProfileRow): Profile {
     country: (row.country as string) || "India",
     contact: row.contact as string | undefined,
     contactType: row.contact_type as string | undefined,
+    contacts: Array.isArray(row.contacts)
+      ? (row.contacts as Profile["contacts"])
+      : undefined,
     profilePhoto: row.profile_photo as string | undefined,
     photos: (row.photos as string[] | undefined) ?? [],
     verified: Boolean(row.verified ?? false),
@@ -117,6 +131,8 @@ export function fromProfileRow(row: ProfileRow): Profile {
     trustScore: Number(row.trust_score ?? 0),
     managedBy: row.managed_by as Profile["managedBy"],
     accountHolderName: row.account_holder_name as string | undefined,
+    relationship: row.relationship as Profile["relationship"],
+    nickname: row.nickname as string | undefined,
     role: (row.role as Profile["role"]) ?? "user",
     partnerPreference: row.partner_preference as Profile["partnerPreference"],
     createdAt: row.created_at ? new Date(row.created_at as string).toISOString().slice(0, 10) : "",

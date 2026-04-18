@@ -1,128 +1,182 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import { Heart, Eye, Bookmark, UserX, FileText, Phone } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ProfileAvatar } from "@/components/ui/ProfileAvatar";
 import { useProfiles } from "@/contexts/ProfilesContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { getReceivedInterests, acceptInterest, declineInterest } from "@/lib/api/interests";
+import { getReceivedInterests, getSentInterests, acceptInterest, declineInterest } from "@/lib/api/interests";
 import { getProfileById as fetchProfile } from "@/lib/api/profiles";
 import { getProfileViews } from "@/lib/api/profileViews";
 import { getShortlistedIds, removeFromShortlist } from "@/lib/api/shortlist";
 import { getBlockedIds, unblockUser } from "@/lib/api/blocked";
-import { getNotes, saveNote } from "@/lib/api/notes";
-import { getContactViews, removeContactView, clearContactViews } from "@/lib/api/contactViews";
+import { getNotes } from "@/lib/api/notes";
+import { getContactViews } from "@/lib/api/contactViews";
 import { getAge } from "@/lib/utils";
 import { getProfileSlug } from "@/lib/memberId";
 import type { Profile } from "@/types";
-import { 
-  loadContactViewHistory, 
-  removeContactFromHistory, 
-  clearContactViewHistory,
+import {
+  loadContactViewHistory,
   formatTimeAgo,
-  type ContactView 
 } from "@/lib/contactViewHistory";
 
-const tabs = [
+type TabId = "interests" | "views" | "contacted" | "shortlist" | "blocked" | "notes";
+
+const tabs: { id: TabId; label: string; icon: typeof Heart }[] = [
   { id: "interests", label: "Interests", icon: Heart },
-  { id: "views", label: "Profile Views", icon: Eye },
-  { id: "contacted", label: "Viewed Contacts", icon: Phone },
+  { id: "views", label: "Views", icon: Eye },
+  { id: "contacted", label: "Contacts", icon: Phone },
   { id: "shortlist", label: "Shortlist", icon: Bookmark },
   { id: "blocked", label: "Blocked", icon: UserX },
-  { id: "notes", label: "My Notes", icon: FileText },
+  { id: "notes", label: "Notes", icon: FileText },
 ];
+
+const RECENT_CONTACTS_LIMIT = 20;
+
+interface CachedContactInfo {
+  fullName: string;
+  photo: string;
+  memberId: string;
+}
 
 export default function ActivitiesPage() {
   const router = useRouter();
   const { user } = useAuth();
   const { profiles, getProfileById } = useProfiles();
-  const [activeTab, setActiveTab] = useState("interests");
+  const [activeTab, setActiveTab] = useState<TabId>("interests");
   const [receivedInterests, setReceivedInterests] = useState<
     Array<{ id: string; message?: string; fromProfileId: string; profile?: Profile }>
   >([]);
-  const [profileViews, setProfileViews] = useState<Array<{ viewerId: string; viewedAt: string; profile?: Profile }>>([]);
+  const [sentInterests, setSentInterests] = useState<
+    Array<{ id: string; status: string; toProfileId: string; profile?: Profile }>
+  >([]);
+  const [profileViews, setProfileViews] = useState<
+    Array<{ viewerId: string; viewedAt: string; profile?: Profile }>
+  >([]);
   const [shortlistedProfiles, setShortlistedProfiles] = useState<Profile[]>([]);
   const [blockedProfiles, setBlockedProfiles] = useState<Profile[]>([]);
-  const [notes, setNotes] = useState<Array<{ profileId: string; note: string; updatedAt: string; profile?: Profile }>>([]);
-  const [contactViews, setContactViews] = useState<Array<{ profileId: string; viewedAt: string; profile?: Profile }>>([]);
+  const [notes, setNotes] = useState<
+    Array<{ profileId: string; note: string; updatedAt: string; profile?: Profile }>
+  >([]);
+  const [contactViews, setContactViews] = useState<
+    Array<{ profileId: string; viewedAt: string; profile?: Profile; cached?: CachedContactInfo }>
+  >([]);
+  const [contactsTotal, setContactsTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const loadInterests = useCallback(async () => {
     if (!user?.id) {
       setReceivedInterests([]);
+      setSentInterests([]);
       setLoading(false);
       return;
     }
-    const { data, error } = await getReceivedInterests(user.id);
-    if (error || !data.length) {
+    setLoading(true);
+
+    const resolveProfile = async (pid: string): Promise<Profile | undefined> => {
+      let p: Profile | undefined =
+        getProfileById(pid) || profiles.find((x) => x.id === pid);
+      if (!p) {
+        const { data } = await fetchProfile(pid);
+        p = data || undefined;
+      }
+      return p;
+    };
+
+    const [recv, sent] = await Promise.all([
+      getReceivedInterests(user.id),
+      getSentInterests(user.id),
+    ]);
+
+    if (recv.error || !recv.data.length) {
       setReceivedInterests([]);
     } else {
       const withProfiles = await Promise.all(
-        data
+        recv.data
           .filter((i) => i.status === "pending")
-          .map(async (i) => {
-            let profile = getProfileById(i.fromProfileId) || profiles.find((p) => p.id === i.fromProfileId);
-            if (!profile) {
-              const { data: p } = await fetchProfile(i.fromProfileId);
-              profile = p || undefined;
-            }
-            return {
-              id: i.id,
-              message: i.message,
-              fromProfileId: i.fromProfileId,
-              profile: profile ?? undefined,
-            };
-          })
+          .map(async (i) => ({
+            id: i.id,
+            message: i.message,
+            fromProfileId: i.fromProfileId,
+            profile: await resolveProfile(i.fromProfileId),
+          }))
       );
       setReceivedInterests(withProfiles.filter((r) => r.profile));
     }
+
+    if (sent.error || !sent.data.length) {
+      setSentInterests([]);
+    } else {
+      const withProfiles = await Promise.all(
+        sent.data.map(async (i) => ({
+          id: i.id,
+          status: i.status,
+          toProfileId: i.toProfileId,
+          profile: await resolveProfile(i.toProfileId),
+        }))
+      );
+      setSentInterests(withProfiles.filter((r) => r.profile));
+    }
+
     setLoading(false);
   }, [user?.id, getProfileById, profiles]);
 
   const loadContacted = useCallback(async () => {
+    setLoading(true);
+    // Build a cache from localStorage so we always have name/photo even if the
+    // DB profile lookup fails (deleted profiles, RLS blocks, etc.).
     const fromStorage = loadContactViewHistory();
-    if (!user?.id) {
-      setContactViews(fromStorage.map((c) => ({ profileId: c.profileId, viewedAt: c.viewedAt })));
-      return;
-    }
-    const { data } = await getContactViews(user.id);
-    if (data?.length) {
-      const withProfiles = await Promise.all(
-        data.map(async (v) => {
-          let profile = getProfileById(v.viewedId) || profiles.find((p) => p.id === v.viewedId);
-          if (!profile) {
-            const { data: p } = await fetchProfile(v.viewedId);
-            profile = p ?? undefined;
-          }
-          return { profileId: v.viewedId, viewedAt: v.viewedAt, profile };
-        })
-      );
-      setContactViews(withProfiles.filter((v) => v.profile));
+    const cache = new Map<string, CachedContactInfo>();
+    fromStorage.forEach((c) => {
+      cache.set(c.profileId, {
+        fullName: c.profileName,
+        photo: c.profilePhoto,
+        memberId: c.memberId,
+      });
+    });
+
+    let merged: Array<{ profileId: string; viewedAt: string }> = [];
+    if (user?.id) {
+      const { data } = await getContactViews(user.id);
+      const dbList = (data || []).map((v) => ({ profileId: v.viewedId, viewedAt: v.viewedAt }));
+      // Merge DB + localStorage by profileId, keeping the most recent viewedAt.
+      const byId = new Map<string, { profileId: string; viewedAt: string }>();
+      [...dbList, ...fromStorage.map((c) => ({ profileId: c.profileId, viewedAt: c.viewedAt }))].forEach((v) => {
+        const existing = byId.get(v.profileId);
+        if (!existing || v.viewedAt > existing.viewedAt) byId.set(v.profileId, v);
+      });
+      merged = Array.from(byId.values()).sort((a, b) => (a.viewedAt < b.viewedAt ? 1 : -1));
     } else {
-      setContactViews(
-        fromStorage.map((c) => ({
-          profileId: c.profileId,
-          viewedAt: c.viewedAt,
-          profile: {
-            id: c.profileId,
-            fullName: c.profileName,
-            profilePhoto: c.profilePhoto,
-            publicId: c.memberId,
-          } as Profile,
-        }))
-      );
+      merged = fromStorage.map((c) => ({ profileId: c.profileId, viewedAt: c.viewedAt }));
     }
+
+    setContactsTotal(merged.length);
+    const recent = merged.slice(0, RECENT_CONTACTS_LIMIT);
+
+    const enriched = await Promise.all(
+      recent.map(async (v) => {
+        const cached = cache.get(v.profileId);
+        let profile = getProfileById(v.profileId) || profiles.find((p) => p.id === v.profileId);
+        if (!profile) {
+          const { data: p } = await fetchProfile(v.profileId);
+          profile = p ?? undefined;
+        }
+        return { profileId: v.profileId, viewedAt: v.viewedAt, profile, cached };
+      })
+    );
+    setContactViews(enriched);
+    setLoading(false);
   }, [user?.id, getProfileById, profiles]);
 
-  useEffect(() => {
-    if (activeTab === "contacted") loadContacted();
-  }, [activeTab, loadContacted]);
-
   const loadProfileViews = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setProfileViews([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const { data } = await getProfileViews(user.id);
     const withProfiles = await Promise.all(
@@ -140,7 +194,11 @@ export default function ActivitiesPage() {
   }, [user?.id, getProfileById, profiles]);
 
   const loadShortlist = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setShortlistedProfiles([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const { data } = await getShortlistedIds(user.id);
     const profs = await Promise.all(
@@ -158,7 +216,11 @@ export default function ActivitiesPage() {
   }, [user?.id, getProfileById, profiles]);
 
   const loadBlocked = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setBlockedProfiles([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const { data } = await getBlockedIds(user.id);
     const profs = await Promise.all(
@@ -176,7 +238,11 @@ export default function ActivitiesPage() {
   }, [user?.id, getProfileById, profiles]);
 
   const loadNotes = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setNotes([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const { data } = await getNotes(user.id);
     const withProfiles = await Promise.all(
@@ -196,41 +262,59 @@ export default function ActivitiesPage() {
   useEffect(() => {
     if (activeTab === "interests") loadInterests();
     else if (activeTab === "views") loadProfileViews();
+    else if (activeTab === "contacted") loadContacted();
     else if (activeTab === "shortlist") loadShortlist();
     else if (activeTab === "blocked") loadBlocked();
     else if (activeTab === "notes") loadNotes();
-  }, [activeTab, loadInterests, loadProfileViews, loadShortlist, loadBlocked, loadNotes]);
+  }, [activeTab, loadInterests, loadProfileViews, loadContacted, loadShortlist, loadBlocked, loadNotes]);
 
-  const handleRemoveContact = async (profileId: string) => {
-    removeContactFromHistory(profileId);
-    if (user?.id) await removeContactView(user.id, profileId);
-    loadContacted();
-  };
-
-  const handleClearHistory = async () => {
-    if (!confirm("Are you sure you want to clear all contact view history?")) return;
-    clearContactViewHistory();
-    if (user?.id) await clearContactViews(user.id);
-    setContactViews([]);
-  };
+  const tabCounts = useMemo<Record<TabId, number>>(
+    () => ({
+      interests: receivedInterests.length + sentInterests.length,
+      views: profileViews.length,
+      contacted: contactsTotal,
+      shortlist: shortlistedProfiles.length,
+      blocked: blockedProfiles.length,
+      notes: notes.length,
+    }),
+    [receivedInterests.length, sentInterests.length, profileViews.length, contactsTotal, shortlistedProfiles.length, blockedProfiles.length, notes.length]
+  );
 
   return (
-    <div className="max-w-lg mx-auto pb-6">
-      <header className="bg-white border-b border-[var(--border)] px-4 py-4">
-        <h1 className="text-xl font-bold text-[var(--foreground)] mb-4">Activities</h1>
-        <div className="flex gap-2 overflow-x-auto pb-2">
-          {tabs.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${
-                activeTab === id ? "bg-[var(--primary)] text-white" : "bg-gray-100 text-gray-600"
-              }`}
-            >
-              <Icon size={16} />
-              {label}
-            </button>
-          ))}
+    <div className="max-w-2xl mx-auto pb-6">
+      <header className="bg-white border-b border-[var(--border)] px-4 py-4 sticky top-0 z-10">
+        <h1 className="text-xl font-bold text-[var(--foreground)] mb-3">Activities</h1>
+        {/* Icon-bar tabs: 6 columns, all visible at once on every screen size. */}
+        <div role="tablist" aria-label="Activity sections" className="grid grid-cols-6 gap-1">
+          {tabs.map(({ id, label, icon: Icon }) => {
+            const isActive = activeTab === id;
+            const count = tabCounts[id];
+            return (
+              <button
+                key={id}
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setActiveTab(id)}
+                className={`relative flex flex-col items-center justify-center gap-1 py-2 rounded-xl transition-colors ${
+                  isActive
+                    ? "bg-[var(--primary)] text-white shadow-sm"
+                    : "text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                <Icon size={20} />
+                <span className="text-[11px] font-medium leading-tight">{label}</span>
+                {count > 0 && (
+                  <span
+                    className={`absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-semibold flex items-center justify-center ${
+                      isActive ? "bg-white text-[var(--primary)]" : "bg-[var(--primary)] text-white"
+                    }`}
+                  >
+                    {count > 99 ? "99+" : count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </header>
 
@@ -248,34 +332,24 @@ export default function ActivitiesPage() {
               />
             ) : (
               receivedInterests.map(({ id, profile, message }) => (
-                <div
-                  key={id}
-                  className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm"
-                >
-                  <Link href={`/profile/${getProfileSlug(profile!)}`} className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0">
-                    <Image
-                      src={profile!.profilePhoto || "/placeholder.svg"}
-                      alt={profile!.fullName}
-                      width={64}
-                      height={64}
-                      className="object-cover w-full h-full"
-                      unoptimized
-                    />
+                <div key={id} className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm">
+                  <Link href={`/profile/${getProfileSlug(profile!)}`}>
+                    <ProfileAvatar src={profile!.profilePhoto} alt={profile!.fullName} size={64} />
                   </Link>
                   <div className="flex-1 min-w-0">
                     <Link href={`/profile/${getProfileSlug(profile!)}`}>
                       <h4 className="font-semibold text-[var(--foreground)]">{profile!.fullName}</h4>
                     </Link>
-                    <p className="text-sm text-gray-500">{getAge(profile!.dateOfBirth)} yrs • {profile!.profession}</p>
+                    <p className="text-sm text-gray-500">
+                      {getAge(profile!.dateOfBirth)} yrs • {profile!.profession}
+                    </p>
                     {message && <p className="text-sm text-gray-600 mt-1">&quot;{message}&quot;</p>}
                     <div className="flex gap-2 mt-2">
                       <Link
                         href={`/messages/${profile!.id}`}
                         onClick={async (e) => {
                           e.preventDefault();
-                          await acceptInterest(id, {
-                            accepterName: user?.fullName,
-                          });
+                          await acceptInterest(id, { accepterName: user?.fullName });
                           loadInterests();
                           router.push(`/messages/${profile!.id}`);
                         }}
@@ -298,22 +372,66 @@ export default function ActivitiesPage() {
               ))
             )}
             <h3 className="font-semibold text-[var(--foreground)] mt-8">Sent</h3>
-            <EmptyState
-              icon={Heart}
-              title="No interests sent yet"
-              description="Start connecting with profiles you like"
-              action={{
-                label: "Browse Profiles",
-                href: "/search",
-              }}
-            />
+            {loading ? (
+              <div className="py-8 text-center text-gray-500">Loading...</div>
+            ) : sentInterests.length === 0 ? (
+              <EmptyState
+                icon={Heart}
+                title="No interests sent yet"
+                description="Start connecting with profiles you like"
+                action={{ label: "Browse Profiles", href: "/search" }}
+              />
+            ) : (
+              <div className="space-y-3">
+                {sentInterests.map(({ id, status, profile }) => {
+                  const statusStyle =
+                    status === "accepted"
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : status === "declined"
+                      ? "bg-red-50 text-red-700 border-red-200"
+                      : "bg-amber-50 text-amber-700 border-amber-200";
+                  const statusLabel =
+                    status === "accepted"
+                      ? "Accepted"
+                      : status === "declined"
+                      ? "Declined"
+                      : "Pending";
+                  return (
+                    <Link
+                      key={id}
+                      href={`/profile/${getProfileSlug(profile!)}`}
+                      className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition"
+                    >
+                      <ProfileAvatar src={profile!.profilePhoto} alt={profile!.fullName} size={64} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="font-semibold text-[var(--foreground)] truncate">
+                            {profile!.fullName}
+                          </h4>
+                          <span
+                            className={`shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-full border ${statusStyle}`}
+                          >
+                            {statusLabel}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-500 truncate mt-0.5">
+                          {profile!.dateOfBirth ? `${getAge(profile!.dateOfBirth)} yrs` : ""}
+                          {profile!.profession ? ` • ${profile!.profession}` : ""}
+                          {!profile!.profession && profile!.city ? ` • ${profile!.city}` : ""}
+                        </p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
         {activeTab === "views" && (
           <div className="space-y-4">
             <h3 className="font-semibold text-[var(--foreground)]">Who viewed your profile</h3>
-            {loading && activeTab === "views" ? (
+            {loading ? (
               <div className="py-8 text-center text-gray-500">Loading...</div>
             ) : profileViews.length === 0 ? (
               <EmptyState
@@ -329,19 +447,12 @@ export default function ActivitiesPage() {
                     href={`/profile/${getProfileSlug(v.profile!)}`}
                     className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition"
                   >
-                    <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0">
-                      <Image
-                        src={v.profile!.profilePhoto || "/placeholder.svg"}
-                        alt={v.profile!.fullName}
-                        width={64}
-                        height={64}
-                        className="object-cover w-full h-full"
-                        unoptimized
-                      />
-                    </div>
+                    <ProfileAvatar src={v.profile!.profilePhoto} alt={v.profile!.fullName} size={64} />
                     <div className="flex-1 min-w-0">
                       <h4 className="font-semibold text-[var(--foreground)]">{v.profile!.fullName}</h4>
-                      <p className="text-sm text-gray-500">{getAge(v.profile!.dateOfBirth)} yrs • {v.profile!.profession}</p>
+                      <p className="text-sm text-gray-500">
+                        {getAge(v.profile!.dateOfBirth)} yrs • {v.profile!.profession}
+                      </p>
                       <p className="text-xs text-gray-400 mt-1">Viewed {formatTimeAgo(v.viewedAt)}</p>
                     </div>
                   </Link>
@@ -353,79 +464,68 @@ export default function ActivitiesPage() {
 
         {activeTab === "contacted" && (
           <div className="space-y-4">
-            <div className="flex justify-between items-center mb-2">
+            {/* Total counter card on top */}
+            <div className="bg-gradient-to-r from-[var(--primary)] to-[var(--primary)]/80 text-white rounded-2xl px-5 py-4 flex items-center justify-between shadow-sm">
+              <div>
+                <p className="text-xs uppercase tracking-wide opacity-90">Total Contacts Viewed</p>
+                <p className="text-3xl font-bold leading-tight">{contactsTotal}</p>
+              </div>
+              <Phone size={36} className="opacity-80" />
+            </div>
+
+            <div className="flex items-center justify-between">
               <h3 className="font-semibold text-[var(--foreground)]">
-                Contacts Viewed {contactViews.length > 0 && `(${contactViews.length})`}
+                Recent {Math.min(contactsTotal, RECENT_CONTACTS_LIMIT) > 0 && `(${Math.min(contactsTotal, RECENT_CONTACTS_LIMIT)})`}
               </h3>
-              {contactViews.length > 0 && (
-                <button 
-                  onClick={handleClearHistory}
-                  className="text-sm text-red-600 hover:text-red-700 hover:underline transition"
-                >
-                  Clear All
-                </button>
+              {contactsTotal > RECENT_CONTACTS_LIMIT && (
+                <span className="text-xs text-gray-500">
+                  Showing latest {RECENT_CONTACTS_LIMIT} of {contactsTotal}
+                </span>
               )}
             </div>
-            
-            {contactViews.length === 0 ? (
+
+            {loading ? (
+              <div className="py-8 text-center text-gray-500">Loading...</div>
+            ) : contactViews.length === 0 ? (
               <EmptyState
                 icon={Phone}
                 title="No contacts viewed yet"
                 description="When you view contact details of profiles, they'll appear here for easy access"
-                action={{
-                  label: "Browse Profiles",
-                  href: "/search",
-                }}
+                action={{ label: "Browse Profiles", href: "/search" }}
               />
             ) : (
               <div className="space-y-3">
-                {contactViews.map((c) => (
-                  <div
-                    key={c.profileId}
-                    className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition"
-                  >
+                {contactViews.map((c) => {
+                  const name = c.profile?.fullName || c.cached?.fullName || "Profile";
+                  const photo = c.profile?.profilePhoto || c.cached?.photo;
+                  const memberId = c.profile?.publicId || c.profile?.memberId || c.cached?.memberId;
+                  const meta: string[] = [];
+                  if (c.profile?.dateOfBirth) meta.push(`${getAge(c.profile.dateOfBirth)} yrs`);
+                  if (c.profile?.profession) meta.push(c.profile.profession);
+                  else if (c.profile?.city) meta.push(c.profile.city);
+                  const slug = c.profile ? getProfileSlug(c.profile) : c.profileId;
+                  return (
                     <Link
-                      href={`/profile/${c.profile ? getProfileSlug(c.profile) : c.profileId}`}
-                      className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0"
+                      key={c.profileId}
+                      href={`/profile/${slug}`}
+                      className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition"
                     >
-                      <Image
-                        src={c.profile?.profilePhoto || "/placeholder.svg"}
-                        alt={c.profile?.fullName || "Profile"}
-                        width={64}
-                        height={64}
-                        className="object-cover w-full h-full"
-                        unoptimized
-                      />
-                    </Link>
-                    <div className="flex-1 min-w-0">
-                      <Link href={`/profile/${c.profile ? getProfileSlug(c.profile) : c.profileId}`}>
-                        <h4 className="font-semibold text-[var(--foreground)] hover:text-[var(--primary)] transition">
-                          {c.profile?.fullName || "Profile"}
-                        </h4>
-                      </Link>
-                      <p className="text-sm text-gray-500">
-                        {c.profile?.publicId || c.profile?.memberId || c.profileId}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        Viewed {formatTimeAgo(c.viewedAt)}
-                      </p>
-                      <div className="flex gap-2 mt-2">
-                        <Link
-                          href={`/profile/${c.profile ? getProfileSlug(c.profile) : c.profileId}`}
-                          className="px-4 py-1.5 rounded-lg bg-[var(--primary)] text-white text-sm font-medium hover:bg-[var(--primary)]/90 transition"
-                        >
-                          View Profile
-                        </Link>
-                        <button
-                          onClick={() => handleRemoveContact(c.profileId)}
-                          className="px-4 py-1.5 rounded-lg border border-[var(--border)] text-sm hover:bg-gray-50 transition"
-                        >
-                          Remove
-                        </button>
+                      <ProfileAvatar src={photo} alt={name} size={64} />
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-[var(--foreground)] truncate">{name}</h4>
+                        {memberId && (
+                          <p className="text-xs text-gray-400 mt-0.5 truncate">{memberId}</p>
+                        )}
+                        {meta.length > 0 && (
+                          <p className="text-sm text-gray-500 mt-1">{meta.join(" • ")}</p>
+                        )}
+                        <p className="text-xs text-gray-400 mt-1">
+                          Viewed {formatTimeAgo(c.viewedAt)}
+                        </p>
                       </div>
-                    </div>
-                  </div>
-                ))}
+                    </Link>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -434,7 +534,7 @@ export default function ActivitiesPage() {
         {activeTab === "shortlist" && (
           <div className="space-y-4">
             <h3 className="font-semibold text-[var(--foreground)]">Shortlisted profiles</h3>
-            {loading && activeTab === "shortlist" ? (
+            {loading ? (
               <div className="py-8 text-center text-gray-500">Loading...</div>
             ) : shortlistedProfiles.length === 0 ? (
               <EmptyState
@@ -446,25 +546,17 @@ export default function ActivitiesPage() {
             ) : (
               <div className="space-y-3">
                 {shortlistedProfiles.map((profile) => (
-                  <div
-                    key={profile.id}
-                    className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm"
-                  >
-                    <Link href={`/profile/${getProfileSlug(profile)}`} className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0">
-                      <Image
-                        src={profile.profilePhoto || "/placeholder.svg"}
-                        alt={profile.fullName}
-                        width={64}
-                        height={64}
-                        className="object-cover w-full h-full"
-                        unoptimized
-                      />
+                  <div key={profile.id} className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm">
+                    <Link href={`/profile/${getProfileSlug(profile)}`}>
+                      <ProfileAvatar src={profile.profilePhoto} alt={profile.fullName} size={64} />
                     </Link>
                     <div className="flex-1 min-w-0">
                       <Link href={`/profile/${getProfileSlug(profile)}`}>
                         <h4 className="font-semibold text-[var(--foreground)]">{profile.fullName}</h4>
                       </Link>
-                      <p className="text-sm text-gray-500">{getAge(profile.dateOfBirth)} yrs • {profile.profession}</p>
+                      <p className="text-sm text-gray-500">
+                        {getAge(profile.dateOfBirth)} yrs • {profile.profession}
+                      </p>
                       <div className="flex gap-2 mt-2">
                         <Link
                           href={`/profile/${getProfileSlug(profile)}`}
@@ -494,7 +586,7 @@ export default function ActivitiesPage() {
         {activeTab === "blocked" && (
           <div className="space-y-4">
             <h3 className="font-semibold text-[var(--foreground)]">Blocked users</h3>
-            {loading && activeTab === "blocked" ? (
+            {loading ? (
               <div className="py-8 text-center text-gray-500">Loading...</div>
             ) : blockedProfiles.length === 0 ? (
               <EmptyState
@@ -505,23 +597,13 @@ export default function ActivitiesPage() {
             ) : (
               <div className="space-y-3">
                 {blockedProfiles.map((profile) => (
-                  <div
-                    key={profile.id}
-                    className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm"
-                  >
-                    <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0">
-                      <Image
-                        src={profile.profilePhoto || "/placeholder.svg"}
-                        alt={profile.fullName}
-                        width={64}
-                        height={64}
-                        className="object-cover w-full h-full"
-                        unoptimized
-                      />
-                    </div>
+                  <div key={profile.id} className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm">
+                    <ProfileAvatar src={profile.profilePhoto} alt={profile.fullName} size={64} />
                     <div className="flex-1 min-w-0">
                       <h4 className="font-semibold text-[var(--foreground)]">{profile.fullName}</h4>
-                      <p className="text-sm text-gray-500">{getAge(profile.dateOfBirth)} yrs • {profile.profession}</p>
+                      <p className="text-sm text-gray-500">
+                        {getAge(profile.dateOfBirth)} yrs • {profile.profession}
+                      </p>
                       <button
                         onClick={async () => {
                           if (!user?.id) return;
@@ -543,7 +625,7 @@ export default function ActivitiesPage() {
         {activeTab === "notes" && (
           <div className="space-y-4">
             <h3 className="font-semibold text-[var(--foreground)]">My notes</h3>
-            {loading && activeTab === "notes" ? (
+            {loading ? (
               <div className="py-8 text-center text-gray-500">Loading...</div>
             ) : notes.length === 0 ? (
               <EmptyState
@@ -555,19 +637,9 @@ export default function ActivitiesPage() {
             ) : (
               <div className="space-y-3">
                 {notes.map((n) => (
-                  <div
-                    key={n.profileId}
-                    className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm"
-                  >
-                    <Link href={`/profile/${getProfileSlug(n.profile!)}`} className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0">
-                      <Image
-                        src={n.profile!.profilePhoto || "/placeholder.svg"}
-                        alt={n.profile!.fullName}
-                        width={64}
-                        height={64}
-                        className="object-cover w-full h-full"
-                        unoptimized
-                      />
+                  <div key={n.profileId} className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm">
+                    <Link href={`/profile/${getProfileSlug(n.profile!)}`}>
+                      <ProfileAvatar src={n.profile!.profilePhoto} alt={n.profile!.fullName} size={64} />
                     </Link>
                     <div className="flex-1 min-w-0">
                       <Link href={`/profile/${getProfileSlug(n.profile!)}`}>

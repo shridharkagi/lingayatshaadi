@@ -24,9 +24,13 @@ import {
   X,
   Copy,
   Check,
+  ShieldCheck,
+  UserCheck,
+  HeartHandshake,
 } from "lucide-react";
 import { useProfiles } from "@/contexts/ProfilesContext";
 import { hasAcceptedInterest, hasSentInterest, sendInterest } from "@/lib/api/interests";
+import { getProfileByPublicId } from "@/lib/api/profiles";
 import { recordProfileView } from "@/lib/api/profileViews";
 import { addToShortlist, removeFromShortlist, isShortlisted } from "@/lib/api/shortlist";
 import { blockUser } from "@/lib/api/blocked";
@@ -45,6 +49,7 @@ import { useAppConfig } from "@/contexts/AppConfigContext";
 import { HobbyTag } from "@/components/ui/HobbyTag";
 import { LanguageTag } from "@/components/ui/LanguageTag";
 import { ProfileCard } from "@/components/ui/ProfileCard";
+import { ContactsList } from "@/components/ui/ContactsList";
 import { Profile } from "@/types";
 import { trackContactView } from "@/lib/contactViewHistory";
 
@@ -118,9 +123,19 @@ function DetailSection({
 export default function OtherProfilePage() {
   const params = useParams();
   const router = useRouter();
-  const { user, isLoggedIn } = useAuth();
+  const { user, authUser, isLoggedIn } = useAuth();
+  // Actor id (profiles.id) used for relational interactions like Interest,
+  // Shortlist, Notes, Views — these tables FK to profiles(id) and have an
+  // RLS policy that requires auth.uid() = profiles.user_id.
+  // If the logged-in user hasn't completed their own matrimonial profile yet
+  // we cannot insert into those tables — we surface a friendly prompt
+  // instead of a silent / cryptic RLS error.
+  const actorId = user?.id || "";
+  const needsOwnProfile = isLoggedIn && !actorId;
   const { config } = useAppConfig();
-  const { profiles } = useProfiles();
+  const { profiles, profilesLoading } = useProfiles();
+  const [fallbackProfile, setFallbackProfile] = useState<Profile | null>(null);
+  const [fallbackLoading, setFallbackLoading] = useState(false);
   const [showContact, setShowContact] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -136,6 +151,12 @@ export default function OtherProfilePage() {
   const [reportMessage, setReportMessage] = useState("");
   const [reporting, setReporting] = useState(false);
   const [copiedMemberId, setCopiedMemberId] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+
+  const showToast = useCallback((msg: string, type: "success" | "error" = "success") => {
+    setToast({ msg, type });
+    window.setTimeout(() => setToast(null), 2500);
+  }, []);
 
   const slugFromParams = typeof params.id === "string" ? params.id : params.id?.[0] ?? "";
   const [displayedSlug, setDisplayedSlug] = useState(slugFromParams);
@@ -144,16 +165,50 @@ export default function OtherProfilePage() {
     setDisplayedSlug(slugFromParams);
   }, [slugFromParams]);
 
-  const profile = (() => {
-    const publicId = parseProfileSlug(slugFromParams);
-    if (publicId) {
+  const publicIdFromSlug = parseProfileSlug(slugFromParams);
+
+  const profileFromContext = (() => {
+    if (publicIdFromSlug) {
       return profiles.find(
         (p) =>
-          (p.publicId || p.memberId || "").toUpperCase().replace(/-/g, "") === publicId.replace(/-/g, "")
+          (p.publicId || p.memberId || "").toUpperCase().replace(/-/g, "") === publicIdFromSlug.replace(/-/g, "")
       );
     }
     return profiles.find((p) => p.id === slugFromParams);
   })();
+
+  const profile =
+    profileFromContext ||
+    (fallbackProfile &&
+    publicIdFromSlug &&
+    (fallbackProfile.publicId || "").toUpperCase() === publicIdFromSlug
+      ? fallbackProfile
+      : undefined);
+
+  // If the profile isn't in the in-memory context (e.g. visitor or RLS / pagination
+  // hides it), fetch it directly by public id so the page never falsely shows
+  // "Profile not found" on the first navigation.
+  useEffect(() => {
+    if (profileFromContext) return;
+    if (profilesLoading) return;
+    if (!publicIdFromSlug) return;
+    if (
+      fallbackProfile &&
+      (fallbackProfile.publicId || "").toUpperCase() === publicIdFromSlug
+    ) {
+      return;
+    }
+    let cancelled = false;
+    setFallbackLoading(true);
+    getProfileByPublicId(publicIdFromSlug).then(({ data }) => {
+      if (cancelled) return;
+      setFallbackProfile(data);
+      setFallbackLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [profileFromContext, profilesLoading, publicIdFromSlug, fallbackProfile]);
 
   const currentIdx = profile ? profiles.findIndex((p) => p.id === profile.id) : -1;
   const displayedId = profile?.id ?? displayedSlug;
@@ -167,24 +222,24 @@ export default function OtherProfilePage() {
 
   // Record profile view when logged-in user views another profile
   useEffect(() => {
-    if (user?.id && profile?.id && user.id !== profile.id) {
-      recordProfileView(user.id, profile.id);
+    if (actorId && profile?.id && actorId !== profile.id) {
+      recordProfileView(actorId, profile.id);
     }
-  }, [user?.id, profile?.id]);
+  }, [actorId, profile?.id]);
 
   // Fetch interest status and shortlist when profile or user changes
   useEffect(() => {
-    if (!profile?.id || !user?.id) {
+    if (!profile?.id || !actorId) {
       setInterestAccepted(false);
       setHasShownInterest(false);
       setIsSaved(false);
       return;
     }
-    hasAcceptedInterest(user.id, profile.id).then(({ data }) => setInterestAccepted(!!data));
-    hasSentInterest(user.id, profile.id).then(({ data }) => setHasShownInterest(!!data));
-    isShortlisted(user.id, profile.id).then(({ data }) => setIsSaved(!!data));
-    getNote(user.id, profile.id).then(({ data }) => setMyNote(data || ""));
-  }, [profile?.id, user?.id]);
+    hasAcceptedInterest(actorId, profile.id).then(({ data }) => setInterestAccepted(!!data));
+    hasSentInterest(actorId, profile.id).then(({ data }) => setHasShownInterest(!!data));
+    isShortlisted(actorId, profile.id).then(({ data }) => setIsSaved(!!data));
+    getNote(actorId, profile.id).then(({ data }) => setMyNote(data || ""));
+  }, [profile?.id, actorId]);
 
   const goPrev = useCallback(() => {
     if (currentIdx <= 0 || isTransitioning) return;
@@ -281,6 +336,16 @@ export default function OtherProfilePage() {
   };
 
   if (!profile) {
+    if (profilesLoading || fallbackLoading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="flex items-center gap-2 text-gray-500">
+            <span className="inline-block w-4 h-4 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin" />
+            <span>Loading profile…</span>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p>Profile not found</p>
@@ -522,11 +587,31 @@ export default function OtherProfilePage() {
         <div className="grid grid-cols-4 gap-1 sm:gap-1.5">
           <button
             onClick={async () => {
-              if (!user?.id || !profile || hasShownInterest || sendingInterest) return;
+              if (!isLoggedIn) {
+                router.push("/login");
+                return;
+              }
+              if (needsOwnProfile) {
+                showToast("Create your profile first to send interest", "error");
+                router.push("/profile/complete");
+                return;
+              }
+              if (!actorId || !profile || hasShownInterest || sendingInterest) return;
               setSendingInterest(true);
-              const { error } = await sendInterest(user.id, profile.id, undefined, user.fullName);
+              const { error } = await sendInterest(
+                actorId,
+                profile.id,
+                undefined,
+                user?.fullName
+              );
               setSendingInterest(false);
-              if (!error) setHasShownInterest(true);
+              if (!error) {
+                setHasShownInterest(true);
+                showToast("Interest sent");
+              } else {
+                console.warn("[interest] failed:", error);
+                showToast(error || "Could not send interest", "error");
+              }
             }}
             disabled={hasShownInterest || sendingInterest}
             className={`flex flex-col items-center justify-center gap-1 px-2 py-3 sm:py-2.5 rounded-xl transition min-h-[44px] border ${
@@ -569,7 +654,7 @@ export default function OtherProfilePage() {
                 const newShowContact = !showContact;
                 setShowContact(newShowContact);
                 if (newShowContact && profile) {
-                  trackContactView(profile, user?.id);
+                  trackContactView(profile, actorId || undefined);
                 }
               }}
               className={`flex flex-col items-center justify-center gap-1 px-2 py-3 sm:py-2.5 rounded-xl transition min-h-[44px] border ${
@@ -584,13 +669,29 @@ export default function OtherProfilePage() {
           )}
           <button
             onClick={async () => {
-              if (!user?.id || !profile || savingShortlist) return;
+              if (!isLoggedIn) {
+                router.push("/login");
+                return;
+              }
+              if (needsOwnProfile) {
+                showToast("Create your profile first to shortlist", "error");
+                router.push("/profile/complete");
+                return;
+              }
+              if (!actorId || !profile || savingShortlist) return;
               setSavingShortlist(true);
               const { error } = isSaved
-                ? await removeFromShortlist(user.id, profile.id)
-                : await addToShortlist(user.id, profile.id);
+                ? await removeFromShortlist(actorId, profile.id)
+                : await addToShortlist(actorId, profile.id);
               setSavingShortlist(false);
-              if (!error) setIsSaved(!isSaved);
+              if (!error) {
+                const next = !isSaved;
+                setIsSaved(next);
+                showToast(next ? "Added to shortlist" : "Removed from shortlist");
+              } else {
+                console.warn("[shortlist] failed:", error);
+                showToast(error || "Could not update shortlist", "error");
+              }
             }}
             disabled={savingShortlist}
             className={`flex flex-col items-center justify-center gap-1 px-2 py-3 sm:py-2.5 rounded-xl transition min-h-[44px] border ${
@@ -624,27 +725,17 @@ export default function OtherProfilePage() {
         {showContact && (
           <div className="mt-4 p-4 rounded-2xl bg-[var(--primary)]/5 border border-[var(--primary)]/20">
             <h4 className="font-semibold text-[var(--foreground)] mb-3">Contact Details</h4>
-            <div className="space-y-2">
-              {profile.contact && (
-                <a
-                  href={`tel:${profile.contact.replace(/\D/g, "")}`}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-white hover:bg-white/90 transition text-[var(--primary)] font-medium"
-                >
-                  <Phone size={18} />
-                  <span>{profile.contact}</span>
-                  <span className="text-xs px-2 py-0.5 bg-[var(--primary)]/20 rounded">Call</span>
-                </a>
-              )}
-              {profile.address && (
-                <p className="flex items-center gap-3 p-3 rounded-xl bg-white/60">
-                  <MapPin size={18} className="text-gray-500" />
-                  <span>{profile.address}, {profile.city}, {profile.state}</span>
-                </p>
-              )}
-              {!profile.contact && !profile.address && (
-                <p className="text-gray-500 text-sm">No contact details available.</p>
-              )}
-            </div>
+            <ContactsList
+              contacts={profile.contacts}
+              fallbackNumber={profile.contact}
+              fallbackBelongsTo={profile.contactType}
+            />
+            {profile.address && (
+              <p className="mt-3 flex items-center gap-3 p-3 rounded-xl bg-white/60 text-sm">
+                <MapPin size={18} className="text-gray-500" />
+                <span>{profile.address}, {profile.city}, {profile.state}</span>
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -679,11 +770,65 @@ export default function OtherProfilePage() {
         {/* Profile Details - reference design (Location, Education & Career, Family) */}
         <div className="bg-white rounded-2xl p-4 shadow-sm">
           <h3 className="font-semibold text-base sm:text-lg text-[var(--foreground)] mb-3">Profile Details</h3>
+          {!isLoggedIn && (
+            <Link
+              href="/login"
+              className="mb-4 flex items-start sm:items-center gap-3 p-3 sm:p-4 rounded-xl bg-[var(--primary)]/5 border border-[var(--primary)]/20 hover:bg-[var(--primary)]/10 transition-colors"
+            >
+              <div className="w-9 h-9 rounded-full bg-[var(--primary)] text-white flex items-center justify-center flex-shrink-0">
+                <User size={18} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-[var(--foreground)]">
+                  Login to view full profile
+                </p>
+                <p className="text-xs sm:text-sm text-gray-600 mt-0.5">
+                  Sign in to see name, photos, contact details and connect with this profile.
+                </p>
+              </div>
+              <span className="hidden sm:inline-block px-3 py-1.5 rounded-lg bg-[var(--primary)] text-white text-xs font-medium flex-shrink-0">
+                Login
+              </span>
+            </Link>
+          )}
           <div className="divide-y divide-gray-100">
             <DetailSection icon={User} heading="Basic Info">
-              {(profile.managedBy === "parent" || profile.managedBy === "guardian") && (
-                <p className="text-[var(--primary)] font-medium">This profile is managed by a parent/guardian{profile.accountHolderName ? ` (${profile.accountHolderName})` : ""}</p>
-              )}
+              {(() => {
+                const mb = profile.managedBy;
+                const holder = (profile.accountHolderName || "").trim();
+                const looksLikeBusiness = !!holder && /matrim|admin|samaj|service|agency/i.test(holder);
+                const isAdmin = mb === "admin" || looksLikeBusiness;
+                const isSelf = !isAdmin && mb === "self";
+                const isParentGuardian = !isAdmin && (mb === "parent" || mb === "guardian");
+                if (!isAdmin && !isSelf && !isParentGuardian) return null;
+
+                let label = "";
+                let Icon = UserCheck;
+                let tone = "";
+                if (isSelf) {
+                  label = holder ? `Created by ${holder}` : "Created by Self";
+                  Icon = UserCheck;
+                  tone = "text-emerald-700 bg-emerald-50 border-emerald-200";
+                } else if (isAdmin) {
+                  label = holder ? `Created by ${holder}` : "Created by Admin";
+                  Icon = ShieldCheck;
+                  tone = "text-amber-700 bg-amber-50 border-amber-200";
+                } else {
+                  label = holder ? `Created by ${holder}` : "Created by Family";
+                  Icon = HeartHandshake;
+                  tone = "text-[var(--primary)] bg-[var(--primary)]/10 border-[var(--primary)]/20";
+                }
+
+                return (
+                  <span
+                    className={`mb-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] font-medium leading-none align-middle ${tone}`}
+                    title={label}
+                  >
+                    <Icon size={12} className="flex-shrink-0" />
+                    <span className="truncate max-w-[200px]">{label}</span>
+                  </span>
+                );
+              })()}
               <p className="flex items-center gap-2">
                 <span>Member ID:</span>
                 <button
@@ -825,7 +970,7 @@ export default function OtherProfilePage() {
                     const newShowContact = !showContact;
                     setShowContact(newShowContact);
                     if (newShowContact && profile) {
-                      trackContactView(profile, user?.id);
+                      trackContactView(profile, actorId || undefined);
                     }
                   }}
                   className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors text-[var(--primary)] font-medium"
@@ -835,24 +980,16 @@ export default function OtherProfilePage() {
                 </button>
                 {showContact && (
                   <div className="mt-3 p-4 rounded-xl bg-[var(--primary)]/5 border border-[var(--primary)]/20 space-y-2">
-                    {profile.contact ? (
-                      <a
-                        href={`tel:${profile.contact.replace(/\D/g, "")}`}
-                        className="flex items-center gap-3 p-3 rounded-xl bg-white hover:bg-white/90 transition text-[var(--primary)] font-medium"
-                      >
-                        <Phone size={18} />
-                        <span>{profile.contact}</span>
-                        <span className="text-xs px-2 py-0.5 bg-[var(--primary)]/20 rounded">Call</span>
-                      </a>
-                    ) : null}
+                    <ContactsList
+                      contacts={profile.contacts}
+                      fallbackNumber={profile.contact}
+                      fallbackBelongsTo={profile.contactType}
+                    />
                     {profile.address && (
                       <p className="flex items-center gap-3 p-3 rounded-xl bg-white/60">
                         <MapPin size={18} className="text-gray-500" />
                         <span>{profile.address}, {profile.city}, {profile.state}</span>
                       </p>
-                    )}
-                    {!profile.contact && !profile.address && (
-                      <p className="text-gray-500 text-sm">No contact details available.</p>
                     )}
                   </div>
                 )}
@@ -936,7 +1073,7 @@ export default function OtherProfilePage() {
           </div>
         )}
 
-        {isLoggedIn && user?.id && profile && user.id !== profile.id && (
+        {isLoggedIn && actorId && profile && actorId !== profile.id && (
           <div className="mt-4 p-4 rounded-2xl bg-gray-50 border border-gray-100">
             <h4 className="font-semibold text-[var(--foreground)] mb-2">My note</h4>
             <textarea
@@ -947,9 +1084,9 @@ export default function OtherProfilePage() {
             />
             <button
               onClick={async () => {
-                if (!user?.id || !profile || savingNote) return;
+                if (!actorId || !profile || savingNote) return;
                 setSavingNote(true);
-                await saveNote(user.id, profile.id, myNote);
+                await saveNote(actorId, profile.id, myNote);
                 setSavingNote(false);
               }}
               disabled={savingNote}
@@ -968,12 +1105,12 @@ export default function OtherProfilePage() {
             <Flag size={18} className="text-gray-500" />
             Report
           </button>
-          {isLoggedIn && user?.id && profile && user.id !== profile.id && (
+          {isLoggedIn && actorId && profile && actorId !== profile.id && (
             <button
               onClick={async () => {
-                if (!user?.id || !profile) return;
+                if (!actorId || !profile) return;
                 if (confirm("Block this user? They won't see your profile and you won't see theirs.")) {
-                  await blockUser(user.id, profile.id);
+                  await blockUser(actorId, profile.id);
                   router.push("/search");
                 }
               }}
@@ -985,7 +1122,7 @@ export default function OtherProfilePage() {
           )}
         </div>
 
-        {showReportModal && isLoggedIn && user?.id && profile && (
+        {showReportModal && isLoggedIn && actorId && profile && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
             <div className="bg-white rounded-2xl p-6 max-w-md w-full">
               <h3 className="text-lg font-semibold mb-4">Report Profile</h3>
@@ -1023,9 +1160,9 @@ export default function OtherProfilePage() {
                 <button
                   disabled={!reportReason.trim() || reporting}
                   onClick={async () => {
-                    if (!reportReason.trim() || !user?.id || !profile) return;
+                    if (!reportReason.trim() || !actorId || !profile) return;
                     setReporting(true);
-                    const { error } = await reportProfile(user.id, profile.id, reportReason.trim(), reportMessage.trim());
+                    const { error } = await reportProfile(actorId, profile.id, reportReason.trim(), reportMessage.trim());
                     setReporting(false);
                     if (!error) {
                       setShowReportModal(false);
@@ -1060,6 +1197,18 @@ export default function OtherProfilePage() {
         </div>
       </div>
 
+      {toast && (
+        <div className="fixed left-1/2 -translate-x-1/2 bottom-24 sm:bottom-8 z-[60] px-4 max-w-[90vw]">
+          <div
+            role="status"
+            className={`px-4 py-2.5 rounded-xl shadow-lg text-sm font-medium text-white ${
+              toast.type === "success" ? "bg-green-600" : "bg-red-600"
+            }`}
+          >
+            {toast.msg}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { postgrestUpsert, postgrestDeleteEq } from "@/lib/postgrestServer";
 import { hashPhoneOtp, normalizeIndianPhone } from "@/lib/phoneAuth";
+import { resolveOtpChannel } from "@/lib/phoneOtpConfig";
+import { twilioStartSmsVerify } from "@/lib/twilioVerify";
 
 /** Ensure Node runtime (not Edge) so server-side fetch to Supabase matches local curl behavior. */
 export const runtime = "nodejs";
@@ -18,15 +20,52 @@ function explainSupabaseNetworkError(message: string): string | null {
   return null;
 }
 
-function getSecret(): string | null {
-  const s = process.env.PHONE_OTP_SECRET;
-  if (s && s.length >= 16) return s;
-  return null;
+export async function POST(request: NextRequest) {
+  let body: { phone?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const parsed = normalizeIndianPhone(body.phone ?? "");
+  if (!parsed) {
+    return NextResponse.json({ error: "Enter a valid 10-digit Indian mobile number" }, { status: 400 });
+  }
+
+  const channel = resolveOtpChannel();
+
+  if (channel === "bypass") {
+    return NextResponse.json({ ok: true, channel: "bypass" });
+  }
+
+  if (channel === "twilio") {
+    const result = await twilioStartSmsVerify(parsed.e164);
+    if (!result.ok) {
+      return NextResponse.json(
+        { error: result.error || "Could not send SMS via Twilio" },
+        { status: 502 }
+      );
+    }
+    return NextResponse.json({ ok: true, channel: "twilio", status: result.status });
+  }
+
+  if (channel === "apihome") {
+    return sendViaApiHome(parsed);
+  }
+
+  return NextResponse.json(
+    {
+      error:
+        "No OTP provider configured. Set DEV_OTP_BYPASS=true, or configure TWILIO_* / APIHOME_SMS_KEY.",
+    },
+    { status: 500 }
+  );
 }
 
-export async function POST(request: NextRequest) {
-  const secret = getSecret();
-  if (!secret) {
+async function sendViaApiHome(parsed: { e164: string; digits10: string }) {
+  const secret = process.env.PHONE_OTP_SECRET;
+  if (!secret || secret.length < 16) {
     return NextResponse.json(
       { error: "Server misconfiguration: PHONE_OTP_SECRET is not set (min 16 chars)" },
       { status: 500 }
@@ -39,18 +78,6 @@ export async function POST(request: NextRequest) {
       { error: "Server misconfiguration: APIHOME_SMS_KEY is not set" },
       { status: 500 }
     );
-  }
-
-  let body: { phone?: string };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-
-  const parsed = normalizeIndianPhone(body.phone ?? "");
-  if (!parsed) {
-    return NextResponse.json({ error: "Enter a valid 10-digit Indian mobile number" }, { status: 400 });
   }
 
   const otp = String(Math.floor(100000 + Math.random() * 900000));
@@ -115,5 +142,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Could not reach SMS gateway" }, { status: 502 });
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, channel: "apihome" });
 }

@@ -1,37 +1,73 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-/** Client for browser (uses anon key) */
-export function createSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("supabaseUrl and supabaseAnonKey are required");
-  }
-  
-  return createClient(supabaseUrl, supabaseAnonKey);
+/**
+ * Singleton Supabase clients.
+ *
+ * IMPORTANT: We must reuse a single browser/anon client across the whole app.
+ * Creating multiple clients makes each one race for the same `navigator.locks`
+ * auth lock, which surfaces as the runtime error:
+ *   "Lock broken by another request with the 'steal' option."
+ * This also caused noticeable slowness during navigation because every page
+ * mount re-initialised auth and re-acquired the lock.
+ *
+ * We cache on `globalThis` so that Next.js HMR / Fast Refresh doesn't create
+ * fresh instances per module reload during development either.
+ */
+
+type GlobalWithSupabase = typeof globalThis & {
+  __ls_supabase_anon__?: SupabaseClient | null;
+  __ls_supabase_admin__?: SupabaseClient | null;
+};
+
+const g = globalThis as GlobalWithSupabase;
+
+function buildAnonClient(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anon) return null;
+  return createClient(url, anon, {
+    auth: {
+      // A unique storage key per app — prevents collision with other apps on
+      // the same origin and keeps the Web Lock name predictable.
+      storageKey: "ls.auth.token",
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  });
 }
 
-/** Safe client creation that returns null if not configured */
-export function createSupabaseClientSafe() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return null;
+/** Get the singleton browser client (anon key). Throws if env is missing. */
+export function createSupabaseClient(): SupabaseClient {
+  if (!g.__ls_supabase_anon__) {
+    const client = buildAnonClient();
+    if (!client) {
+      throw new Error("supabaseUrl and supabaseAnonKey are required");
+    }
+    g.__ls_supabase_anon__ = client;
   }
-  
-  return createClient(supabaseUrl, supabaseAnonKey);
+  return g.__ls_supabase_anon__;
 }
 
-/** Server-only client with service role (bypasses RLS) */
-export function createSupabaseAdmin() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  
-  if (!supabaseUrl || !supabaseServiceRoleKey) {
-    throw new Error("SUPABASE_SERVICE_ROLE_KEY is required for server-side uploads");
+/** Same singleton, but returns null instead of throwing when env is missing. */
+export function createSupabaseClientSafe(): SupabaseClient | null {
+  if (g.__ls_supabase_anon__ === undefined) {
+    g.__ls_supabase_anon__ = buildAnonClient();
   }
-  
-  return createClient(supabaseUrl, supabaseServiceRoleKey);
+  return g.__ls_supabase_anon__ ?? null;
+}
+
+/** Server-only singleton client with service role (bypasses RLS). */
+export function createSupabaseAdmin(): SupabaseClient {
+  if (!g.__ls_supabase_admin__) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !serviceKey) {
+      throw new Error("SUPABASE_SERVICE_ROLE_KEY is required for server-side uploads");
+    }
+    g.__ls_supabase_admin__ = createClient(url, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  }
+  return g.__ls_supabase_admin__;
 }

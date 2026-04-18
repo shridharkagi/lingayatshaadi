@@ -134,18 +134,18 @@ export class RateLimiter {
 /**
  * Debounce function for search inputs
  */
-export function debounce<T extends (...args: any[]) => any>(
-  func: T,
+export function debounce<TArgs extends unknown[]>(
+  func: (...args: TArgs) => unknown,
   wait: number
-): (...args: Parameters<T>) => void {
+): (...args: TArgs) => void {
   let timeout: NodeJS.Timeout | null = null;
-  
-  return function executedFunction(...args: Parameters<T>) {
+
+  return function executedFunction(...args: TArgs) {
     const later = () => {
       timeout = null;
       func(...args);
     };
-    
+
     if (timeout) {
       clearTimeout(timeout);
     }
@@ -156,13 +156,13 @@ export function debounce<T extends (...args: any[]) => any>(
 /**
  * Throttle function for scroll events
  */
-export function throttle<T extends (...args: any[]) => any>(
-  func: T,
+export function throttle<TArgs extends unknown[]>(
+  func: (...args: TArgs) => unknown,
   wait: number
-): (...args: Parameters<T>) => void {
+): (...args: TArgs) => void {
   let inThrottle: boolean;
   
-  return function executedFunction(...args: Parameters<T>) {
+  return function executedFunction(...args: TArgs) {
     if (!inThrottle) {
       func(...args);
       inThrottle = true;

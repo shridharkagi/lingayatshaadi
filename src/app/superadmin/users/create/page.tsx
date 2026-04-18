@@ -79,7 +79,7 @@ export default function SuperAdminCreateProfilePage() {
       ...profile,
       email: profile.email!,
       fullName: profile.fullName!,
-      gender: profile.gender as "male" | "female" | "other",
+      gender: profile.gender as "male" | "female",
       dateOfBirth: profile.dateOfBirth!,
       maritalStatus: profile.maritalStatus || "",
       caste: profile.caste || "Lingayat",

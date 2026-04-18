@@ -1,50 +1,121 @@
 import { Profile } from "@/types";
 
 /**
- * Public ID format: LS + YY + MM + 0001 (incremental per month)
- * Examples: LS26010001, LS26010002, LS26020003, LS27010004
- * - LS = Static prefix
- * - 26 = Year (2 digits)
- * - 01 = Month (2 digits)
- * - 0001 = Incremental sequence (4 digits, resets each month)
+ * Public ID format (current):
+ *   L + [B|G] + YY + MM + NNNNN
+ *
+ *   - "L"     = Static prefix (Lingayat-Shaadi)
+ *   - "B"|"G" = Profile gender flag: B = Bride (female), G = Groom (male)
+ *   - "YY"    = 2-digit year of registration  (e.g. "26" for 2026)
+ *   - "MM"    = 2-digit month of registration (e.g. "04" for April)
+ *   - "NNNNN" = 5-digit zero-padded GLOBAL incremental sequence shared across
+ *               BOTH genders and ALL months. Never resets — the next profile
+ *               (regardless of gender or registration month) gets the next
+ *               number after the highest seen so far.
+ *
+ * Examples (in registration order):
+ *   LB26040 0001  -> 1st profile ever, Bride, registered Apr 2026
+ *   LG26040 0002  -> 2nd profile ever, Groom, also Apr 2026
+ *   LB26050 0003  -> 3rd profile ever, Bride, registered May 2026
+ *
+ * Note: 5 digits caps the global counter at 99,999 profiles. If/when you
+ * approach that, bump to 6 digits — this is a one-line change here plus a
+ * one-time SQL re-pad.
+ *
+ * Legacy format (still supported for parsing existing rows):
+ *   LS + YY + MM + NNNN   (e.g. LS26010003)
  */
-export function generatePublicId(existingProfiles: Profile[]): string {
+
+const NEW_PUBLIC_ID_RE = /^L[BG]\d{9}$/;
+const LEGACY_PUBLIC_ID_RE = /^LS\d{8}$/;
+
+export function genderFlag(gender: Profile["gender"] | string | undefined): "B" | "G" {
+  return gender === "female" ? "B" : "G";
+}
+
+/**
+ * Generate the next public ID for a new profile.
+ *
+ * The counter is GLOBAL — the next number is `max(seq across all existing
+ * public_ids) + 1`, regardless of the new profile's gender or the registration
+ * month of the existing rows. Only the YY/MM and B/G prefix are picked from
+ * "now" / the new profile's gender.
+ *
+ * For server-side generation against the live DB, prefer
+ * `generatePublicIdFromExistingIds()` below which works on a flat list of
+ * public_id strings fetched from Supabase.
+ */
+export function generatePublicId(
+  existingProfiles: Profile[],
+  gender: Profile["gender"] | string = "male"
+): string {
+  const ids = existingProfiles
+    .map((p) => (p.publicId || p.memberId || "").toUpperCase().replace(/-/g, ""))
+    .filter(Boolean);
+  return generatePublicIdFromExistingIds(ids, gender);
+}
+
+/**
+ * Pure helper: given a flat list of existing public_id strings (any format)
+ * and the gender of the NEW profile, return the next public_id.
+ *
+ * The counter is global — it ignores YY/MM partitioning and gender, just takes
+ * the highest numeric suffix seen anywhere and adds 1. This means re-numbering
+ * happens automatically: new profiles always continue from the largest known
+ * sequence.
+ */
+export function generatePublicIdFromExistingIds(
+  existingIds: string[],
+  gender: Profile["gender"] | string = "male"
+): string {
   const now = new Date();
   const yy = String(now.getFullYear()).slice(-2);
   const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const prefix = `LS${yy}${mm}`;
-
-  const sameMonthProfiles = existingProfiles.filter((p) => {
-    const pubId = (p.publicId || p.memberId || "").toUpperCase().replace(/-/g, "");
-    return pubId.startsWith(prefix) && pubId.length === 10;
-  });
+  const flag = genderFlag(gender);
 
   let maxSeq = 0;
-  for (const p of sameMonthProfiles) {
-    const pubId = (p.publicId || p.memberId || "").toUpperCase().replace(/-/g, "");
-    if (pubId.length === 10) {
-      const seq = parseInt(pubId.slice(-4), 10);
-      if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
-    }
+  for (const raw of existingIds) {
+    const seq = extractGlobalSequence((raw || "").toUpperCase().replace(/-/g, ""));
+    if (seq > maxSeq) maxSeq = seq;
   }
 
-  const nextSeq = String(maxSeq + 1).padStart(4, "0");
-  return `LS${yy}${mm}${nextSeq}`;
+  const next = String(maxSeq + 1).padStart(5, "0");
+  return `L${flag}${yy}${mm}${next}`;
 }
 
 /**
- * Slugify first name only for URL: lowercase, alphanumeric
+ * Extract the numeric sequence portion from a public_id of either format.
+ * Returns 0 if the id is not in a recognised format.
+ *
+ *   - New:    L[BG]YYMM NNNNN  -> last 5 digits
+ *   - Legacy: LS YYMM NNNN     -> last 4 digits
  */
+function extractGlobalSequence(id: string): number {
+  if (NEW_PUBLIC_ID_RE.test(id)) {
+    const n = parseInt(id.slice(6), 10);
+    return Number.isNaN(n) ? 0 : n;
+  }
+  if (LEGACY_PUBLIC_ID_RE.test(id)) {
+    const n = parseInt(id.slice(6), 10);
+    return Number.isNaN(n) ? 0 : n;
+  }
+  return 0;
+}
+
+/** Slugify first name only for URL: lowercase, alphanumeric. */
 function slugifyFirstName(name: string): string {
   const firstName = (name || "profile").trim().split(/\s+/)[0] || "profile";
-  return firstName
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "") || "profile";
+  return (
+    firstName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "profile"
+  );
 }
 
 /**
- * Get profile URL slug: /profile/ls26010001-rohan (first name only)
+ * Build the public profile URL slug, e.g. /profile/lb260400004-ananya
+ * (lowercased public_id + "-" + slugified first name).
  */
 export function getProfileSlug(profile: Profile): string {
   const publicId = (profile.publicId || profile.memberId || profile.id).toLowerCase();
@@ -52,20 +123,35 @@ export function getProfileSlug(profile: Profile): string {
   return `${publicId}-${nameSlug}`;
 }
 
-/** Get the display Member ID (publicId preferred over memberId) */
+/** Get the display Member ID (publicId preferred over memberId). */
 export function getMemberIdDisplay(profile: Profile | Partial<Profile>): string {
   return profile.publicId || profile.memberId || profile.id || "—";
 }
 
 /**
- * Extract publicId from a profile slug (e.g. "ls26010001-proya" -> "LS26010001")
+ * Extract the canonical UPPERCASE publicId from a URL slug.
+ *
+ * Accepts both formats:
+ *   "lb260400004-ananya" -> "LB260400004"  (new)
+ *   "ls26010004-ananya"  -> "LS26010004"   (legacy)
+ *
+ * Returns null if the first segment is not a valid public id in either format.
  */
 export function parseProfileSlug(slug: string): string | null {
   if (!slug || typeof slug !== "string") return null;
-  const trimmed = slug.trim();
-  const firstPart = trimmed.split("-")[0];
+  const firstPart = slug.trim().split("-")[0];
   if (!firstPart) return null;
   const upper = firstPart.toUpperCase();
-  if (/^LS\d{8}$/.test(upper)) return upper;
+  if (NEW_PUBLIC_ID_RE.test(upper)) return upper;
+  if (LEGACY_PUBLIC_ID_RE.test(upper)) return upper;
   return null;
+}
+
+/** Public regex predicates, exposed for tests / mappers. */
+export function isNewPublicId(id: string | undefined | null): boolean {
+  return !!id && NEW_PUBLIC_ID_RE.test(id.toUpperCase());
+}
+
+export function isLegacyPublicId(id: string | undefined | null): boolean {
+  return !!id && LEGACY_PUBLIC_ID_RE.test(id.toUpperCase());
 }

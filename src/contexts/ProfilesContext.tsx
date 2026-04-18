@@ -12,7 +12,14 @@ interface ProfilesContextType {
   profilesLoading: boolean;
   refreshProfiles: () => Promise<void>;
   getProfileById: (id: string) => Profile | undefined;
-  addProfile: (profile: Partial<Profile> & { email: string; fullName: string; gender: string; dateOfBirth: string }) => Profile;
+  addProfile: (
+    profile: Partial<Profile> & {
+      email: string;
+      fullName: string;
+      gender: Profile["gender"];
+      dateOfBirth: string;
+    }
+  ) => Profile;
   updateProfileById: (id: string, updates: Partial<Profile>) => void;
 }
 
@@ -23,23 +30,41 @@ export function ProfilesProvider({ children }: { children: React.ReactNode }) {
   const [profiles, setProfiles] = useState<Profile[]>(() => []);
   const [profilesLoading, setProfilesLoading] = useState(true);
 
+  const currentUserId = currentUser?.id;
+
   const refreshProfiles = useCallback(async () => {
     setProfilesLoading(true);
     const { data, error } = await searchProfiles({}, 100);
     if (!error && data.length > 0) {
-      const filtered = currentUser?.id
-        ? data.filter((p) => p.id !== currentUser.id)
+      const filtered = currentUserId
+        ? data.filter((p) => p.id !== currentUserId)
         : data;
       setProfiles(filtered);
     } else {
       setProfiles([...mockProfiles]);
     }
     setProfilesLoading(false);
-  }, [currentUser?.id]);
+  }, [currentUserId]);
 
   useEffect(() => {
-    refreshProfiles();
-  }, [refreshProfiles]);
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await searchProfiles({}, 100);
+      if (cancelled) return;
+      if (!error && data.length > 0) {
+        const filtered = currentUserId
+          ? data.filter((p) => p.id !== currentUserId)
+          : data;
+        setProfiles(filtered);
+      } else {
+        setProfiles([...mockProfiles]);
+      }
+      setProfilesLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUserId]);
 
   const getProfileById = useCallback(
     (id: string) =>
@@ -48,9 +73,16 @@ export function ProfilesProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addProfile = useCallback(
-    (data: Partial<Profile> & { email: string; fullName: string; gender: string; dateOfBirth: string }) => {
+    (
+      data: Partial<Profile> & {
+        email: string;
+        fullName: string;
+        gender: Profile["gender"];
+        dateOfBirth: string;
+      }
+    ) => {
       const now = new Date().toISOString().slice(0, 10);
-      const publicId = generatePublicId(profiles);
+      const publicId = generatePublicId(profiles, data.gender);
       const id = `profile-${Date.now()}`;
       const newProfile: Profile = {
         ...data,

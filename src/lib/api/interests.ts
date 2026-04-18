@@ -69,6 +69,37 @@ export async function getReceivedInterests(myProfileId: string): Promise<{
   }
 }
 
+/** Get interests sent by a profile */
+export async function getSentInterests(myProfileId: string): Promise<{
+  data: Array<Interest & { toProfileId: string }>;
+  error: string | null;
+}> {
+  try {
+    const supabase = createSupabaseClientSafe();
+    if (!supabase) return { data: [], error: "Supabase not configured" };
+
+    const { data, error } = await supabase
+      .from("interests")
+      .select("*")
+      .eq("from_id", myProfileId)
+      .order("created_at", { ascending: false });
+
+    if (error) return { data: [], error: error.message };
+    return {
+      data: (data || []).map((r) => ({
+        ...toInterest(r as InterestRow),
+        toProfileId: (r as InterestRow).to_id,
+      })),
+      error: null,
+    };
+  } catch (err) {
+    return {
+      data: [],
+      error: err instanceof Error ? err.message : "Failed to fetch sent interests",
+    };
+  }
+}
+
 /** Send an interest */
 export async function sendInterest(
   fromProfileId: string,

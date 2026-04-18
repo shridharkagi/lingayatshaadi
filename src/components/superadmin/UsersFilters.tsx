@@ -9,7 +9,7 @@ export type ProfileCreatedFilter = "" | "today" | "week" | "month" | "custom";
 
 export interface UsersFiltersState {
   search: string;
-  gender: "" | "male" | "female" | "other";
+  gender: "" | "male" | "female";
   ageMin: number;
   ageMax: number;
   state: string;
@@ -104,7 +104,6 @@ export function UsersFilters({ filters, onChange, onClear }: UsersFiltersProps) 
                 <option value="">All</option>
                 <option value="male">Male</option>
                 <option value="female">Female</option>
-                <option value="other">Other</option>
               </select>
             </div>
 

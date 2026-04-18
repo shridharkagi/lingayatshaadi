@@ -25,13 +25,39 @@ export const STATE_CITIES: Record<string, string[]> = {
   Delhi: ["Delhi"],
 };
 
-// Indian states
+// Indian states + Union Territories (sorted alphabetically)
 export const INDIAN_STATES = [
   "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat",
   "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra",
   "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim",
-  "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal", "Delhi", "Jammu and Kashmir"
+  "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
+  // Union Territories
+  "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu",
+  "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
+].sort();
+
+/**
+ * Common values for the "Whom does this contact belong to?" picker on each
+ * profile contact number. The form also allows a free-text "Other" entry.
+ */
+export const CONTACT_OWNER_RELATIONS = [
+  "Self",
+  "Father",
+  "Mother",
+  "Brother",
+  "Sister",
+  "Guardian",
+  "Spouse",
+  "Uncle",
+  "Aunt",
+  "Cousin",
+  "Friend",
+  "Other",
 ];
+
+/** Communication channels supported per contact entry (multi-select tags). */
+export const CONTACT_METHODS = ["Call", "WhatsApp", "SMS"] as const;
+export type ContactMethod = (typeof CONTACT_METHODS)[number];
 
 // Zodiac signs (Rashi)
 export const ZODIAC_SIGNS = [

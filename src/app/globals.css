@@ -50,6 +50,7 @@
   --foreground: var(--color-secondary-dark);
   --primary: var(--color-primary);
   --primary-light: var(--color-primary-hover);
+  --primary-hover: var(--color-primary-hover);
   --accent: var(--color-primary);
   --accent-light: var(--color-primary-hover);
   --card-bg: var(--color-bg-card);
