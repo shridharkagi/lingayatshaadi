@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 import "./globals.css";
@@ -63,11 +63,6 @@ export const metadata: Metadata = {
     images: ["/og-image.jpg"],
   },
   metadataBase: new URL("https://test.ligayatshaadi.in"),
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 5,
-  },
   robots: {
     index: true,
     follow: true,
@@ -79,6 +74,12 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
 };
 
 export default function RootLayout({
