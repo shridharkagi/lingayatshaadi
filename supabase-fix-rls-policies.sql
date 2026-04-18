@@ -105,6 +105,8 @@ CREATE POLICY "Users can update interests they received" ON interests
 
 -- ---------- contact_views ----------
 DROP POLICY IF EXISTS "Users can manage their contact views" ON contact_views;
+DROP POLICY IF EXISTS "Users can view their contact views" ON contact_views;
+DROP POLICY IF EXISTS "Users can record contact views" ON contact_views;
 
 ALTER TABLE contact_views ENABLE ROW LEVEL SECURITY;
 
