@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pure HTML Click Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            padding: 40px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            padding: 5px;
+            background: #f0f0f0;
+            border-radius: 10px;
+        }
+        .tab {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: transparent;
+            color: #666;
+        }
+        .tab:hover {
+            background: #e0e0e0;
+        }
+        .tab.active {
+            background: #E67300;
+            color: white;
+        }
+        .content {
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
+        .log {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            padding: 5px;
+            margin: 2px 0;
+            font-size: 14px;
+            color: #333;
+        }
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔥 Pure HTML Click Test (No React/Next.js)</h1>
+        <p style="margin-bottom: 20px; color: #666;">
+            This page has ZERO dependencies. If clicks don't work here, it's a browser/extension issue.
+        </p>
+
+        <div class="tabs">
+            <button class="tab active" id="email-tab" onclick="switchTab('email')">
+                📧 Email
+            </button>
+            <button class="tab" id="otp-tab" onclick="switchTab('otp')">
+                📱 Mobile OTP
+            </button>
+        </div>
+
+        <div class="content" id="content">
+            <h3>Current Mode: <span id="current-mode" class="success">Email</span></h3>
+            <p>Total Clicks: <span id="click-count" class="success">0</span></p>
+        </div>
+
+        <div class="log" id="log">
+            <div class="log-entry">Log will appear here when you click tabs...</div>
+        </div>
+
+        <div style="margin-top: 20px; padding: 15px; background: #fff3cd; border-radius: 8px;">
+            <strong>⚠️ Instructions:</strong>
+            <ol style="margin-left: 20px; margin-top: 10px;">
+                <li>Click the "Mobile OTP" button above</li>
+                <li>If it doesn't work, try in a different browser</li>
+                <li>Try in Incognito/Private mode (disables extensions)</li>
+                <li>Check console for errors (F12 → Console)</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        let clickCount = 0;
+        let currentMode = 'email';
+
+        function addLog(message) {
+            const log = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+            log.insertBefore(entry, log.firstChild);
+            
+            console.log('LOG:', message);
+        }
+
+        function switchTab(mode) {
+            clickCount++;
+            currentMode = mode;
+
+            // Update display
+            document.getElementById('current-mode').textContent = mode.toUpperCase();
+            document.getElementById('click-count').textContent = clickCount;
+
+            // Update tab styles
+            const emailTab = document.getElementById('email-tab');
+            const otpTab = document.getElementById('otp-tab');
+
+            if (mode === 'email') {
+                emailTab.classList.add('active');
+                otpTab.classList.remove('active');
+            } else {
+                emailTab.classList.remove('active');
+                otpTab.classList.add('active');
+            }
+
+            // Log the action
+            addLog(`✅ Successfully switched to ${mode.toUpperCase()} mode`);
+        }
+
+        // Add event listeners for extra debugging
+        document.getElementById('otp-tab').addEventListener('mousedown', function() {
+            addLog('👆 Mouse DOWN on Mobile OTP button');
+        });
+
+        document.getElementById('otp-tab').addEventListener('mouseup', function() {
+            addLog('👆 Mouse UP on Mobile OTP button');
+        });
+
+        document.getElementById('otp-tab').addEventListener('click', function() {
+            addLog('🖱️ CLICK event fired on Mobile OTP button');
+        });
+
+        // Page load message
+        window.addEventListener('load', function() {
+            addLog('✅ Page loaded successfully - Pure HTML/CSS/JS only');
+        });
+    </script>
+</body>
+</html>

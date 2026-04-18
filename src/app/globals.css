@@ -125,9 +125,28 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Ensure buttons and interactive elements are clickable */
+button,
+[role="button"],
+[role="tab"],
+a,
+input,
+textarea,
+select {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+input,
+textarea,
+select {
+  cursor: text;
+}
+
 /* Prevent text selection on interactive elements */
 button, 
 [role="button"],
+[role="tab"],
 .touch-manipulation {
   -webkit-user-select: none;
   user-select: none;

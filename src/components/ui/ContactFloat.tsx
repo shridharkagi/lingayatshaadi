@@ -41,12 +41,32 @@ export function ContactFloat() {
     setWhatsappUrl(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`);
   }, [pathname, whatsappNumber, config.whatsappDefaultMessage]);
 
+  // Native DOM event delegation - works around Turbopack breaking React onClick in dev
+  useEffect(() => {
+    const handleClick = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target.closest("#contact-float-btn")) {
+        e.preventDefault();
+        setPopupOpen(true);
+      } else if (target.closest("#contact-float-close")) {
+        e.preventDefault();
+        setPopupOpen(false);
+      } else if (target.closest("#contact-float-backdrop") && !target.closest("[data-contact-popup-content]")) {
+        e.preventDefault();
+        setPopupOpen(false);
+      }
+    };
+    document.addEventListener("click", handleClick, true);
+    return () => document.removeEventListener("click", handleClick, true);
+  }, []);
+
   return (
     <>
       <button
         type="button"
+        id="contact-float-btn"
         onClick={() => setPopupOpen(true)}
-        className="fixed bottom-24 right-4 z-50 flex items-center justify-center w-14 h-14 rounded-full bg-[var(--primary)] text-white shadow-lg hover:scale-105 active:scale-95 transition-transform lg:bottom-6 lg:right-6"
+        className="fixed bottom-24 right-4 z-50 flex items-center justify-center w-14 h-14 rounded-full bg-[var(--primary)] text-white shadow-lg hover:scale-105 active:scale-95 transition-transform lg:bottom-6 lg:right-6 cursor-pointer touch-manipulation"
         title="Contact us"
         aria-label="Contact us"
       >
@@ -55,6 +75,7 @@ export function ContactFloat() {
 
       {popupOpen && (
         <div
+          id="contact-float-backdrop"
           className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 bg-black/40 sm:p-4"
           onClick={() => setPopupOpen(false)}
           role="dialog"
@@ -62,6 +83,7 @@ export function ContactFloat() {
           aria-labelledby="contact-popup-title"
         >
           <div
+            data-contact-popup-content
             className="w-full max-w-sm bg-white rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
@@ -71,8 +93,9 @@ export function ContactFloat() {
               </h2>
               <button
                 type="button"
+                id="contact-float-close"
                 onClick={() => setPopupOpen(false)}
-                className="p-2 -m-2 rounded-lg hover:bg-[var(--color-border)]/50 transition-colors"
+                className="p-2 -m-2 rounded-lg hover:bg-[var(--color-border)]/50 transition-colors cursor-pointer"
                 aria-label="Close"
               >
                 <X size={20} />

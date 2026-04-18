@@ -1,12 +1,16 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { Profile } from "@/types";
 import { mockProfiles } from "@/data/mock";
 import { generatePublicId } from "@/lib/memberId";
+import { searchProfiles } from "@/lib/api/profiles";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface ProfilesContextType {
   profiles: Profile[];
+  profilesLoading: boolean;
+  refreshProfiles: () => Promise<void>;
   getProfileById: (id: string) => Profile | undefined;
   addProfile: (profile: Partial<Profile> & { email: string; fullName: string; gender: string; dateOfBirth: string }) => Profile;
   updateProfileById: (id: string, updates: Partial<Profile>) => void;
@@ -15,10 +19,31 @@ interface ProfilesContextType {
 const ProfilesContext = createContext<ProfilesContextType | undefined>(undefined);
 
 export function ProfilesProvider({ children }: { children: React.ReactNode }) {
-  const [profiles, setProfiles] = useState<Profile[]>(() => [...mockProfiles]);
+  const { user: currentUser } = useAuth();
+  const [profiles, setProfiles] = useState<Profile[]>(() => []);
+  const [profilesLoading, setProfilesLoading] = useState(true);
+
+  const refreshProfiles = useCallback(async () => {
+    setProfilesLoading(true);
+    const { data, error } = await searchProfiles({}, 100);
+    if (!error && data.length > 0) {
+      const filtered = currentUser?.id
+        ? data.filter((p) => p.id !== currentUser.id)
+        : data;
+      setProfiles(filtered);
+    } else {
+      setProfiles([...mockProfiles]);
+    }
+    setProfilesLoading(false);
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    refreshProfiles();
+  }, [refreshProfiles]);
 
   const getProfileById = useCallback(
-    (id: string) => profiles.find((p) => p.id === id),
+    (id: string) =>
+      profiles.find((p) => p.id === id || (p.publicId || p.memberId || "").toLowerCase() === id.toLowerCase()),
     [profiles]
   );
 
@@ -62,7 +87,7 @@ export function ProfilesProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <ProfilesContext.Provider
-      value={{ profiles, getProfileById, addProfile, updateProfileById }}
+      value={{ profiles, profilesLoading, refreshProfiles, getProfileById, addProfile, updateProfileById }}
     >
       {children}
     </ProfilesContext.Provider>

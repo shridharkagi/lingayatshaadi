@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Click Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .tab-container {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            padding: 4px;
+            background: rgba(241, 229, 218, 0.5);
+            border-radius: 12px;
+            max-width: 400px;
+        }
+        button {
+            flex: 1;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        button.active {
+            background: #E67300;
+            color: white;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        button.inactive {
+            background: transparent;
+            color: #6B6B6B;
+        }
+        button:hover {
+            transform: scale(1.02);
+        }
+        .result {
+            padding: 20px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Click Test for Login Tabs</h1>
+    <p>This is a simple HTML test to verify click events work properly.</p>
+    
+    <div class="tab-container">
+        <button id="email-btn" class="active" onclick="switchTab('email')">Email</button>
+        <button id="otp-btn" class="inactive" onclick="switchTab('otp')">Mobile OTP</button>
+    </div>
+    
+    <div class="result">
+        <h3>Current Mode: <span id="current-mode">email</span></h3>
+        <h3>Click Count: <span id="click-count">0</span></h3>
+        <div id="log"></div>
+    </div>
+
+    <script>
+        let clickCount = 0;
+        let currentMode = 'email';
+
+        function switchTab(mode) {
+            clickCount++;
+            currentMode = mode;
+            
+            document.getElementById('current-mode').textContent = mode;
+            document.getElementById('click-count').textContent = clickCount;
+            
+            const emailBtn = document.getElementById('email-btn');
+            const otpBtn = document.getElementById('otp-btn');
+            
+            if (mode === 'email') {
+                emailBtn.className = 'active';
+                otpBtn.className = 'inactive';
+            } else {
+                emailBtn.className = 'inactive';
+                otpBtn.className = 'active';
+            }
+            
+            const log = document.getElementById('log');
+            log.innerHTML = `<p><strong>${new Date().toLocaleTimeString()}</strong>: Switched to ${mode}</p>` + log.innerHTML;
+            
+            console.log('Tab switched to:', mode);
+        }
+        
+        // Add event listeners to detect any click issues
+        document.getElementById('otp-btn').addEventListener('mousedown', () => {
+            console.log('Mobile OTP mousedown');
+        });
+        
+        document.getElementById('otp-btn').addEventListener('mouseup', () => {
+            console.log('Mobile OTP mouseup');
+        });
+        
+        document.getElementById('otp-btn').addEventListener('click', () => {
+            console.log('Mobile OTP click event');
+        });
+    </script>
+</body>
+</html>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -21,7 +22,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default function EditProfilePage() {
   const router = useRouter();
-  const { user, updateProfile } = useAuth();
+  const { user, saveProfile, updateProfile } = useAuth();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   if (!user) return null;
 
@@ -190,8 +193,33 @@ export default function EditProfilePage() {
           <Input label="Contact Type" placeholder="e.g. Office, Personal" value={user.contactType} onChange={(e) => handleUpdate("contactType", e.target.value)} maxLength={50} />
         </Section>
 
-        <Button fullWidth onClick={() => router.back()}>
-          Save Changes
+        {error && <p className="text-red-600 text-sm">{error}</p>}
+        <Button
+          fullWidth
+          disabled={saving}
+          onClick={async () => {
+            if (!user.email || !user.fullName || !user.dateOfBirth || !user.gender) {
+              setError("Required fields missing.");
+              return;
+            }
+            setSaving(true);
+            setError("");
+            const result = await saveProfile({
+              ...user,
+              email: user.email,
+              fullName: user.fullName,
+              dateOfBirth: user.dateOfBirth,
+              gender: user.gender,
+            });
+            setSaving(false);
+            if (result.error) {
+              setError(result.error);
+            } else {
+              router.back();
+            }
+          }}
+        >
+          {saving ? "Saving..." : "Save Changes"}
         </Button>
       </div>
     </div>

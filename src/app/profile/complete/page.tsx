@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Profile } from "@/types";
 import { PROFESSION_TYPES, FOOD_HABITS_OPTIONS } from "@/data/constants";
 import { SubCasteSelector } from "@/components/ui/SubCasteSelector";
+import { syntheticEmailForPhone } from "@/lib/phoneAuth";
 
 const steps = [
   { id: 1, title: "About Me" },
@@ -62,16 +63,33 @@ const initialProfile: Partial<Profile> = {
 
 export default function ProfileCompletePage() {
   const router = useRouter();
-  const { user, updateProfile, register } = useAuth();
+  const { user, authUser, saveProfile } = useAuth();
   const [step, setStep] = useState(1);
   const [profile, setProfile] = useState<Partial<Profile>>(initialProfile);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const signupData = sessionStorage.getItem("lingayat_signup_data");
-    const signupEmail = sessionStorage.getItem("lingayat_signup_email");
-    if (signupData && signupEmail) {
+    const signupEmailStored = sessionStorage.getItem("lingayat_signup_email");
+    if (signupData) {
       try {
-        const data = JSON.parse(signupData);
+        const data = JSON.parse(signupData) as {
+          profileFor?: string;
+          fullName?: string;
+          mobile?: string;
+          city?: string;
+          gender?: string;
+          dateOfBirth?: string;
+        };
+        const digits = String(data.mobile ?? "").replace(/\D/g, "").slice(-10);
+        const signupEmail =
+          signupEmailStored ||
+          (digits.length === 10 ? syntheticEmailForPhone(digits) : "");
+        if (!signupEmail) {
+          if (user) setProfile((p) => ({ ...p, ...user }));
+          return;
+        }
         const profileFor = data.profileFor as "self" | "parent" | undefined;
         if (profileFor === "parent") {
           setProfile((p) => ({
@@ -87,7 +105,7 @@ export default function ProfileCompletePage() {
             ...p,
             fullName: data.fullName,
             dateOfBirth: data.dateOfBirth,
-            gender: data.gender,
+            gender: data.gender as Profile["gender"] | undefined,
             contact: data.mobile || undefined,
             city: data.city || undefined,
             email: signupEmail,
@@ -106,19 +124,58 @@ export default function ProfileCompletePage() {
     setProfile((p) => ({ ...p, [key]: value }));
   };
 
-  const next = () => {
-    if (step < 6) setStep(step + 1);
-    else {
-      const signupEmail = sessionStorage.getItem("lingayat_signup_email");
-      if (signupEmail) {
-        register({ ...profile, email: signupEmail } as Partial<Profile> & { email: string });
-        sessionStorage.removeItem("lingayat_signup_email");
-        sessionStorage.removeItem("lingayat_signup_data");
-      } else if (user) {
-        updateProfile(profile as Partial<Profile>);
-      }
-      router.push("/home");
+  const next = async () => {
+    if (step < 6) {
+      setStep(step + 1);
+      return;
     }
+
+    const storedData = sessionStorage.getItem("lingayat_signup_data");
+    let fallbackEmail = sessionStorage.getItem("lingayat_signup_email") || "";
+    if (!fallbackEmail && storedData) {
+      try {
+        const d = JSON.parse(storedData) as { mobile?: string };
+        const d10 = String(d.mobile ?? "").replace(/\D/g, "").slice(-10);
+        if (d10.length === 10) fallbackEmail = syntheticEmailForPhone(d10);
+      } catch {
+        /* ignore */
+      }
+    }
+    const email = profile.email || fallbackEmail || "";
+    const fullName = profile.fullName || "";
+    const dateOfBirth = profile.dateOfBirth || "";
+    const gender = profile.gender;
+
+    if (!email?.trim() || !fullName?.trim() || !dateOfBirth || !gender) {
+      setError("Please fill in required fields: Full Name, Date of Birth, and Gender.");
+      return;
+    }
+
+    if (!authUser) {
+      setError("Session expired. Please log in again.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    const payload = {
+      ...profile,
+      email: email.trim(),
+      fullName: fullName.trim(),
+      dateOfBirth,
+      gender: gender as Profile["gender"],
+    };
+    const result = await saveProfile(payload);
+    setSaving(false);
+
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+
+    sessionStorage.removeItem("lingayat_signup_email");
+    sessionStorage.removeItem("lingayat_signup_data");
+    router.push("/home");
   };
 
   const prev = () => (step > 1 ? setStep(step - 1) : router.back());
@@ -320,17 +377,20 @@ export default function ProfileCompletePage() {
                   setProfile((prev) => ({ ...prev, photos: (prev.photos || []).filter((p) => p !== url) }));
                 }
               }}
-              userId={user?.id || user?.memberId || "new-user"}
+              userId={authUser?.id || user?.id || user?.memberId || "new-user"}
             />
           </div>
         )}
 
+        {error && (
+          <p className="text-red-600 text-sm mt-2">{error}</p>
+        )}
         <div className="flex gap-3 mt-8">
-          <Button variant="outline" onClick={prev} className="flex-1">
+          <Button variant="outline" onClick={prev} className="flex-1" disabled={saving}>
             Back
           </Button>
-          <Button onClick={next} className="flex-1">
-            {step === 6 ? "Complete" : "Continue"}
+          <Button onClick={next} className="flex-1" disabled={saving}>
+            {step === 6 ? (saving ? "Saving..." : "Complete") : "Continue"}
           </Button>
         </div>
       </div>

@@ -15,7 +15,7 @@ export function Button({
   disabled,
   ...props
 }: ButtonProps) {
-  const base = "rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed";
+  const base = "rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer touch-manipulation";
   const variants = {
     primary: "bg-[var(--primary)] text-white hover:bg-[var(--primary-light)] active:scale-[0.98]",
     secondary: "bg-[var(--accent)] text-white hover:bg-[var(--accent-light)] active:scale-[0.98]",

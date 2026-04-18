@@ -26,7 +26,12 @@ import {
   Check,
 } from "lucide-react";
 import { useProfiles } from "@/contexts/ProfilesContext";
-import { mockInterests } from "@/data/mock";
+import { hasAcceptedInterest, hasSentInterest, sendInterest } from "@/lib/api/interests";
+import { recordProfileView } from "@/lib/api/profileViews";
+import { addToShortlist, removeFromShortlist, isShortlisted } from "@/lib/api/shortlist";
+import { blockUser } from "@/lib/api/blocked";
+import { getNote, saveNote } from "@/lib/api/notes";
+import { reportProfile } from "@/lib/api/reports";
 import { getAge } from "@/lib/utils";
 import {
   maskString,
@@ -88,14 +93,6 @@ function ShareProfileButton({ profile }: { profile: Profile }) {
   );
 }
 
-function canMessage(profileId: string): boolean {
-  return mockInterests.some(
-    (i) =>
-      i.status === "accepted" &&
-      ((i.fromId === "current" && i.toId === profileId) ||
-        (i.toId === "current" && i.fromId === profileId))
-  );
-}
 
 /* Card section matching the reference design: icon + gray heading + black details */
 function DetailSection({
@@ -121,14 +118,23 @@ function DetailSection({
 export default function OtherProfilePage() {
   const params = useParams();
   const router = useRouter();
-  const { isLoggedIn } = useAuth();
+  const { user, isLoggedIn } = useAuth();
   const { config } = useAppConfig();
   const { profiles } = useProfiles();
   const [showContact, setShowContact] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [hasShownInterest, setHasShownInterest] = useState(false);
+  const [interestAccepted, setInterestAccepted] = useState(false);
+  const [sendingInterest, setSendingInterest] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [savingShortlist, setSavingShortlist] = useState(false);
+  const [myNote, setMyNote] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportMessage, setReportMessage] = useState("");
+  const [reporting, setReporting] = useState(false);
   const [copiedMemberId, setCopiedMemberId] = useState(false);
 
   const slugFromParams = typeof params.id === "string" ? params.id : params.id?.[0] ?? "";
@@ -158,6 +164,27 @@ export default function OtherProfilePage() {
   useEffect(() => {
     setShowContact(false);
   }, [profile?.id]);
+
+  // Record profile view when logged-in user views another profile
+  useEffect(() => {
+    if (user?.id && profile?.id && user.id !== profile.id) {
+      recordProfileView(user.id, profile.id);
+    }
+  }, [user?.id, profile?.id]);
+
+  // Fetch interest status and shortlist when profile or user changes
+  useEffect(() => {
+    if (!profile?.id || !user?.id) {
+      setInterestAccepted(false);
+      setHasShownInterest(false);
+      setIsSaved(false);
+      return;
+    }
+    hasAcceptedInterest(user.id, profile.id).then(({ data }) => setInterestAccepted(!!data));
+    hasSentInterest(user.id, profile.id).then(({ data }) => setHasShownInterest(!!data));
+    isShortlisted(user.id, profile.id).then(({ data }) => setIsSaved(!!data));
+    getNote(user.id, profile.id).then(({ data }) => setMyNote(data || ""));
+  }, [profile?.id, user?.id]);
 
   const goPrev = useCallback(() => {
     if (currentIdx <= 0 || isTransitioning) return;
@@ -230,7 +257,6 @@ export default function OtherProfilePage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [goPrev, goNext]);
 
-  const interestAccepted = profile ? canMessage(profile.id) : false;
   const whatsappUrl = config.whatsappGroupUrl?.trim() || "";
 
   const handleCopyMemberId = async () => {
@@ -494,13 +520,20 @@ export default function OtherProfilePage() {
       {/* Action buttons - improved mobile responsiveness */}
       <div className="px-3 py-2">
         <div className="grid grid-cols-4 gap-1 sm:gap-1.5">
-          <button 
-            onClick={() => setHasShownInterest(!hasShownInterest)}
+          <button
+            onClick={async () => {
+              if (!user?.id || !profile || hasShownInterest || sendingInterest) return;
+              setSendingInterest(true);
+              const { error } = await sendInterest(user.id, profile.id, undefined, user.fullName);
+              setSendingInterest(false);
+              if (!error) setHasShownInterest(true);
+            }}
+            disabled={hasShownInterest || sendingInterest}
             className={`flex flex-col items-center justify-center gap-1 px-2 py-3 sm:py-2.5 rounded-xl transition min-h-[44px] border ${
-              hasShownInterest 
-                ? 'bg-red-50 border-red-200 text-red-600' 
-                : 'hover:bg-gray-100 active:bg-gray-200 border-transparent hover:border-gray-200'
-            }`}
+              hasShownInterest
+                ? "bg-red-50 border-red-200 text-red-600"
+                : "hover:bg-gray-100 active:bg-gray-200 border-transparent hover:border-gray-200"
+            } ${sendingInterest ? "opacity-70" : ""}`}
           >
             <Heart size={20} className={`flex-shrink-0 ${hasShownInterest ? 'fill-red-600' : ''}`} />
             <span className="text-xs font-medium truncate">Interest</span>
@@ -536,7 +569,7 @@ export default function OtherProfilePage() {
                 const newShowContact = !showContact;
                 setShowContact(newShowContact);
                 if (newShowContact && profile) {
-                  trackContactView(profile);
+                  trackContactView(profile, user?.id);
                 }
               }}
               className={`flex flex-col items-center justify-center gap-1 px-2 py-3 sm:py-2.5 rounded-xl transition min-h-[44px] border ${
@@ -549,12 +582,21 @@ export default function OtherProfilePage() {
               <span className="text-xs font-medium truncate">Contact</span>
             </button>
           )}
-          <button 
-            onClick={() => setIsSaved(!isSaved)}
+          <button
+            onClick={async () => {
+              if (!user?.id || !profile || savingShortlist) return;
+              setSavingShortlist(true);
+              const { error } = isSaved
+                ? await removeFromShortlist(user.id, profile.id)
+                : await addToShortlist(user.id, profile.id);
+              setSavingShortlist(false);
+              if (!error) setIsSaved(!isSaved);
+            }}
+            disabled={savingShortlist}
             className={`flex flex-col items-center justify-center gap-1 px-2 py-3 sm:py-2.5 rounded-xl transition min-h-[44px] border ${
-              isSaved 
-                ? 'bg-yellow-50 border-yellow-200 text-yellow-700' 
-                : 'hover:bg-gray-100 active:bg-gray-200 border-transparent hover:border-gray-200'
+              isSaved
+                ? "bg-yellow-50 border-yellow-200 text-yellow-700"
+                : "hover:bg-gray-100 active:bg-gray-200 border-transparent hover:border-gray-200"
             }`}
             aria-label="Save to shortlist"
           >
@@ -783,7 +825,7 @@ export default function OtherProfilePage() {
                     const newShowContact = !showContact;
                     setShowContact(newShowContact);
                     if (newShowContact && profile) {
-                      trackContactView(profile);
+                      trackContactView(profile, user?.id);
                     }
                   }}
                   className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors text-[var(--primary)] font-medium"
@@ -894,16 +936,111 @@ export default function OtherProfilePage() {
           </div>
         )}
 
+        {isLoggedIn && user?.id && profile && user.id !== profile.id && (
+          <div className="mt-4 p-4 rounded-2xl bg-gray-50 border border-gray-100">
+            <h4 className="font-semibold text-[var(--foreground)] mb-2">My note</h4>
+            <textarea
+              value={myNote}
+              onChange={(e) => setMyNote(e.target.value)}
+              placeholder="Add a private note about this profile..."
+              className="w-full px-3 py-2 text-sm rounded-xl border border-[var(--border)] min-h-[80px] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+            />
+            <button
+              onClick={async () => {
+                if (!user?.id || !profile || savingNote) return;
+                setSavingNote(true);
+                await saveNote(user.id, profile.id, myNote);
+                setSavingNote(false);
+              }}
+              disabled={savingNote}
+              className="mt-2 px-4 py-1.5 rounded-lg bg-[var(--primary)] text-white text-sm font-medium"
+            >
+              {savingNote ? "Saving..." : "Save note"}
+            </button>
+          </div>
+        )}
+
         <div className="flex gap-2 pt-4">
-          <button className="flex-1 flex items-center justify-center gap-2 py-3 text-sm sm:text-base text-gray-600 border border-[var(--border)] rounded-xl hover:bg-gray-50 transition-colors">
+          <button
+            onClick={() => setShowReportModal(true)}
+            className="flex-1 flex items-center justify-center gap-2 py-3 text-sm sm:text-base text-gray-600 border border-[var(--border)] rounded-xl hover:bg-gray-50 transition-colors"
+          >
             <Flag size={18} className="text-gray-500" />
             Report
           </button>
-          <button className="flex-1 flex items-center justify-center gap-2 py-3 text-sm sm:text-base text-gray-600 border border-[var(--border)] rounded-xl hover:bg-gray-50 transition-colors">
-            <Ban size={18} className="text-gray-500" />
-            Block
-          </button>
+          {isLoggedIn && user?.id && profile && user.id !== profile.id && (
+            <button
+              onClick={async () => {
+                if (!user?.id || !profile) return;
+                if (confirm("Block this user? They won't see your profile and you won't see theirs.")) {
+                  await blockUser(user.id, profile.id);
+                  router.push("/search");
+                }
+              }}
+              className="flex-1 flex items-center justify-center gap-2 py-3 text-sm sm:text-base text-red-600 border border-red-200 rounded-xl hover:bg-red-50 transition-colors"
+            >
+              <Ban size={18} />
+              Block
+            </button>
+          )}
         </div>
+
+        {showReportModal && isLoggedIn && user?.id && profile && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+            <div className="bg-white rounded-2xl p-6 max-w-md w-full">
+              <h3 className="text-lg font-semibold mb-4">Report Profile</h3>
+              <p className="text-sm text-gray-600 mb-4">Help us keep the community safe. Select a reason and add details if needed.</p>
+              <select
+                value={reportReason}
+                onChange={(e) => setReportReason(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-[var(--border)] mb-3"
+              >
+                <option value="">Select reason</option>
+                <option value="Fake profile">Fake profile</option>
+                <option value="Inappropriate content">Inappropriate content</option>
+                <option value="Harassment">Harassment</option>
+                <option value="Spam">Spam</option>
+                <option value="Wrong information">Wrong information</option>
+                <option value="Other">Other</option>
+              </select>
+              <textarea
+                value={reportMessage}
+                onChange={(e) => setReportMessage(e.target.value)}
+                placeholder="Additional details (optional)"
+                className="w-full px-4 py-3 rounded-xl border border-[var(--border)] min-h-[80px] mb-4"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setShowReportModal(false);
+                    setReportReason("");
+                    setReportMessage("");
+                  }}
+                  className="flex-1 py-3 rounded-xl border border-[var(--border)]"
+                >
+                  Cancel
+                </button>
+                <button
+                  disabled={!reportReason.trim() || reporting}
+                  onClick={async () => {
+                    if (!reportReason.trim() || !user?.id || !profile) return;
+                    setReporting(true);
+                    const { error } = await reportProfile(user.id, profile.id, reportReason.trim(), reportMessage.trim());
+                    setReporting(false);
+                    if (!error) {
+                      setShowReportModal(false);
+                      setReportReason("");
+                      setReportMessage("");
+                    }
+                  }}
+                  className="flex-1 py-3 rounded-xl bg-red-600 text-white disabled:opacity-50"
+                >
+                  {reporting ? "Submitting..." : "Submit Report"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Results */}
         <div className="pt-6">

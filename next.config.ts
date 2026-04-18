@@ -1,6 +1,14 @@
 import type { NextConfig } from "next";
+import path from "path";
+
+/** Use this app folder as root so Next does not pick a parent directory that has another package-lock.json. */
+const projectRoot = path.join(__dirname);
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: projectRoot,
+  turbopack: {
+    root: projectRoot,
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com", pathname: "/**" },
@@ -8,6 +16,11 @@ const nextConfig: NextConfig = {
     ],
   },
   async headers() {
+    // Skip security headers in development to avoid CSP issues
+    if (process.env.NODE_ENV === "development") {
+      return [];
+    }
+    
     return [
       {
         source: "/:path*",

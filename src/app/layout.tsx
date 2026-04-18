@@ -7,7 +7,6 @@ import { AppConfigProvider } from "@/contexts/AppConfigContext";
 import { ProfilesProvider } from "@/contexts/ProfilesContext";
 import { ContactFloat } from "@/components/ui/ContactFloat";
 import { ConfigInjector } from "@/components/ConfigInjector";
-
 function getSeoConfig() {
   try {
     const path = join(process.cwd(), "data", "site-config.json");

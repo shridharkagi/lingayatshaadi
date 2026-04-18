@@ -27,11 +27,28 @@ export function loadContactViewHistory(): ContactView[] {
   }
 }
 
+/** Optional: called to persist contact view to DB (requires viewerProfileId) */
+export async function trackContactViewToDb(
+  viewerProfileId: string,
+  profile: Profile
+): Promise<void> {
+  try {
+    const { recordContactView } = await import("@/lib/api/contactViews");
+    await recordContactView(viewerProfileId, profile.id);
+  } catch {
+    // ignore
+  }
+}
+
 /**
- * Track a contact view
+ * Track a contact view (localStorage + optional DB)
  */
-export function trackContactView(profile: Profile): void {
+export function trackContactView(profile: Profile, viewerProfileId?: string): void {
   if (typeof window === 'undefined') return;
+
+  if (viewerProfileId) {
+    trackContactViewToDb(viewerProfileId, profile);
+  }
   
   const contactView: ContactView = {
     profileId: profile.id,

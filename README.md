@@ -19,19 +19,42 @@ A responsive matrimonial web application for the Lingayat community. Built with 
 ## Tech Stack
 
 - Next.js 16 (App Router)
-- React 19
+- React 18.3.1
 - TypeScript
 - Tailwind CSS
 - Lucide React (icons)
+- Supabase (Backend)
 
 ## Getting Started
 
+### ⚠️ Important: Local Development
+
+Due to a Turbopack bug in Next.js 16, click events don't work in development mode. Use production mode instead:
+
 ```bash
+# Install dependencies
 npm install
-npm run dev
+
+# Copy environment variables
+cp .env.example .env.local
+
+# Run in production mode (RECOMMENDED)
+npm run dev:prod
 ```
 
-Open [http://localhost:3000](http://localhost:3000)
+Open [http://localhost:3002](http://localhost:3002)
+
+**All clicks will work perfectly!** ✅
+
+For detailed development setup, see [LOCAL_DEVELOPMENT_GUIDE.md](LOCAL_DEVELOPMENT_GUIDE.md)
+
+### Alternative: Traditional Dev Mode (Not Recommended)
+
+```bash
+npm run dev  # Opens on http://localhost:3000
+```
+
+⚠️ **Note:** Clicks won't work in dev mode due to a Turbopack bug. Use production mode instead.
 
 ## Demo Login
 
@@ -73,6 +96,8 @@ See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for deployment instructions and [
 
 ## Documentation
 
+- **[LOCAL_DEVELOPMENT_GUIDE.md](LOCAL_DEVELOPMENT_GUIDE.md)** - 🔥 **START HERE** - Local development setup with production mode
+- **[CLICK_ISSUE_RESOLVED.md](CLICK_ISSUE_RESOLVED.md)** - Click events issue resolution (Turbopack bug workaround)
 - **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - Complete deployment instructions for Vercel/Netlify/Custom server
 - **[TESTING_SOCIAL_PREVIEWS.md](TESTING_SOCIAL_PREVIEWS.md)** - Guide to test and troubleshoot social media link previews
 - **[SOCIAL_MEDIA_PREVIEW_FIX.md](SOCIAL_MEDIA_PREVIEW_FIX.md)** - Summary of social media preview implementation

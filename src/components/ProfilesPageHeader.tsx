@@ -1,12 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Heart, Menu } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
 export function ProfilesPageHeader() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const handleClick = (e: Event) => {
+      const target = (e.target as HTMLElement).closest("#profiles-menu-btn");
+      if (target) {
+        e.preventDefault();
+        setMobileMenuOpen((prev) => !prev);
+      }
+    };
+    document.addEventListener("click", handleClick, true);
+    return () => document.removeEventListener("click", handleClick, true);
+  }, []);
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-[var(--color-border)] shadow-[var(--shadow-soft)]">
@@ -42,6 +54,7 @@ export function ProfilesPageHeader() {
         </nav>
         <button
           type="button"
+          id="profiles-menu-btn"
           onClick={() => setMobileMenuOpen((prev) => !prev)}
           className="md:hidden p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center -mr-1 rounded-lg hover:bg-[var(--color-border)]/50 active:bg-[var(--color-border)] transition-colors touch-manipulation"
           aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}

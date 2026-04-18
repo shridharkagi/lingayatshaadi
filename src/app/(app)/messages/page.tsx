@@ -5,21 +5,59 @@ import Image from "next/image";
 import { MessageCircle } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useProfiles } from "@/contexts/ProfilesContext";
-import { mockMessages } from "@/data/mock";
-import { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { getConversations } from "@/lib/api/messages";
+import { getProfileById as fetchProfile } from "@/lib/api/profiles";
+import { useState, useEffect, useCallback } from "react";
 
 export default function MessagesPage() {
   const [mounted, setMounted] = useState(false);
-  const { profiles } = useProfiles();
-  
+  const { user } = useAuth();
+  const { profiles, getProfileById } = useProfiles();
+  const [conversations, setConversations] = useState<
+    Array<{ profile: { id: string; fullName: string; profilePhoto?: string }; lastMessage: { content: string; createdAt: string }; unread: number }>
+  >([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadConversations = useCallback(async () => {
+    if (!user?.id) {
+      setConversations([]);
+      setLoading(false);
+      return;
+    }
+    const { data, error } = await getConversations(user.id);
+    if (error || !data.length) {
+      setConversations([]);
+    } else {
+      const list = await Promise.all(
+        data.map(async (c) => {
+          let profile = getProfileById(c.otherProfileId) || profiles.find((p) => p.id === c.otherProfileId);
+          if (!profile) {
+            const { data: p } = await fetchProfile(c.otherProfileId);
+            profile = p || undefined;
+          }
+          return {
+            profile: profile
+              ? { id: profile.id, fullName: profile.fullName, profilePhoto: profile.profilePhoto }
+              : { id: c.otherProfileId, fullName: "Unknown", profilePhoto: undefined },
+            lastMessage: c.lastMessage,
+            unread: c.unreadCount,
+          };
+        })
+      );
+      setConversations(list);
+    }
+    setLoading(false);
+  }, [user?.id, getProfileById, profiles]);
+
   useEffect(() => {
     setMounted(true);
   }, []);
-  
-  const profile2 = profiles.find((p) => p.id === "2");
-  const conversations = profile2
-    ? [{ profile: profile2, lastMessage: mockMessages[2], unread: 1 }]
-    : [];
+
+  useEffect(() => {
+    if (mounted && user) loadConversations();
+    else if (!user) setLoading(false);
+  }, [mounted, user, loadConversations]);
 
   // Don't render until mounted on client side
   if (!mounted) return null;
@@ -31,7 +69,9 @@ export default function MessagesPage() {
       </header>
 
       <div className="p-4">
-        {conversations.length === 0 ? (
+        {loading ? (
+          <div className="py-8 text-center text-gray-500">Loading...</div>
+        ) : conversations.length === 0 ? (
           <EmptyState
             icon={MessageCircle}
             title="No messages yet"

@@ -142,6 +142,25 @@ export default function LandingPage() {
     }
   }, [loading, isLoggedIn, profileComplete, router]);
 
+  // Native DOM event delegation - works around Turbopack breaking React onClick in dev
+  useEffect(() => {
+    const handleClick = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target.closest("#mobile-menu-btn")) {
+        e.preventDefault();
+        setMobileMenuOpen((prev) => !prev);
+      }
+      const faqBtn = target.closest("[data-faq-index]");
+      if (faqBtn) {
+        e.preventDefault();
+        const i = parseInt(faqBtn.getAttribute("data-faq-index") ?? "-1", 10);
+        setOpenFaq((prev) => (prev === i ? null : i));
+      }
+    };
+    document.addEventListener("click", handleClick, true);
+    return () => document.removeEventListener("click", handleClick, true);
+  }, []);
+
   return (
     <div className="min-h-screen" style={{ background: "var(--gradient-bg-warm)" }}>
       {/* Header */}
@@ -178,6 +197,7 @@ export default function LandingPage() {
           </nav>
           <button
             type="button"
+            id="mobile-menu-btn"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -452,15 +472,17 @@ export default function LandingPage() {
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[var(--color-text-primary)] mb-8 sm:mb-10 text-center">
             Frequently Asked Questions
           </h2>
-          <div className="bg-white rounded-2xl shadow-[var(--shadow-card)] overflow-hidden border border-[var(--color-border)]/50">
+          <div id="faq-accordion" className="bg-white rounded-2xl shadow-[var(--shadow-card)] overflow-hidden border border-[var(--color-border)]/50">
             {faqs.map((faq, i) => (
               <div
                 key={i}
                 className="border-b border-[var(--color-border)] last:border-0"
               >
                 <button
+                  type="button"
+                  data-faq-index={i}
                   onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                  className="w-full px-6 py-5 flex items-start justify-between gap-4 text-left hover:bg-[var(--color-bg)]/50 transition"
+                  className="w-full px-6 py-5 flex items-start justify-between gap-4 text-left hover:bg-[var(--color-bg)]/50 transition cursor-pointer"
                 >
                   <span className="text-[var(--color-text-muted)] font-medium mr-2">
                     {String(i + 1).padStart(2, "0")}

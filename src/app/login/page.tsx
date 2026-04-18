@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -9,66 +9,105 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/contexts/AuthContext";
 
-// TODO: Connect to Supabase Auth (signInWithPassword, signInWithOtp)
-type LoginMode = "email" | "otp";
-
 const LOGIN_IMAGE =
   "https://images.unsplash.com/photo-1605649487212-47bdab064df7?w=800&q=80";
 
+type LoginMode = "otp" | "password";
+
 export default function LoginPage() {
   const router = useRouter();
-  const { login: loginUser } = useAuth();
-  const [mode, setMode] = useState<LoginMode>("email");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const { sendPhoneOtp, verifyPhoneOtp, signInWithPhonePassword } = useAuth();
+  const [loginMode, setLoginMode] = useState<LoginMode>("otp");
   const [mobile, setMobile] = useState("");
+  const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const handleEmailSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    const handleClick = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('[aria-label="Open menu"], [aria-label="Close menu"]')) {
+        e.preventDefault();
+        setMenuOpen((prev) => !prev);
+      }
+    };
+    document.addEventListener("click", handleClick, true);
+    return () => document.removeEventListener("click", handleClick, true);
+  }, []);
+
+  const phoneE164 = () => `+91${mobile.replace(/\D/g, "")}`;
+
+  const switchMode = (mode: LoginMode) => {
+    setLoginMode(mode);
     setError("");
-    if (!email?.trim()) {
-      setError("Please enter your email");
-      return;
-    }
-    loginUser(email.trim(), password || "demo");
-    router.push("/home");
+    setOtpSent(false);
+    setOtp("");
+    setPassword("");
   };
 
-  const handleSendOtp = (e: React.FormEvent) => {
+  const handleSendPhoneOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!mobile?.trim() || mobile.replace(/\D/g, "").length < 10) {
+    if (!mobile?.trim() || mobile.replace(/\D/g, "").length !== 10) {
       setError("Please enter a valid 10-digit mobile number");
       return;
     }
-    setOtpSent(true);
-    setOtp("");
+    setLoading(true);
+    const result = await sendPhoneOtp(phoneE164());
+    setLoading(false);
+
+    if (result.error) {
+      setError(result.error);
+    } else {
+      setOtpSent(true);
+    }
   };
 
-  const handleOtpSubmit = (e: React.FormEvent) => {
+  const handleVerifyPhoneOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (!otp || otp.length !== 6) {
       setError("Please enter 6-digit OTP");
       return;
     }
-    loginUser(`+91${mobile.replace(/\D/g, "")}@otp.demo`, "otp");
-    router.push("/home");
+    setLoading(true);
+    const result = await verifyPhoneOtp(phoneE164(), otp);
+    setLoading(false);
+
+    if (result.error) {
+      setError(result.error);
+    } else {
+      router.push("/home");
+    }
   };
 
-  const switchMode = (newMode: LoginMode) => {
-    setMode(newMode);
+  const handlePasswordSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError("");
-    setOtpSent(false);
+    if (!mobile?.trim() || mobile.replace(/\D/g, "").length !== 10) {
+      setError("Please enter a valid 10-digit mobile number");
+      return;
+    }
+    if (!password) {
+      setError("Please enter your password");
+      return;
+    }
+    setLoading(true);
+    const result = await signInWithPhonePassword(phoneE164(), password);
+    setLoading(false);
+
+    if (result.error) {
+      setError(result.error);
+    } else {
+      router.push("/home");
+    }
   };
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)] flex flex-col">
-      {/* Header with Hamburger */}
       <header className="sticky top-0 z-50 bg-white border-b border-[var(--color-border)] shadow-[var(--shadow-soft)]">
         <div className="flex items-center justify-between px-4 h-14">
           <Link href="/" className="flex items-center gap-2">
@@ -128,7 +167,6 @@ export default function LoginPage() {
       </header>
 
       <div className="flex-1 flex flex-col lg:flex-row">
-        {/* Image Section */}
         <div className="lg:w-1/2 relative min-h-[200px] lg:min-h-[calc(100vh-3.5rem)]">
           <Image
             src={LOGIN_IMAGE}
@@ -147,140 +185,125 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Form Section */}
-        <div className="lg:w-1/2 flex flex-col justify-center p-6 lg:p-12">
-          <div className="max-w-md mx-auto w-full">
+        <div className="lg:w-1/2 flex flex-col justify-center p-6 lg:p-12 relative z-10">
+          <div className="max-w-md mx-auto w-full relative z-10">
             <h1 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">
               Welcome back
             </h1>
-            <p className="text-[var(--color-text-muted)] mb-6">
-              Sign in to continue your journey
+            <p className="text-[var(--color-text-muted)] mb-4">
+              Sign in with your mobile number — use a one-time code or your password
             </p>
 
-            {/* Tab buttons - ensure they switch mode */}
             <div
               role="tablist"
-              aria-label="Login method"
-              className="flex gap-2 mb-6 p-1 bg-[var(--color-border)]/50 rounded-xl shadow-sm"
+              aria-label="Sign in method"
+              className="flex gap-2 mb-6 p-1 bg-[var(--color-border)]/50 rounded-xl"
             >
               <button
                 type="button"
                 role="tab"
-                aria-selected={mode === "email"}
-                aria-controls="email-panel"
-                id="email-tab"
-                onClick={() => switchMode("email")}
-                className={`flex-1 py-3 rounded-lg text-sm font-medium transition-all ${
-                  mode === "email"
+                aria-selected={loginMode === "otp"}
+                onClick={() => switchMode("otp")}
+                className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  loginMode === "otp"
                     ? "bg-[var(--primary)] text-white shadow-md"
-                    : "bg-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+                    : "text-[var(--color-text-muted)]"
                 }`}
               >
-                Email
+                OTP
               </button>
               <button
                 type="button"
                 role="tab"
-                aria-selected={mode === "otp"}
-                aria-controls="otp-panel"
-                id="otp-tab"
-                onClick={() => switchMode("otp")}
-                className={`flex-1 py-3 rounded-lg text-sm font-medium transition-all ${
-                  mode === "otp"
+                aria-selected={loginMode === "password"}
+                onClick={() => switchMode("password")}
+                className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  loginMode === "password"
                     ? "bg-[var(--primary)] text-white shadow-md"
-                    : "bg-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+                    : "text-[var(--color-text-muted)]"
                 }`}
               >
-                Mobile OTP
+                Password
               </button>
             </div>
 
-            {/* Form content - key forces fresh render on mode change */}
-            {mode === "email" ? (
-              <form
-                key="email-form"
-                onSubmit={handleEmailSubmit}
-                className="space-y-4"
-                id="email-panel"
-                role="tabpanel"
-                aria-labelledby="email-tab"
-              >
+            {loginMode === "otp" ? (
+              !otpSent ? (
+                <form onSubmit={handleSendPhoneOtp} className="space-y-4" aria-label="OTP mobile">
+                  <Input
+                    label="Mobile Number"
+                    type="tel"
+                    placeholder="Enter 10-digit mobile number"
+                    value={mobile}
+                    onChange={(e) =>
+                      setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))
+                    }
+                    maxLength={10}
+                    autoComplete="tel-national"
+                  />
+                  {error && <p className="text-red-500 text-sm">{error}</p>}
+                  <Button type="submit" fullWidth size="lg" disabled={loading}>
+                    {loading ? "Sending OTP..." : "Send OTP"}
+                  </Button>
+                </form>
+              ) : (
+                <form onSubmit={handleVerifyPhoneOtp} className="space-y-4" aria-label="Enter OTP">
+                  <p className="text-sm text-[var(--color-text-muted)]">
+                    OTP sent to +91 {mobile}
+                  </p>
+                  <Input
+                    label="Enter OTP"
+                    placeholder="Enter 6-digit code"
+                    value={otp}
+                    onChange={(e) =>
+                      setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                    }
+                    maxLength={6}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                  />
+                  {error && <p className="text-red-500 text-sm">{error}</p>}
+                  <Button type="submit" fullWidth size="lg" disabled={loading}>
+                    {loading ? "Verifying..." : "Verify & Sign In"}
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOtpSent(false);
+                      setOtp("");
+                      setError("");
+                    }}
+                    className="w-full text-sm text-[var(--primary)] font-medium py-2"
+                  >
+                    Change number
+                  </button>
+                </form>
+              )
+            ) : (
+              <form onSubmit={handlePasswordSignIn} className="space-y-4" aria-label="Password sign in">
                 <Input
-                  label="Email"
-                  type="email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  label="Mobile Number"
+                  type="tel"
+                  placeholder="Enter 10-digit mobile number"
+                  value={mobile}
+                  onChange={(e) =>
+                    setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))
+                  }
+                  maxLength={10}
+                  autoComplete="tel-national"
                 />
                 <Input
                   label="Password"
                   type="password"
-                  placeholder="Enter your password"
+                  placeholder="Your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
                 />
                 {error && <p className="text-red-500 text-sm">{error}</p>}
-                <Button type="submit" fullWidth size="lg">
-                  Sign In
+                <Button type="submit" fullWidth size="lg" disabled={loading}>
+                  {loading ? "Signing in..." : "Sign In"}
                 </Button>
-              </form>
-            ) : (
-              <form
-                key="otp-form"
-                onSubmit={otpSent ? handleOtpSubmit : handleSendOtp}
-                className="space-y-4"
-                id="otp-panel"
-                role="tabpanel"
-                aria-labelledby="otp-tab"
-              >
-                {!otpSent ? (
-                  <>
-                    <Input
-                      label="Mobile Number"
-                      type="tel"
-                      placeholder="Enter 10-digit mobile number"
-                      value={mobile}
-                      onChange={(e) =>
-                        setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))
-                      }
-                      maxLength={10}
-                    />
-                    {error && <p className="text-red-500 text-sm">{error}</p>}
-                    <Button type="submit" fullWidth size="lg">
-                      Send OTP
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm text-[var(--color-text-muted)]">
-                      OTP sent to +91 {mobile}
-                    </p>
-                    <Input
-                      label="Enter OTP"
-                      placeholder="Enter 6-digit code"
-                      value={otp}
-                      onChange={(e) =>
-                        setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
-                      }
-                      maxLength={6}
-                    />
-                    {error && <p className="text-red-500 text-sm">{error}</p>}
-                    <Button type="submit" fullWidth size="lg">
-                      Verify & Sign In
-                    </Button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setOtpSent(false);
-                        setOtp("");
-                        setError("");
-                      }}
-                      className="w-full text-sm text-[var(--primary)] font-medium py-2"
-                    >
-                      Change number
-                    </button>
-                  </>
-                )}
               </form>
             )}
 

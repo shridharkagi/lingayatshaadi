@@ -1,32 +1,81 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Send } from "lucide-react";
 import { useProfiles } from "@/contexts/ProfilesContext";
-import { mockMessages } from "@/data/mock";
+import { useAuth } from "@/contexts/AuthContext";
+import { getMessages, sendMessage, subscribeToNewMessages, getConversationId } from "@/lib/api/messages";
+import { getProfileById as fetchProfile } from "@/lib/api/profiles";
 import { getProfileSlug } from "@/lib/memberId";
+import type { Message, Profile } from "@/types";
 
 export default function ChatPage() {
   const params = useParams();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const { profiles } = useProfiles();
+  const { user } = useAuth();
+  const { profiles, getProfileById } = useProfiles();
   const [message, setMessage] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [sending, setSending] = useState(false);
   const id = typeof params.id === "string" ? params.id : params.id?.[0];
-  
+
+  const [fetchedProfile, setFetchedProfile] = useState<Profile | null>(null);
+  const profile = id
+    ? (getProfileById(id) || profiles.find((p) => p.id === id) || fetchedProfile || null)
+    : undefined;
+
+  useEffect(() => {
+    if (id && !getProfileById(id) && !profiles.find((p) => p.id === id)) {
+      fetchProfile(id).then(({ data }) => {
+        if (data) setFetchedProfile(data);
+      });
+    } else {
+      setFetchedProfile(null);
+    }
+  }, [id, profiles, getProfileById]);
+
+  const loadMessages = useCallback(async () => {
+    if (!user?.id || !id) return;
+    const { data } = await getMessages(user.id, id);
+    setMessages(data || []);
+  }, [user?.id, id]);
+
   useEffect(() => {
     setMounted(true);
   }, []);
-  
-  const profile = profiles.find((p) => p.id === id);
-  const messages = mockMessages.filter(
-    (m) =>
-      (m.senderId === params.id && m.receiverId === "current") ||
-      (m.receiverId === params.id && m.senderId === "current")
-  );
+
+  useEffect(() => {
+    if (mounted && user?.id && id) loadMessages();
+  }, [mounted, user?.id, id, loadMessages]);
+
+  // Real-time: subscribe to new messages in this conversation
+  useEffect(() => {
+    if (!user?.id || !id) return;
+    const convId = getConversationId(user.id, id);
+    const unsubscribe = subscribeToNewMessages(convId, (newMsg) => {
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === newMsg.id)) return prev;
+        return [...prev, newMsg];
+      });
+    });
+    return unsubscribe;
+  }, [user?.id, id]);
+
+  const handleSend = async () => {
+    const text = message.trim();
+    if (!text || !user?.id || !id || sending) return;
+    setSending(true);
+    const { data, error } = await sendMessage(user.id, id, text);
+    setSending(false);
+    if (!error && data) {
+      setMessages((prev) => [...prev, data]);
+      setMessage("");
+    }
+  };
 
   // Don't render until mounted on client side
   if (!mounted || !profile) return null;
@@ -63,11 +112,11 @@ export default function ChatPage() {
         {messages.map((m) => (
           <div
             key={m.id}
-            className={`flex ${m.senderId === "current" ? "justify-end" : "justify-start"}`}
+            className={`flex ${m.senderId === user?.id ? "justify-end" : "justify-start"}`}
           >
             <div
               className={`max-w-[85%] sm:max-w-[80%] px-3 sm:px-4 py-2 rounded-2xl break-words ${
-                m.senderId === "current"
+                m.senderId === user?.id
                   ? "bg-[var(--primary)] text-white rounded-br-md"
                   : "bg-gray-100 text-gray-800 rounded-bl-md"
               }`}
@@ -87,18 +136,16 @@ export default function ChatPage() {
             onChange={(e) => setMessage(e.target.value)}
             className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base rounded-xl border border-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] min-h-[44px] touch-manipulation"
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                // Handle send message here
+                handleSend();
               }
             }}
           />
           <button 
             className="flex-shrink-0 p-2.5 sm:p-3 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] active:scale-95 transition min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
             aria-label="Send message"
-            onClick={() => {
-              // Handle send message here
-            }}
+            onClick={handleSend}
           >
             <Send size={20} className="sm:w-5 sm:h-5" />
           </button>
