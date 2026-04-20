@@ -5,7 +5,10 @@ import { Profile } from "@/types";
 import { mockProfiles } from "@/data/mock";
 import { generatePublicId } from "@/lib/memberId";
 import { searchProfiles } from "@/lib/api/profiles";
+import { withTimeout } from "@/lib/withTimeout";
 import { useAuth } from "@/contexts/AuthContext";
+
+const PROFILE_LIST_TIMEOUT_MS = 22_000;
 
 interface ProfilesContextType {
   profiles: Profile[];
@@ -35,7 +38,11 @@ export function ProfilesProvider({ children }: { children: React.ReactNode }) {
   const refreshProfiles = useCallback(async () => {
     setProfilesLoading(true);
     try {
-      const { data, error } = await searchProfiles({}, 100);
+      const { data, error } = await withTimeout(
+        searchProfiles({}, 100),
+        PROFILE_LIST_TIMEOUT_MS,
+        "Profile list"
+      );
       if (!error && data.length > 0) {
         const filtered = currentUserId
           ? data.filter((p) => p.id !== currentUserId)
@@ -55,7 +62,11 @@ export function ProfilesProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        const { data, error } = await searchProfiles({}, 100);
+        const { data, error } = await withTimeout(
+          searchProfiles({}, 100),
+          PROFILE_LIST_TIMEOUT_MS,
+          "Profile list"
+        );
         if (cancelled) return;
         if (!error && data.length > 0) {
           const filtered = currentUserId

@@ -7,7 +7,13 @@ import { fromProfileRow } from "@/lib/profileMapper";
 import { upsertProfile } from "@/lib/api/profiles";
 import { normalizeIndianPhone, syntheticEmailForPhone } from "@/lib/phoneAuth";
 import { friendlyEmailChangeError, isAuthEmailRateLimitedMessage } from "@/lib/authUserFacingErrors";
+import { withTimeout } from "@/lib/withTimeout";
 import type { User } from "@supabase/supabase-js";
+
+const GET_SESSION_TIMEOUT_MS = 20_000;
+const SIGN_IN_TIMEOUT_MS = 30_000;
+const SET_SESSION_PER_ATTEMPT_MS = 12_000;
+const PHONE_AUTH_FETCH_MS = 28_000;
 
 /** Account-holder basic details captured at signup and stored in auth user_metadata. */
 export interface AccountMeta {
@@ -202,8 +208,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    supabase.auth
-      .getSession()
+    withTimeout(supabase.auth.getSession(), GET_SESSION_TIMEOUT_MS, "getSession")
       .then(({ data: { session } }) => {
         if (session?.user) {
           setAuthUser(session.user);
@@ -290,11 +295,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     phone: string,
     purpose: "login" | "signup" | "password_reset" = "login"
   ) => {
+    const controller = new AbortController();
+    const abortTimer = window.setTimeout(() => controller.abort(), PHONE_AUTH_FETCH_MS);
     try {
       const res = await fetch("/api/auth/phone/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone, purpose }),
+        signal: controller.signal,
       });
       const data = (await res.json()) as {
         error?: string;
@@ -308,8 +316,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       }
       return { cooldownSeconds: data.cooldown_seconds };
-    } catch {
+    } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") {
+        return { error: "Request timed out. Check your connection and try again." };
+      }
       return { error: "Failed to send SMS OTP" };
+    } finally {
+      window.clearTimeout(abortTimer);
     }
   };
 
@@ -323,20 +336,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       // Try synthetic email first (matches every account created via phone-OTP signup,
       // including older rows whose phone column was never populated).
-      let { error } = await supabase.auth.signInWithPassword({ email, password });
+      let { error } = await withTimeout(
+        supabase.auth.signInWithPassword({ email, password }),
+        SIGN_IN_TIMEOUT_MS,
+        "Sign in"
+      );
       if (error) {
         // Fallback: phone-based sign-in (works for accounts whose phone column is set
         // and password was registered against that phone).
-        const phoneAttempt = await supabase.auth.signInWithPassword({
-          phone: parsed.e164,
-          password,
-        });
+        const phoneAttempt = await withTimeout(
+          supabase.auth.signInWithPassword({
+            phone: parsed.e164,
+            password,
+          }),
+          SIGN_IN_TIMEOUT_MS,
+          "Sign in"
+        );
         error = phoneAttempt.error;
       }
       if (error) return { error: error.message || "Invalid mobile number or password" };
       return {};
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("timed out")) {
+        return { error: "Sign in timed out. Check your connection and try again." };
+      }
       return { error: `Sign in failed: ${msg}` };
     }
   };
@@ -349,14 +373,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!id) return { error: "Enter mobile number or email" };
     if (id.includes("@")) {
       try {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: id.toLowerCase(),
-          password,
-        });
+        const { error } = await withTimeout(
+          supabase.auth.signInWithPassword({
+            email: id.toLowerCase(),
+            password,
+          }),
+          SIGN_IN_TIMEOUT_MS,
+          "Sign in"
+        );
         if (error) return { error: error.message || "Invalid email or password" };
         return {};
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes("timed out")) {
+          return { error: "Sign in timed out. Check your connection and try again." };
+        }
         return { error: `Sign in failed: ${msg}` };
       }
     }
@@ -372,7 +403,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     const lockErrorPattern = /lock:ls\.auth\.token|another request stole it/i;
     let lastSessionError: string | null = null;
-    const withTimeout = async <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+    const setSessionWithTimeout = async <T,>(promise: Promise<T>, ms: number): Promise<T> => {
       return await Promise.race([
         promise,
         new Promise<T>((_, reject) =>
@@ -383,12 +414,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       try {
-        const { error } = await withTimeout(
+        const { error } = await setSessionWithTimeout(
           supabase.auth.setSession({
             access_token,
             refresh_token,
           }),
-          3000
+          SET_SESSION_PER_ATTEMPT_MS
         );
         if (!error) {
           lastSessionError = null;
@@ -408,8 +439,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (lastSessionError) {
-      const { data: sessionData, error: sessionReadError } = await supabase.auth.getSession();
-      if (sessionReadError || !sessionData.session?.access_token) {
+      try {
+        const { data: sessionData, error: sessionReadError } = await withTimeout(
+          supabase.auth.getSession(),
+          GET_SESSION_TIMEOUT_MS,
+          "getSession"
+        );
+        if (sessionReadError || !sessionData.session?.access_token) {
+          return { error: `Could not establish session: ${lastSessionError}` };
+        }
+      } catch {
         return { error: `Could not establish session: ${lastSessionError}` };
       }
     }
@@ -420,11 +459,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!supabase) {
       return { error: "Supabase is not configured" };
     }
+    const controller = new AbortController();
+    const abortTimer = window.setTimeout(() => controller.abort(), PHONE_AUTH_FETCH_MS);
     try {
       const res = await fetch("/api/auth/phone/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone, otp, new_password: newPassword }),
+        signal: controller.signal,
       });
       let data: { error?: string; access_token?: string; refresh_token?: string } = {};
       try {
@@ -441,7 +483,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return await establishSessionFromTokens(data.access_token, data.refresh_token);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
+      if (e instanceof Error && e.name === "AbortError") {
+        return { error: "Request timed out. Check your connection and try again." };
+      }
       return { error: `Reset failed: ${msg}` };
+    } finally {
+      window.clearTimeout(abortTimer);
     }
   };
 
@@ -510,6 +557,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!supabase) {
       return { error: "Supabase is not configured" };
     }
+    const controller = new AbortController();
+    const abortTimer = window.setTimeout(() => controller.abort(), PHONE_AUTH_FETCH_MS);
     try {
       const payload: Record<string, unknown> = { phone, otp: token };
       if (password) payload.password = password;
@@ -518,6 +567,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
+        signal: controller.signal,
       });
       let data: {
         error?: string;
@@ -538,7 +588,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return await establishSessionFromTokens(data.access_token, data.refresh_token);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
+      if (e instanceof Error && e.name === "AbortError") {
+        return { error: "Verification timed out. Check your connection and try again." };
+      }
       return { error: `Failed to verify OTP: ${msg}` };
+    } finally {
+      window.clearTimeout(abortTimer);
     }
   };
 

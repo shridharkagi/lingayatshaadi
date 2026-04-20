@@ -94,20 +94,22 @@ export function SearchFilters({
   const [mounted, setMounted] = useState(false);
   const [isExpanded, setIsExpanded] = useState(!collapsible);
 
-  // Load saved filters on mount
+  // Load saved filters on mount (skip merging storage on /brides and /grooms so a
+  // desktop-saved narrow search cannot make the dedicated listing look "blank"
+  // on mobile the first time the filter sheet opens).
   useEffect(() => {
     setMounted(true);
+    if (lockedProfileType) {
+      onChange({ ...defaultFilters, profileType: lockedProfileType });
+      return;
+    }
     const saved = loadFilters();
     if (saved) {
       onChange({
         ...saved,
         foodHabits: saved.foodHabits || [],
-        // If parent has locked the profile type (e.g. /brides route),
-        // never let a stale localStorage value override it.
-        profileType: lockedProfileType ?? saved.profileType,
+        profileType: saved.profileType,
       });
-    } else if (lockedProfileType && filters.profileType !== lockedProfileType) {
-      onChange({ ...filters, profileType: lockedProfileType });
     }
   }, []);
 
