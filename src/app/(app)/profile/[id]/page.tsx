@@ -50,6 +50,7 @@ import {
 import { getProfileSlug, parseProfileSlug, getMemberIdDisplay } from "@/lib/memberId";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAppConfig } from "@/contexts/AppConfigContext";
+import { useAuthModal } from "@/contexts/AuthModalContext";
 import { FEATURE_MESSAGING_ENABLED } from "@/lib/featureFlags";
 import { HobbyTag } from "@/components/ui/HobbyTag";
 import { LanguageTag } from "@/components/ui/LanguageTag";
@@ -131,6 +132,7 @@ export default function OtherProfilePage() {
   const params = useParams();
   const router = useRouter();
   const { user, authUser, isLoggedIn } = useAuth();
+  const { openAuthModal } = useAuthModal();
   // Actor id (profiles.id) used for relational interactions like Interest,
   // Shortlist, Notes, Views — these tables FK to profiles(id) and have an
   // RLS policy that requires auth.uid() = profiles.user_id.
@@ -354,6 +356,18 @@ export default function OtherProfilePage() {
   }, [goPrev, goNext]);
 
   const whatsappUrl = config.whatsappGroupUrl?.trim() || "";
+  const openSupportPopup = () => {
+    if (typeof document !== "undefined") {
+      const floatBtn = document.getElementById("contact-float-btn") as HTMLButtonElement | null;
+      if (floatBtn) {
+        floatBtn.click();
+        return;
+      }
+    }
+    if (typeof window !== "undefined") {
+      window.location.href = `tel:${(config.callContactNumber || "6360130905").replace(/\D/g, "")}`;
+    }
+  };
 
   const handleCopyMemberId = async () => {
     if (!profile) return;
@@ -477,7 +491,7 @@ export default function OtherProfilePage() {
   })();
 
   return (
-    <div className="max-w-3xl mx-auto pb-6 px-2 sm:px-3">
+    <div className="w-full max-w-[1800px] mx-auto pb-6 px-1 sm:px-2 lg:px-2 xl:px-3">
       {moderationBanner}
       {showGallery && hasMultiplePhotos && (
         <div
@@ -577,7 +591,7 @@ export default function OtherProfilePage() {
           </div>
         </div>
       )}
-      <header className="sticky top-0 bg-white/95 backdrop-blur border-b border-[var(--border)] px-4 py-3 flex items-center justify-between z-10 rounded-b-xl">
+      <header className="sticky top-0 bg-white/95 backdrop-blur border-b border-[var(--border)] px-3 sm:px-4 py-3 flex items-center justify-between z-10 rounded-b-xl">
         <button
           onClick={() => router.back()}
           className="flex items-center gap-2 px-3 py-2 -ml-2 rounded-xl hover:bg-gray-100 transition-colors font-medium text-[var(--foreground)]"
@@ -613,6 +627,8 @@ export default function OtherProfilePage() {
         <ShareProfileButton profile={profile} />
       </header>
 
+      <div className="lg:grid lg:grid-cols-[minmax(340px,40%)_minmax(0,60%)] lg:gap-3 xl:gap-4 lg:items-start">
+      <div className="space-y-3 lg:sticky lg:top-[84px]">
       <div
         key={profile.id}
         className={`relative transition-all duration-300 ease-in-out ${
@@ -620,7 +636,7 @@ export default function OtherProfilePage() {
         }`}
       >
         <div
-          className="relative aspect-[4/5] lg:aspect-[4/5] max-h-[640px] bg-gray-200 overflow-hidden rounded-[12px] touch-pan-y shadow-sm"
+          className="relative aspect-[4/5] md:aspect-[3/4] md:max-h-[620px] md:mx-auto md:w-[min(100%,560px)] lg:w-full lg:max-h-[760px] max-h-[640px] bg-gray-200 overflow-hidden rounded-[12px] touch-pan-y shadow-sm"
           onTouchStart={touchStart}
           onTouchEnd={touchEnd}
         >
@@ -674,21 +690,15 @@ export default function OtherProfilePage() {
               {profile.profession}
             </p>
           )}
-          {profile.verified && (
-            <span className="inline-block mt-2 px-2.5 py-1 text-xs font-medium text-[var(--color-secondary-dark)] bg-[var(--color-accent-gold)] rounded-[8px]">
-              Verified
-            </span>
-          )}
           {(() => {
-            const { percent, isComplete } = computeProfileCompletion(profile);
-            if (!isComplete) return null;
+            if (!profile.verified) return null;
             return (
               <span
-                className="inline-flex items-center gap-1 mt-2 ml-2 px-2.5 py-1 text-xs font-semibold text-emerald-800 bg-emerald-100 rounded-[8px]"
-                title={`Profile is ${percent}% complete`}
+                className="inline-flex items-center gap-1 mt-2 px-2.5 py-1 text-xs font-semibold text-emerald-800 bg-emerald-100 rounded-[8px]"
+                title="Verified profile"
               >
                 <BadgeCheck size={13} />
-                Verified Complete
+                Verified
               </span>
             );
           })()}
@@ -700,11 +710,11 @@ export default function OtherProfilePage() {
 
       {/* Action buttons - improved mobile responsiveness */}
       <div className="px-3 py-2 rounded-2xl bg-gradient-to-b from-white to-gray-50 border border-gray-100">
-        <div className="grid grid-cols-4 gap-1 sm:gap-1.5">
+        <div className={`grid ${FEATURE_MESSAGING_ENABLED ? "grid-cols-5" : "grid-cols-4"} gap-1 sm:gap-1.5`}>
           <button
             onClick={async () => {
               if (!isLoggedIn) {
-                router.push("/login");
+                openAuthModal("login");
                 return;
               }
               if (needsOwnProfile) {
@@ -730,40 +740,40 @@ export default function OtherProfilePage() {
               }
             }}
             disabled={hasShownInterest || sendingInterest}
-            className={`flex flex-col items-center justify-center gap-1 px-2 py-3 sm:py-2.5 rounded-xl transition min-h-[44px] border ${
+            className={`flex flex-col items-center justify-center gap-0.5 px-1.5 py-2 sm:py-1.5 rounded-xl transition min-h-[40px] border ${
               hasShownInterest
                 ? "bg-red-50 border-red-200 text-red-600"
                 : "hover:bg-gray-100 active:bg-gray-200 border-transparent hover:border-gray-200"
             } ${sendingInterest ? "opacity-70" : ""}`}
           >
-            <Heart size={20} className={`flex-shrink-0 ${hasShownInterest ? 'fill-red-600' : ''}`} />
-            <span className="text-xs font-medium truncate">Interest</span>
+            <Heart size={18} className={`flex-shrink-0 ${hasShownInterest ? 'fill-red-600' : ''}`} />
+            <span className="text-[11px] font-medium truncate">Interest</span>
           </button>
           {FEATURE_MESSAGING_ENABLED &&
             (interestAccepted ? (
-              <Link href={`/messages/${profile.id}`} className="min-h-[44px]">
-                <button className="w-full h-full flex flex-col items-center justify-center gap-1 px-2 py-3 sm:py-2.5 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition border border-transparent hover:border-gray-200">
-                  <MessageCircle size={20} className="flex-shrink-0" />
-                  <span className="text-xs font-medium truncate">Message</span>
+              <Link href={`/messages/${profile.id}`} className="min-h-[40px]">
+                <button className="w-full h-full flex flex-col items-center justify-center gap-0.5 px-1.5 py-2 sm:py-1.5 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition border border-transparent hover:border-gray-200">
+                  <MessageCircle size={18} className="flex-shrink-0" />
+                  <span className="text-[11px] font-medium truncate">Message</span>
                 </button>
               </Link>
             ) : (
               <button
                 disabled
                 title="Accept interest request first to message"
-                className="flex flex-col items-center justify-center gap-1 px-2 py-3 sm:py-2.5 rounded-xl opacity-50 cursor-not-allowed min-h-[44px] border border-gray-200"
+                className="flex flex-col items-center justify-center gap-0.5 px-1.5 py-2 sm:py-1.5 rounded-xl opacity-50 cursor-not-allowed min-h-[40px] border border-gray-200"
               >
-                <MessageCircle size={20} className="flex-shrink-0" />
-                <span className="text-xs font-medium truncate">Message</span>
+                <MessageCircle size={18} className="flex-shrink-0" />
+                <span className="text-[11px] font-medium truncate">Message</span>
               </button>
             ))}
           {!isLoggedIn ? (
             <a
               href={`tel:${(config.callContactNumber || "6360130905").replace(/\D/g, "")}`}
-              className="flex flex-col items-center justify-center gap-1 px-2 py-3 sm:py-2.5 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition min-h-[44px] border border-transparent hover:border-gray-200"
+              className="flex flex-col items-center justify-center gap-0.5 px-1.5 py-2 sm:py-1.5 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition min-h-[40px] border border-transparent hover:border-gray-200"
             >
-              <Phone size={20} className="flex-shrink-0" />
-              <span className="text-xs font-medium truncate">Contact</span>
+              <Phone size={18} className="flex-shrink-0" />
+              <span className="text-[11px] font-medium truncate">Contact</span>
             </a>
           ) : (
             <button
@@ -774,20 +784,20 @@ export default function OtherProfilePage() {
                   trackContactView(profile, actorId || undefined);
                 }
               }}
-              className={`flex flex-col items-center justify-center gap-1 px-2 py-3 sm:py-2.5 rounded-xl transition min-h-[44px] border ${
+              className={`flex flex-col items-center justify-center gap-0.5 px-1.5 py-2 sm:py-1.5 rounded-xl transition min-h-[40px] border ${
                 showContact 
                   ? 'bg-blue-50 border-blue-200 text-blue-600' 
                   : 'hover:bg-gray-100 active:bg-gray-200 border-transparent hover:border-gray-200'
               }`}
             >
-              <Phone size={20} className="flex-shrink-0" />
-              <span className="text-xs font-medium truncate">Contact</span>
+              <Phone size={18} className="flex-shrink-0" />
+              <span className="text-[11px] font-medium truncate">Contact</span>
             </button>
           )}
           <button
             onClick={async () => {
               if (!isLoggedIn) {
-                router.push("/login");
+                openAuthModal("login");
                 return;
               }
               if (needsOwnProfile) {
@@ -811,15 +821,24 @@ export default function OtherProfilePage() {
               }
             }}
             disabled={savingShortlist}
-            className={`flex flex-col items-center justify-center gap-1 px-2 py-3 sm:py-2.5 rounded-xl transition min-h-[44px] border ${
+            className={`flex flex-col items-center justify-center gap-0.5 px-1.5 py-2 sm:py-1.5 rounded-xl transition min-h-[40px] border ${
               isSaved
                 ? "bg-yellow-50 border-yellow-200 text-yellow-700"
                 : "hover:bg-gray-100 active:bg-gray-200 border-transparent hover:border-gray-200"
             }`}
             aria-label="Save to shortlist"
           >
-            <Bookmark size={20} className={`flex-shrink-0 ${isSaved ? 'fill-yellow-700' : ''}`} />
-            <span className="text-xs font-medium truncate">Save</span>
+            <Bookmark size={18} className={`flex-shrink-0 ${isSaved ? 'fill-yellow-700' : ''}`} />
+            <span className="text-[11px] font-medium truncate">Save</span>
+          </button>
+          <button
+            type="button"
+            onClick={openSupportPopup}
+            className="flex flex-col items-center justify-center gap-0.5 px-1.5 py-2 sm:py-1.5 rounded-xl transition min-h-[40px] border hover:bg-gray-100 active:bg-gray-200 border-transparent hover:border-gray-200"
+            aria-label="Contact support"
+          >
+            <Phone size={18} className="flex-shrink-0" />
+            <span className="text-[11px] font-medium truncate">Support</span>
           </button>
         </div>
         
@@ -856,8 +875,9 @@ export default function OtherProfilePage() {
           </div>
         )}
       </div>
+      </div>
 
-      <div className="space-y-4 mt-1">
+      <div className="space-y-4 mt-1 lg:max-h-[calc(100vh-104px)] lg:overflow-y-auto lg:pr-0.5">
         {profile.aboutMeVisible && profile.aboutMe && (
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
             <h3 className="font-semibold text-base sm:text-lg text-[var(--foreground)] mb-2">About Me</h3>
@@ -888,9 +908,10 @@ export default function OtherProfilePage() {
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
           <h3 className="font-semibold text-base sm:text-lg text-[var(--foreground)] mb-3">Profile Details</h3>
           {!isLoggedIn && (
-            <Link
-              href="/login"
-              className="mb-4 flex items-start sm:items-center gap-3 p-3 sm:p-4 rounded-xl bg-[var(--primary)]/5 border border-[var(--primary)]/20 hover:bg-[var(--primary)]/10 transition-colors"
+            <button
+              type="button"
+              onClick={() => openAuthModal("login")}
+              className="w-full text-left mb-4 flex items-start sm:items-center gap-3 p-3 sm:p-4 rounded-xl bg-[var(--primary)]/5 border border-[var(--primary)]/20 hover:bg-[var(--primary)]/10 transition-colors"
             >
               <div className="w-9 h-9 rounded-full bg-[var(--primary)] text-white flex items-center justify-center flex-shrink-0">
                 <User size={18} />
@@ -906,38 +927,32 @@ export default function OtherProfilePage() {
               <span className="hidden sm:inline-block px-3 py-1.5 rounded-lg bg-[var(--primary)] text-white text-xs font-medium flex-shrink-0">
                 Login
               </span>
-            </Link>
+            </button>
           )}
           <div className="divide-y divide-gray-100">
             <DetailSection icon={User} heading="Basic Info">
               {(() => {
                 const mb = profile.managedBy;
-                const rawHolder = (profile.accountHolderName || "").trim();
-                // Collapse generic admin labels (e.g. "Super Admin", "SuperAdmin",
-                // "Site Admin") to a single canonical "Admin" so users see a
-                // consistent, friendly badge instead of internal role names.
-                const holder = /^(super\s*admin|site\s*admin|system\s*admin|admin)$/i.test(rawHolder)
-                  ? "Admin"
-                  : rawHolder;
-                const looksLikeBusiness = !!holder && /matrim|admin|samaj|service|agency/i.test(holder);
-                const isAdmin = mb === "admin" || looksLikeBusiness;
-                const isSelf = !isAdmin && mb === "self";
-                const isParentGuardian = !isAdmin && (mb === "parent" || mb === "guardian");
+                // Use explicit managedBy from profile row to avoid accidental
+                // misclassification based on account holder naming patterns.
+                const isAdmin = mb === "admin";
+                const isSelf = mb === "self";
+                const isParentGuardian = mb === "parent" || mb === "guardian";
                 if (!isAdmin && !isSelf && !isParentGuardian) return null;
 
                 let label = "";
                 let Icon = UserCheck;
                 let tone = "";
                 if (isSelf) {
-                  label = holder ? `Created by ${holder}` : "Created by Self";
+                  label = "Managed by Self";
                   Icon = UserCheck;
                   tone = "text-emerald-700 bg-emerald-50 border-emerald-200";
                 } else if (isAdmin) {
-                  label = holder ? `Created by ${holder}` : "Created by Admin";
+                  label = "Managed by Admin";
                   Icon = ShieldCheck;
                   tone = "text-amber-700 bg-amber-50 border-amber-200";
                 } else {
-                  label = holder ? `Created by ${holder}` : "Created by Family";
+                  label = "Managed by Parent";
                   Icon = HeartHandshake;
                   tone = "text-[var(--primary)] bg-[var(--primary)]/10 border-[var(--primary)]/20";
                 }
@@ -1286,7 +1301,10 @@ export default function OtherProfilePage() {
             </div>
           );
         })()}
+      </div>
+      </div>
 
+      <div className="space-y-4 mt-4">
         {hasMultiplePhotos && (
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <h3 className="font-semibold text-[var(--foreground)] mb-3">More Photos</h3>
