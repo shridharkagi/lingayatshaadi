@@ -147,6 +147,10 @@ const GALLERY_SWIPE_DOMINANCE = 1.35;
 /** Slight crossfade when changing the active gallery photo (ms). */
 const GALLERY_IMG_TRANSITION_MS = 340;
 
+/** Profile stack card: only treat as horizontal swipe after movement exceeds slop and |dx| dominates |dy|. */
+const CARD_SWIPE_SLOP_PX = 12;
+const CARD_SWIPE_HORIZONTAL_DOMINANCE = 1.25;
+
 function swipeVelocityFromSamples(pts: Array<{ x: number; t: number }>): number {
   if (pts.length < 2) return 0;
   const end = pts[pts.length - 1];
@@ -291,6 +295,9 @@ export default function OtherProfilePage() {
   const swipeCardRef = useRef<HTMLDivElement>(null);
   const swipePointerId = useRef<number | null>(null);
   const swipeStartX = useRef(0);
+  const swipeStartY = useRef(0);
+  /** null = not decided; h = card follows horizontal drag; v = user is scrolling, ignore swipe. */
+  const swipeAxisLockRef = useRef<"h" | "v" | null>(null);
   /** Recent pointer samples for fling velocity (px/ms), Tinder-style. */
   const swipeSamplesRef = useRef<Array<{ x: number; t: number }>>([]);
   const [swipeOffset, setSwipeOffset] = useState(0);
@@ -448,14 +455,12 @@ export default function OtherProfilePage() {
       if (e.pointerType === "mouse" && e.button !== 0) return;
       swipePointerId.current = e.pointerId;
       swipeStartX.current = e.clientX;
-      const t = typeof performance !== "undefined" ? performance.now() : Date.now();
-      swipeSamplesRef.current = [{ x: e.clientX, t }];
+      swipeStartY.current = e.clientY;
+      swipeAxisLockRef.current = null;
+      swipeSamplesRef.current = [];
       setSwipeDragging(true);
-      try {
-        e.currentTarget.setPointerCapture(e.pointerId);
-      } catch {
-        /* ignore */
-      }
+      // Defer setPointerCapture until we know the gesture is horizontal-dominant
+      // so vertical page scroll on the photo is not hijacked.
     },
     [profiles.length, currentIdx, isTransitioning, swipeExiting]
   );
@@ -463,12 +468,35 @@ export default function OtherProfilePage() {
   const onSwipePointerMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (swipePointerId.current !== e.pointerId) return;
+      const dx = e.clientX - swipeStartX.current;
+      const dy = e.clientY - swipeStartY.current;
+      const lock = swipeAxisLockRef.current;
+      if (lock === "v") return;
+      if (lock === null) {
+        const slop = CARD_SWIPE_SLOP_PX;
+        if (dx * dx + dy * dy < slop * slop) return;
+        if (Math.abs(dx) >= Math.abs(dy) * CARD_SWIPE_HORIZONTAL_DOMINANCE) {
+          swipeAxisLockRef.current = "h";
+          const t = typeof performance !== "undefined" ? performance.now() : Date.now();
+          swipeSamplesRef.current = [{ x: e.clientX, t }];
+          try {
+            e.currentTarget.setPointerCapture(e.pointerId);
+          } catch {
+            /* ignore */
+          }
+        } else {
+          swipeAxisLockRef.current = "v";
+          swipePointerId.current = null;
+          setSwipeDragging(false);
+          setSwipeOffset(0);
+          return;
+        }
+      }
       const t = typeof performance !== "undefined" ? performance.now() : Date.now();
       const pts = swipeSamplesRef.current;
       pts.push({ x: e.clientX, t });
       if (pts.length > 6) pts.shift();
-      const raw = e.clientX - swipeStartX.current;
-      setSwipeOffset(computeSwipeDx(raw));
+      setSwipeOffset(computeSwipeDx(dx));
     },
     [computeSwipeDx]
   );
@@ -476,7 +504,9 @@ export default function OtherProfilePage() {
   const finishSwipePointer = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (swipePointerId.current !== e.pointerId) return;
+      const axisWasHorizontal = swipeAxisLockRef.current === "h";
       swipePointerId.current = null;
+      swipeAxisLockRef.current = null;
       try {
         if (e.currentTarget.hasPointerCapture(e.pointerId)) {
           e.currentTarget.releasePointerCapture(e.pointerId);
@@ -496,10 +526,13 @@ export default function OtherProfilePage() {
       const FLING = 0.38;
 
       const commitNext =
+        axisWasHorizontal &&
         currentIdx < profiles.length - 1 &&
         (raw <= -threshold || (raw < -28 && vx < -FLING));
       const commitPrev =
-        currentIdx > 0 && (raw >= threshold || (raw > 28 && vx > FLING));
+        axisWasHorizontal &&
+        currentIdx > 0 &&
+        (raw >= threshold || (raw > 28 && vx > FLING));
 
       if (!commitNext && !commitPrev) {
         setSwipeOffset(0);
@@ -892,9 +925,10 @@ export default function OtherProfilePage() {
       >
         <div
           ref={swipeCardRef}
-          className="relative z-[1] overflow-hidden rounded-[12px] select-none touch-pan-x touch-pan-y"
+          className="relative z-[1] overflow-hidden rounded-[12px] select-none touch-pan-y"
           style={{
-            touchAction: "pan-x pan-y",
+            // Prefer native vertical scroll; horizontal profile swipe is handled in JS after axis lock.
+            touchAction: "pan-y",
             transform: `translate3d(${swipeOffset}px,0,0) rotate(${swipeMotion.rotateDeg}deg) scale(${swipeMotion.scale})`,
             transformStyle: "preserve-3d",
             backfaceVisibility: "hidden",
