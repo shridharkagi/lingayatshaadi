@@ -229,6 +229,7 @@ export function ProfileFormSections({
                 }
               }}
               userId={userId}
+              profileId={profile.id}
             />
           </>
         ) : (

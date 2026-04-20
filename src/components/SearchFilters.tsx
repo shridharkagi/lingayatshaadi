@@ -73,6 +73,12 @@ interface SearchFiltersProps {
   showClearAll?: boolean;
   /** Make filters collapsible */
   collapsible?: boolean;
+  /**
+   * When set, hides the Bride/Groom toggle entirely and forces the
+   * filter to always reflect the locked value. Used by the dedicated
+   * /brides and /grooms routes where the gender is implicit in the URL.
+   */
+  lockedProfileType?: "bride" | "groom";
 }
 
 export function SearchFilters({
@@ -82,6 +88,7 @@ export function SearchFilters({
   showCta = false,
   showClearAll = true,
   collapsible = false,
+  lockedProfileType,
 }: SearchFiltersProps) {
   const { profileType, ageRange, maritalStatuses, professionTypes, foodHabits } = filters;
   const [mounted, setMounted] = useState(false);
@@ -92,7 +99,15 @@ export function SearchFilters({
     setMounted(true);
     const saved = loadFilters();
     if (saved) {
-      onChange({ ...saved, foodHabits: saved.foodHabits || [] });
+      onChange({
+        ...saved,
+        foodHabits: saved.foodHabits || [],
+        // If parent has locked the profile type (e.g. /brides route),
+        // never let a stale localStorage value override it.
+        profileType: lockedProfileType ?? saved.profileType,
+      });
+    } else if (lockedProfileType && filters.profileType !== lockedProfileType) {
+      onChange({ ...filters, profileType: lockedProfileType });
     }
   }, []);
 
@@ -128,7 +143,10 @@ export function SearchFilters({
   };
 
   const clearAllFilters = () => {
-    onChange(defaultFilters);
+    onChange({
+      ...defaultFilters,
+      profileType: lockedProfileType ?? "",
+    });
     if (typeof window !== "undefined") {
       localStorage.removeItem(STORAGE_KEY);
     }
@@ -173,34 +191,36 @@ export function SearchFilters({
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Profile Type */}
-            <div>
-              <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
-                Profile Type
-              </label>
-              <div className="flex gap-2">
-                {(["bride", "groom"] as const).map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() =>
-                      onChange({
-                        ...filters,
-                        profileType: profileType === type ? "" : type,
-                      })
-                    }
-                    className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium capitalize transition ${
-                      profileType === type
-                        ? "bg-[var(--primary)] text-white"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    }`}
-                  >
-                    {type === "bride" ? "Bride" : "Groom"}
-                  </button>
-                ))}
+          <div className={`grid grid-cols-1 ${lockedProfileType ? "" : "sm:grid-cols-2"} gap-4`}>
+            {/* Profile Type — hidden on dedicated bride/groom routes */}
+            {!lockedProfileType && (
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
+                  Profile Type
+                </label>
+                <div className="flex gap-2">
+                  {(["bride", "groom"] as const).map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() =>
+                        onChange({
+                          ...filters,
+                          profileType: profileType === type ? "" : type,
+                        })
+                      }
+                      className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium capitalize transition ${
+                        profileType === type
+                          ? "bg-[var(--primary)] text-white"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      {type === "bride" ? "Bride" : "Groom"}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Age filter */}
             <div>

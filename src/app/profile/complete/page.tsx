@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState, ReactNode } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState, ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -53,12 +53,55 @@ import {
   updateProfileById,
   getProfileById,
 } from "@/lib/api/profiles";
+import {
+  createDraft,
+  updateDraft,
+  findDraftForUser,
+} from "@/lib/api/drafts";
+import { Cloud, CloudOff, Loader2 } from "lucide-react";
 
 interface StepDef {
   id: number;
   title: string;
   subtitle: string;
   icon: LucideIcon;
+}
+
+/**
+ * Tiny status pill shown while autosave is active. Four states:
+ *   idle   — hidden (first render before any typing).
+ *   saving — "Saving…" with a spinning icon.
+ *   saved  — "Saved" in muted green; fades into idle after a couple seconds.
+ *   error  — "Save failed — we'll retry" in red.
+ */
+function SaveIndicator({
+  state,
+}: {
+  state: "idle" | "saving" | "saved" | "error";
+}) {
+  if (state === "idle") return null;
+  if (state === "saving") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-50 text-blue-700 text-[11px] font-medium">
+        <Loader2 size={11} className="animate-spin" />
+        Saving…
+      </span>
+    );
+  }
+  if (state === "saved") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-medium">
+        <Cloud size={11} />
+        Saved
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-50 text-red-700 text-[11px] font-medium">
+      <CloudOff size={11} />
+      Save failed
+    </span>
+  );
 }
 
 const steps: StepDef[] = [
@@ -397,15 +440,41 @@ function ProfileCompleteInner() {
     ? (relationshipParam as Relationship)
     : undefined;
 
-  const isEditMode = !!profileIdParam;
+  // "Edit mode" now means only: the URL explicitly points at a specific
+  // profile id that already exists on the server (either a live profile
+  // the user is editing, OR a draft being resumed). Until we've hydrated
+  // that row we don't yet know which kind it is.
+  const hasUrlProfileId = !!profileIdParam;
   const [step, setStep] = useState(1);
   const [profile, setProfile] = useState<Partial<Profile>>(initialProfile);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [hydrating, setHydrating] = useState(isEditMode);
+  const [hydrating, setHydrating] = useState(hasUrlProfileId);
+  // Draft tracking: once a draft row exists on the server we keep its id
+  // here so every subsequent autosave patches the same row. `null` means
+  // "no draft yet — first autosave should INSERT".
+  const [draftId, setDraftId] = useState<string | null>(
+    hasUrlProfileId ? profileIdParam : null
+  );
+  // Distinguishes "resuming / creating a draft" (autosave ON, final Save
+  // flips to pending_review) from "editing an already-submitted profile"
+  // (no autosave; explicit Save flips to pending_review via the usual
+  // updateProfileById auto-flip).
+  const [isDraftFlow, setIsDraftFlow] = useState(!hasUrlProfileId);
+  // UI indicator near the header: "Saving…" / "Saved" / "Offline".
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  // Prevents the debounced autosave from firing during the initial load
+  // (otherwise we'd INSERT an empty draft the moment the page mounts).
+  const dirtyRef = useRef(false);
+  // Serialises concurrent autosaves — if a save is in flight when the
+  // debounce fires again, we queue the second one instead of racing two
+  // INSERTs that would both create a draft row.
+  const savingRef = useRef(false);
 
   const { title, subtitle, badgeLabel } = useMemo(() => {
-    if (isEditMode) {
+    // While hydrating we haven't yet discovered whether the URL profile
+    // is a draft resume or a real edit — default to neutral copy.
+    if (hasUrlProfileId && !isDraftFlow) {
       return {
         title: "Edit Profile",
         subtitle: "Update profile details",
@@ -433,7 +502,7 @@ function ProfileCompleteInner() {
       subtitle: "Tell us a few details — you can edit anything later",
       badgeLabel: "New",
     };
-  }, [isEditMode, relationshipFromUrl]);
+  }, [hasUrlProfileId, isDraftFlow, relationshipFromUrl]);
 
   useEffect(() => {
     if (!authLoading && !isLoggedIn) {
@@ -444,7 +513,12 @@ function ProfileCompleteInner() {
   useEffect(() => {
     let cancelled = false;
     const init = async () => {
-      if (isEditMode) {
+      // -----------------------------------------------------------------
+      // Path 1: URL points at a specific profile row.
+      //   - If that row is a draft → resume autosave flow, preload step.
+      //   - Otherwise → classic "edit after submission" flow.
+      // -----------------------------------------------------------------
+      if (hasUrlProfileId) {
         setHydrating(true);
         const { data, error: fetchErr } = await getProfileById(profileIdParam);
         if (cancelled) return;
@@ -454,10 +528,52 @@ function ProfileCompleteInner() {
           return;
         }
         setProfile({ ...initialProfile, ...data });
+        setDraftId(data.id);
+        const isDraft = data.moderationStatus === "draft";
+        setIsDraftFlow(isDraft);
+        if (isDraft && data.draftCurrentStep) {
+          setStep(Math.min(Math.max(data.draftCurrentStep, 1), steps.length));
+        }
         setHydrating(false);
         return;
       }
 
+      // -----------------------------------------------------------------
+      // Path 2: Fresh wizard (no profileId in URL). Before we create a
+      // brand-new row, check whether the user already has a draft for
+      // this relationship lying around. If yes — resume it transparently
+      // so they don't lose progress between devices / tabs.
+      // -----------------------------------------------------------------
+      if (authUser?.id && relationshipFromUrl) {
+        setHydrating(true);
+        const { data: existingDraft } = await findDraftForUser(
+          authUser.id,
+          relationshipFromUrl
+        );
+        if (cancelled) return;
+        if (existingDraft) {
+          setProfile({ ...initialProfile, ...existingDraft });
+          setDraftId(existingDraft.id);
+          setIsDraftFlow(true);
+          if (existingDraft.draftCurrentStep) {
+            setStep(
+              Math.min(Math.max(existingDraft.draftCurrentStep, 1), steps.length)
+            );
+          }
+          // Put the draft id in the URL so refreshes / share-links
+          // resume directly — no need to hit findDraftForUser again.
+          const qs = new URLSearchParams({ profileId: existingDraft.id });
+          if (relationshipFromUrl) qs.set("relationship", relationshipFromUrl);
+          router.replace(`/profile/complete?${qs.toString()}`);
+          setHydrating(false);
+          return;
+        }
+      }
+
+      // -----------------------------------------------------------------
+      // Path 3: Truly blank start. Seed smart defaults from the auth
+      // account so we don't ask for the phone/email again.
+      // -----------------------------------------------------------------
       const base: Partial<Profile> = { ...initialProfile };
       if (relationshipFromUrl) base.relationship = relationshipFromUrl;
 
@@ -477,18 +593,21 @@ function ProfileCompleteInner() {
       }
 
       setProfile(base);
+      setIsDraftFlow(true);
     };
     init();
     return () => {
       cancelled = true;
     };
-  }, [isEditMode, profileIdParam, relationshipFromUrl, accountMeta, authUser]);
+  }, [hasUrlProfileId, profileIdParam, relationshipFromUrl, accountMeta, authUser, router]);
 
   const update = (key: keyof Profile, value: string | boolean | string[]) => {
+    dirtyRef.current = true;
     setProfile((p) => ({ ...p, [key]: value }));
   };
 
   const updateContacts = (next: ProfileContact[]) => {
+    dirtyRef.current = true;
     setProfile((p) => ({
       ...p,
       contacts: next,
@@ -502,14 +621,116 @@ function ProfileCompleteInner() {
     }));
   };
 
+  // Fade the "Saved" pill to idle after a short delay so it doesn't
+  // linger distractingly. We only auto-fade the `saved` state — errors
+  // stay visible until the next save attempt resolves.
+  useEffect(() => {
+    if (saveState !== "saved") return;
+    const t = setTimeout(() => setSaveState("idle"), 2500);
+    return () => clearTimeout(t);
+  }, [saveState]);
+
+  /**
+   * Debounced cross-device autosave.
+   *
+   * Only runs when we're in the draft creation/resume flow (not when the
+   * user is editing an already-submitted profile — those changes must
+   * flow through the explicit Save button so they can be reviewed by
+   * the admin). Fires 1.5s after the last edit.
+   *
+   * On the very first write we INSERT a new draft and push its id into
+   * the URL so a refresh / second tab resumes the same draft instead of
+   * creating a second one.
+   */
+  useEffect(() => {
+    if (hydrating || saving || !isDraftFlow) return;
+    if (!authUser?.id) return;
+    if (!dirtyRef.current) return; // nothing typed yet → no empty draft
+
+    const timer = setTimeout(async () => {
+      if (savingRef.current) return; // another save still in-flight
+      savingRef.current = true;
+      setSaveState("saving");
+      try {
+        if (!draftId) {
+          const { data, error: createErr } = await createDraft(
+            authUser.id,
+            profile,
+            step
+          );
+          if (createErr) {
+            setSaveState("error");
+            return;
+          }
+          if (data?.id) {
+            setDraftId(data.id);
+            const qs = new URLSearchParams({ profileId: data.id });
+            if (relationshipFromUrl) qs.set("relationship", relationshipFromUrl);
+            router.replace(`/profile/complete?${qs.toString()}`);
+          }
+        } else {
+          const { error: updateErr } = await updateDraft(draftId, profile, step);
+          if (updateErr) {
+            setSaveState("error");
+            return;
+          }
+        }
+        setSaveState("saved");
+        dirtyRef.current = false;
+      } finally {
+        savingRef.current = false;
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [profile, step, draftId, isDraftFlow, hydrating, saving, authUser, relationshipFromUrl, router]);
+
   const goToStep = (n: number) => {
-    if (n >= 1 && n <= steps.length) setStep(n);
+    if (n >= 1 && n <= steps.length) {
+      dirtyRef.current = true; // record jump so autosave picks up the new step
+      setStep(n);
+    }
   };
 
   const next = async () => {
     setError("");
     if (step < steps.length) {
-      setStep(step + 1);
+      const newStep = step + 1;
+      dirtyRef.current = true;
+      setStep(newStep);
+      // Proactively flush the autosave with the new step number so a
+      // refresh resumes at the page the user actually landed on. Fire-
+      // and-forget — the normal debounce will also catch this within
+      // 1.5s, but the immediate call eliminates the brief window during
+      // which the DB still shows the previous step.
+      if (isDraftFlow && authUser?.id) {
+        if (!draftId) {
+          // Very first advance before autosave has even fired — create
+          // the draft now so we have an id for subsequent updates.
+          if (!savingRef.current) {
+            savingRef.current = true;
+            setSaveState("saving");
+            createDraft(authUser.id, profile, newStep)
+              .then(({ data }) => {
+                if (data?.id) {
+                  setDraftId(data.id);
+                  const qs = new URLSearchParams({ profileId: data.id });
+                  if (relationshipFromUrl) qs.set("relationship", relationshipFromUrl);
+                  router.replace(`/profile/complete?${qs.toString()}`);
+                }
+                setSaveState("saved");
+              })
+              .catch(() => setSaveState("error"))
+              .finally(() => {
+                savingRef.current = false;
+              });
+          }
+        } else {
+          updateDraft(draftId, profile, newStep).catch(() => {
+            setSaveState("error");
+          });
+        }
+      }
       if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -549,14 +770,35 @@ function ProfileCompleteInner() {
 
     // try/finally guarantees the button never stays stuck on "Saving..."
     // even if the underlying API helper throws or the network drops.
+    //
+    // Save target priority:
+    //   1. `draftId` present → convert draft → submission (updateProfileById
+    //      auto-flips moderation_status to pending_review and clears
+    //      draft_current_step because we pass moderationStatus explicitly).
+    //   2. URL-edit of an already-submitted profile → regular update;
+    //      the edit auto-flip in updateProfileById handles pending_review.
+    //   3. Brand-new profile with no draft row yet (edge case if user
+    //      somehow jumped straight to submit) → createProfile.
     let saved: Profile | null = null;
     let saveErr: string | null = null;
     try {
-      const res = isEditMode
-        ? await updateProfileById(profileIdParam, payload)
-        : await createProfile(authUser.id, payload);
-      saved = res.data;
-      saveErr = res.error;
+      if (draftId && isDraftFlow) {
+        // Submitting a draft → explicitly flip to pending_review.
+        const res = await updateProfileById(draftId, {
+          ...payload,
+          moderationStatus: "pending_review",
+        });
+        saved = res.data;
+        saveErr = res.error;
+      } else if (hasUrlProfileId) {
+        const res = await updateProfileById(profileIdParam, payload);
+        saved = res.data;
+        saveErr = res.error;
+      } else {
+        const res = await createProfile(authUser.id, payload);
+        saved = res.data;
+        saveErr = res.error;
+      }
     } catch (err) {
       saveErr = err instanceof Error ? err.message : "Failed to save profile";
     } finally {
@@ -622,6 +864,7 @@ function ProfileCompleteInner() {
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 text-xs font-medium">
               Step {step} of {steps.length}
             </span>
+            {isDraftFlow && <SaveIndicator state={saveState} />}
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{title}</h1>
           <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
@@ -1137,6 +1380,7 @@ function ProfileCompleteInner() {
                   }
                 }}
                 userId={authUser?.id || profileIdParam || "new-user"}
+                profileId={draftId ?? undefined}
               />
             </SectionCard>
           )}
@@ -1171,9 +1415,9 @@ function ProfileCompleteInner() {
               {step === steps.length
                 ? saving
                   ? "Saving..."
-                  : isEditMode
+                  : hasUrlProfileId && !isDraftFlow
                   ? "Save Changes"
-                  : "Create Profile"
+                  : "Submit for Review"
                 : "Continue"}
             </Button>
           </div>

@@ -4,9 +4,12 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Heart, Menu } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function ProfilesPageHeader() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isLoggedIn, loading } = useAuth();
+  const showAuthReady = !loading;
 
   useEffect(() => {
     const handleClick = (e: Event) => {
@@ -42,15 +45,31 @@ export function ProfilesPageHeader() {
           >
             Help
           </Link>
-          <Link
-            href="/login"
-            className="text-[var(--color-text-muted)] hover:text-[var(--primary)] transition"
-          >
-            Sign In
-          </Link>
-          <Link href="/signup">
-            <Button size="sm">Register</Button>
-          </Link>
+          {showAuthReady && isLoggedIn ? (
+            <>
+              <Link
+                href="/home"
+                className="text-[var(--color-text-muted)] hover:text-[var(--primary)] transition"
+              >
+                Home
+              </Link>
+              <Link href="/account">
+                <Button size="sm">My Account</Button>
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="text-[var(--color-text-muted)] hover:text-[var(--primary)] transition"
+              >
+                Sign In
+              </Link>
+              <Link href="/signup">
+                <Button size="sm">Register</Button>
+              </Link>
+            </>
+          )}
         </nav>
         <button
           type="button"
@@ -71,12 +90,25 @@ export function ProfilesPageHeader() {
           <Link href="/contact" onClick={() => setMobileMenuOpen(false)}>
             Help
           </Link>
-          <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-            Sign In
-          </Link>
-          <Link href="/signup" onClick={() => setMobileMenuOpen(false)}>
-            <Button fullWidth>Register</Button>
-          </Link>
+          {showAuthReady && isLoggedIn ? (
+            <>
+              <Link href="/home" onClick={() => setMobileMenuOpen(false)}>
+                Home
+              </Link>
+              <Link href="/account" onClick={() => setMobileMenuOpen(false)}>
+                <Button fullWidth>My Account</Button>
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
+                Sign In
+              </Link>
+              <Link href="/signup" onClick={() => setMobileMenuOpen(false)}>
+                <Button fullWidth>Register</Button>
+              </Link>
+            </>
+          )}
         </div>
       )}
     </header>

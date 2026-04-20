@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Heart } from "lucide-react";
@@ -24,18 +24,38 @@ export default function SignupPage() {
   });
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resendIn, setResendIn] = useState(0);
 
   const updateForm = (key: keyof typeof form, value: string) => {
     setForm((f) => ({ ...f, [key]: value }));
     setError("");
   };
 
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = window.setInterval(() => {
+      setResendIn((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [resendIn]);
+
   const phoneE164 = () => `+91${form.mobile.replace(/\D/g, "")}`;
 
-  const handleStep1 = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const redirectAfterSignup = () => {
+    router.replace("/profile/complete");
+    // Fallback for dev-mode HMR compile stalls during navigation.
+    window.setTimeout(() => {
+      if (window.location.pathname === "/signup") {
+        window.location.assign("/profile/complete");
+      }
+    }, 1200);
+  };
 
+  const sendSignupOtp = async () => {
+    if (loading) return;
     if (!form.gender) return setError("Please select gender");
     if (!form.firstName.trim()) return setError("First name is required");
     if (!form.city.trim()) return setError("City is required");
@@ -47,21 +67,36 @@ export default function SignupPage() {
     if (form.password !== form.confirmPassword)
       return setError("Passwords do not match");
 
+    setError("");
+    setInfo("");
+    setSuccess("");
     setLoading(true);
-    const result = await sendPhoneOtp(phoneE164());
+    const result = await sendPhoneOtp(phoneE164(), "signup");
     setLoading(false);
 
     if (result.error) {
       setError(result.error);
+      if (result.retryAfter) setResendIn(result.retryAfter);
     } else {
       setStep(2);
+      const cooldown = result.cooldownSeconds ?? 30;
+      setResendIn(cooldown);
+      setInfo("OTP sent. It is valid for 10 minutes.");
     }
+  };
+
+  const handleStep1 = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await sendSignupOtp();
   };
 
   const handleStep2 = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     if (otp.length !== 6) return setError("Enter 6-digit OTP");
 
+    setError("");
+    setInfo("");
     setLoading(true);
     const fullName = [form.firstName, form.lastName].filter(Boolean).join(" ").trim();
     const birthYear = Number((form.dateOfBirth.match(/^\d{4}/) || [])[0]) || undefined;
@@ -80,7 +115,8 @@ export default function SignupPage() {
       setError(result.error);
       return;
     }
-    router.push("/profiles");
+    setSuccess("Mobile verified successfully. Redirecting...");
+    redirectAfterSignup();
   };
 
   const inputClass = "py-2 px-3 md:py-3 md:px-4";
@@ -193,6 +229,7 @@ export default function SignupPage() {
               />
 
               {error && <p className="text-red-500 text-sm">{error}</p>}
+              {info && <p className="text-blue-600 text-sm">{info}</p>}
 
               <Button type="submit" fullWidth size="md" disabled={loading}>
                 {loading ? "Sending OTP..." : "Sign Up"}
@@ -201,6 +238,7 @@ export default function SignupPage() {
           ) : (
             <form onSubmit={handleStep2} className="space-y-3 md:space-y-4">
               <p className="text-sm text-gray-600">Code sent to +91 {form.mobile}</p>
+              <p className="text-xs text-gray-500">OTP is valid for 10 minutes.</p>
               <Input
                 label="OTP"
                 placeholder="Enter 6-digit code"
@@ -212,15 +250,28 @@ export default function SignupPage() {
                 className={inputClass}
               />
               {error && <p className="text-red-500 text-sm">{error}</p>}
+              {info && <p className="text-blue-600 text-sm">{info}</p>}
+              {success && <p className="text-green-600 text-sm">{success}</p>}
               <Button type="submit" fullWidth size="md" disabled={loading}>
                 {loading ? "Verifying..." : "Verify & Create Account"}
               </Button>
+              <button
+                type="button"
+                onClick={sendSignupOtp}
+                disabled={loading || resendIn > 0}
+                className="w-full text-sm text-[var(--primary)] font-medium py-1 disabled:text-gray-400 disabled:cursor-not-allowed"
+              >
+                {resendIn > 0 ? `Resend OTP in ${resendIn}s` : "Resend OTP"}
+              </button>
               <button
                 type="button"
                 onClick={() => {
                   setStep(1);
                   setOtp("");
                   setError("");
+                  setInfo("");
+                  setSuccess("");
+                  setResendIn(0);
                 }}
                 className="w-full text-gray-500 text-sm py-1"
               >

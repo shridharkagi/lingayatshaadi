@@ -7,7 +7,6 @@ import {
 import { hashPhoneOtp, normalizeIndianPhone, syntheticEmailForPhone } from "@/lib/phoneAuth";
 import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { resolveOtpChannel } from "@/lib/phoneOtpConfig";
-import { twilioCheckSmsVerify } from "@/lib/twilioVerify";
 
 export const runtime = "nodejs";
 
@@ -92,16 +91,8 @@ export async function POST(request: NextRequest) {
 
   const channel = resolveOtpChannel();
 
-  if (channel === "twilio") {
-    const result = await twilioCheckSmsVerify(parsed.e164, otpRaw);
-    if (!result.ok) {
-      return NextResponse.json(
-        { error: result.error || "Invalid OTP" },
-        { status: 400 }
-      );
-    }
-  } else if (channel === "apihome") {
-    const verifyErr = await verifyApiHomeOtp(parsed.e164, otpRaw, supabaseUrl, serviceKey);
+  if (channel === "fast2sms") {
+    const verifyErr = await verifyHashedOtp(parsed.e164, otpRaw, supabaseUrl, serviceKey);
     if (verifyErr) return NextResponse.json({ error: verifyErr }, { status: 400 });
   } else if (channel === "bypass") {
     // Accept any 6-digit code. No-op.
@@ -230,7 +221,7 @@ export async function POST(request: NextRequest) {
 }
 
 /** Returns null on success, or an error message string. */
-async function verifyApiHomeOtp(
+async function verifyHashedOtp(
   phoneE164: string,
   otpRaw: string,
   supabaseUrl: string,

@@ -27,10 +27,14 @@ import {
   ShieldCheck,
   UserCheck,
   HeartHandshake,
+  Lock,
+  BadgeCheck,
+  Clock,
+  AlertTriangle,
 } from "lucide-react";
 import { useProfiles } from "@/contexts/ProfilesContext";
 import { hasAcceptedInterest, hasSentInterest, sendInterest } from "@/lib/api/interests";
-import { getProfileByPublicId } from "@/lib/api/profiles";
+import { getProfileByPublicId, profileFromSnapshot } from "@/lib/api/profiles";
 import { recordProfileView } from "@/lib/api/profileViews";
 import { addToShortlist, removeFromShortlist, isShortlisted } from "@/lib/api/shortlist";
 import { blockUser } from "@/lib/api/blocked";
@@ -46,12 +50,15 @@ import {
 import { getProfileSlug, parseProfileSlug, getMemberIdDisplay } from "@/lib/memberId";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAppConfig } from "@/contexts/AppConfigContext";
+import { FEATURE_MESSAGING_ENABLED } from "@/lib/featureFlags";
 import { HobbyTag } from "@/components/ui/HobbyTag";
 import { LanguageTag } from "@/components/ui/LanguageTag";
 import { ProfileCard } from "@/components/ui/ProfileCard";
 import { ContactsList } from "@/components/ui/ContactsList";
 import { Profile } from "@/types";
 import { trackContactView } from "@/lib/contactViewHistory";
+import { hasMeaningfulPreferences } from "@/lib/partnerPreferenceDefaults";
+import { computeProfileCompletion } from "@/lib/profileCompletion";
 
 function ShareProfileButton({ profile }: { profile: Profile }) {
   const handleShare = async () => {
@@ -132,6 +139,8 @@ export default function OtherProfilePage() {
   // instead of a silent / cryptic RLS error.
   const actorId = user?.id || "";
   const needsOwnProfile = isLoggedIn && !actorId;
+  // True when the logged-in user is viewing their own matrimonial profile.
+  // Drives owner-only affordances (CTA cards, completion nudges, etc).
   const { config } = useAppConfig();
   const { profiles, profilesLoading } = useProfiles();
   const [fallbackProfile, setFallbackProfile] = useState<Profile | null>(null);
@@ -177,13 +186,45 @@ export default function OtherProfilePage() {
     return profiles.find((p) => p.id === slugFromParams);
   })();
 
-  const profile =
+  // `rawProfile` holds whatever the DB / context gave us — which for the
+  // owner is always their live, possibly-pending-edits data. Public
+  // viewers, however, should only ever see the last-approved snapshot
+  // (see Batch 5B moderation flow). We branch once here and then use
+  // `profile` everywhere below as before, so the rest of the page is
+  // unchanged.
+  const rawProfile =
     profileFromContext ||
     (fallbackProfile &&
     publicIdFromSlug &&
     (fallbackProfile.publicId || "").toUpperCase() === publicIdFromSlug
       ? fallbackProfile
       : undefined);
+
+  // Ownership check: does the logged-in auth account own this profile?
+  // An account can own multiple profiles (self / son / daughter / etc.),
+  // so matching on `profile.userId === authUser.id` is the correct
+  // "am I the owner?" test — more accurate than the single `actorId`
+  // comparison used further down the page.
+  const isOwnerViewer = !!authUser?.id && !!rawProfile?.userId && rawProfile.userId === authUser.id;
+  const viewerIsAdmin = (user?.role ?? "user") === "superadmin";
+
+  // Decide which view of the profile to render.
+  //   * Owner or admin → always the live row (so they see their own
+  //     pending edits with a "pending review" banner).
+  //   * Public (approved) → the live row as usual.
+  //   * Public (pending / rejected) with an existing snapshot → the
+  //     frozen snapshot, so editable-but-unreviewed fields never leak.
+  //   * Public (no snapshot yet, i.e. brand-new pending profile) →
+  //     leave `profile` undefined so the page falls through to the
+  //     "Profile not found" block, effectively hiding it.
+  const profile = (() => {
+    if (!rawProfile) return undefined;
+    if (isOwnerViewer || viewerIsAdmin) return rawProfile;
+    const status = rawProfile.moderationStatus ?? "approved";
+    if (status === "approved") return rawProfile;
+    const snapshot = profileFromSnapshot(rawProfile.approvedSnapshot);
+    return snapshot ?? undefined;
+  })();
 
   // If the profile isn't in the in-memory context (e.g. visitor or RLS / pagination
   // hides it), fetch it directly by public id so the page never falsely shows
@@ -374,8 +415,70 @@ export default function OtherProfilePage() {
   ];
   const hasMultiplePhotos = allPhotos.length > 1;
 
+  // Owner/admin-only banner that surfaces the moderation status. Public
+  // viewers never see these since they're rendering from the approved
+  // snapshot (or the page 404s for brand-new pending profiles).
+  const moderationBanner = (() => {
+    if (!(isOwnerViewer || viewerIsAdmin)) return null;
+    const status = profile.moderationStatus ?? "approved";
+    if (status === "approved") return null;
+    if (status === "pending_review") {
+      return (
+        <div className="mx-4 mt-3 p-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 flex items-start gap-2.5">
+          <Clock size={18} className="mt-0.5 flex-shrink-0" />
+          <div className="text-sm">
+            <p className="font-semibold">
+              {profile.approvedSnapshot
+                ? "Edits pending admin review"
+                : "Profile pending admin review"}
+            </p>
+            <p className="text-xs mt-0.5 opacity-90">
+              {profile.approvedSnapshot
+                ? "Other members see your previously-approved version until an admin approves the changes."
+                : "Your profile will be visible to others once an admin approves it."}
+            </p>
+          </div>
+        </div>
+      );
+    }
+    if (status === "rejected") {
+      return (
+        <div className="mx-4 mt-3 p-3 rounded-xl border border-red-200 bg-red-50 text-red-900 flex items-start gap-2.5">
+          <AlertTriangle size={18} className="mt-0.5 flex-shrink-0" />
+          <div className="text-sm">
+            <p className="font-semibold">Profile changes not approved</p>
+            {profile.rejectionReason ? (
+              <p className="text-xs mt-0.5 opacity-90">
+                Reason: {profile.rejectionReason}
+              </p>
+            ) : (
+              <p className="text-xs mt-0.5 opacity-90">
+                Please edit and re-submit. An admin has asked for changes.
+              </p>
+            )}
+          </div>
+        </div>
+      );
+    }
+    if (status === "draft") {
+      return (
+        <div className="mx-4 mt-3 p-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800 flex items-start gap-2.5">
+          <Clock size={18} className="mt-0.5 flex-shrink-0" />
+          <div className="text-sm">
+            <p className="font-semibold">Draft — not submitted yet</p>
+            <p className="text-xs mt-0.5 opacity-90">
+              Complete and save the profile to submit it for admin review.
+            </p>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  })();
+
   return (
     <div className="max-w-2xl mx-auto pb-6">
+      {moderationBanner}
       {showGallery && hasMultiplePhotos && (
         <div
           className="fixed inset-0 z-50 bg-black flex flex-col"
@@ -576,6 +679,19 @@ export default function OtherProfilePage() {
               Verified
             </span>
           )}
+          {(() => {
+            const { percent, isComplete } = computeProfileCompletion(profile);
+            if (!isComplete) return null;
+            return (
+              <span
+                className="inline-flex items-center gap-1 mt-2 ml-2 px-2.5 py-1 text-xs font-semibold text-emerald-800 bg-emerald-100 rounded-[8px]"
+                title={`Profile is ${percent}% complete`}
+              >
+                <BadgeCheck size={13} />
+                Verified Complete
+              </span>
+            );
+          })()}
           <span className="inline-block mt-2 ml-2 px-2.5 py-1 text-xs font-medium text-white bg-white/20 rounded-[8px]">
             {getMemberIdDisplay(profile)}
           </span>
@@ -623,23 +739,24 @@ export default function OtherProfilePage() {
             <Heart size={20} className={`flex-shrink-0 ${hasShownInterest ? 'fill-red-600' : ''}`} />
             <span className="text-xs font-medium truncate">Interest</span>
           </button>
-          {interestAccepted ? (
-            <Link href={`/messages/${profile.id}`} className="min-h-[44px]">
-              <button className="w-full h-full flex flex-col items-center justify-center gap-1 px-2 py-3 sm:py-2.5 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition border border-transparent hover:border-gray-200">
+          {FEATURE_MESSAGING_ENABLED &&
+            (interestAccepted ? (
+              <Link href={`/messages/${profile.id}`} className="min-h-[44px]">
+                <button className="w-full h-full flex flex-col items-center justify-center gap-1 px-2 py-3 sm:py-2.5 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition border border-transparent hover:border-gray-200">
+                  <MessageCircle size={20} className="flex-shrink-0" />
+                  <span className="text-xs font-medium truncate">Message</span>
+                </button>
+              </Link>
+            ) : (
+              <button
+                disabled
+                title="Accept interest request first to message"
+                className="flex flex-col items-center justify-center gap-1 px-2 py-3 sm:py-2.5 rounded-xl opacity-50 cursor-not-allowed min-h-[44px] border border-gray-200"
+              >
                 <MessageCircle size={20} className="flex-shrink-0" />
                 <span className="text-xs font-medium truncate">Message</span>
               </button>
-            </Link>
-          ) : (
-            <button
-              disabled
-              title="Accept interest request first to message"
-              className="flex flex-col items-center justify-center gap-1 px-2 py-3 sm:py-2.5 rounded-xl opacity-50 cursor-not-allowed min-h-[44px] border border-gray-200"
-            >
-              <MessageCircle size={20} className="flex-shrink-0" />
-              <span className="text-xs font-medium truncate">Message</span>
-            </button>
-          )}
+            ))}
           {!isLoggedIn ? (
             <a
               href={`tel:${(config.callContactNumber || "6360130905").replace(/\D/g, "")}`}
@@ -795,7 +912,13 @@ export default function OtherProfilePage() {
             <DetailSection icon={User} heading="Basic Info">
               {(() => {
                 const mb = profile.managedBy;
-                const holder = (profile.accountHolderName || "").trim();
+                const rawHolder = (profile.accountHolderName || "").trim();
+                // Collapse generic admin labels (e.g. "Super Admin", "SuperAdmin",
+                // "Site Admin") to a single canonical "Admin" so users see a
+                // consistent, friendly badge instead of internal role names.
+                const holder = /^(super\s*admin|site\s*admin|system\s*admin|admin)$/i.test(rawHolder)
+                  ? "Admin"
+                  : rawHolder;
                 const looksLikeBusiness = !!holder && /matrim|admin|samaj|service|agency/i.test(holder);
                 const isAdmin = mb === "admin" || looksLikeBusiness;
                 const isSelf = !isAdmin && mb === "self";
@@ -856,8 +979,16 @@ export default function OtherProfilePage() {
             </DetailSection>
             <DetailSection icon={GraduationCap} heading="Education & Career">
               <p>{profile.qualification || "—"}</p>
-              <p>{profile.profession || "—"}{profile.companyName ? ` at ${profile.companyName}` : ""}</p>
-              {profile.annualIncome && <p>{profile.annualIncome}</p>}
+              {/* Hide employer name for non-logged-in viewers — keep the
+                  profession visible so the profile still communicates its
+                  key context without leaking company details publicly. */}
+              <p>
+                {profile.profession || "—"}
+                {isLoggedIn && profile.companyName ? ` at ${profile.companyName}` : ""}
+              </p>
+              {/* Annual income (package) is a sensitive field — hidden for
+                  non-logged-in viewers to discourage scraping. */}
+              {isLoggedIn && profile.annualIncome && <p>{profile.annualIncome}</p>}
             </DetailSection>
             <DetailSection icon={Users} heading="Family">
               <p>Father: {displayFatherName || "—"} ({profile.fatherOccupation || "—"})</p>
@@ -868,11 +999,14 @@ export default function OtherProfilePage() {
           </div>
         </div>
 
-        {(profile.rashi || profile.nakshatra || profile.timeOfBirth || profile.placeOfBirth) && (
+        {/* Horoscope block: Time of Birth is considered sensitive and is
+            hidden for non-logged-in viewers. We still show the card if any
+            of the remaining astrology fields are present. */}
+        {(profile.rashi || profile.nakshatra || (isLoggedIn && profile.timeOfBirth) || profile.placeOfBirth) && (
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <h3 className="font-semibold text-[var(--foreground)] mb-1">Horoscope Details</h3>
             <DetailSection icon={Calendar} heading="Birth & Astrology">
-              {profile.timeOfBirth && <p>Time of Birth: {profile.timeOfBirth}</p>}
+              {isLoggedIn && profile.timeOfBirth && <p>Time of Birth: {profile.timeOfBirth}</p>}
               {profile.placeOfBirth && <p>Place of Birth: {profile.placeOfBirth}</p>}
               {profile.rashi && <p>Zodiac Sign: {profile.rashi}</p>}
               {profile.nakshatra && <p>Nakshatra: {profile.nakshatra}</p>}
@@ -998,22 +1132,160 @@ export default function OtherProfilePage() {
           </DetailSection>
         </div>
 
-        {profile.partnerPreference && (
-          <div className="bg-white rounded-2xl p-4 shadow-sm">
-            <h3 className="font-semibold text-[var(--foreground)] mb-1">Partner Preferences</h3>
-            <DetailSection icon={Heart} heading="Preferred">
-              {profile.partnerPreference.ageMin != null && profile.partnerPreference.ageMax != null && (
-                <p>Age: {profile.partnerPreference.ageMin}–{profile.partnerPreference.ageMax} yrs</p>
-              )}
-              {profile.partnerPreference.profession && (
-                <p>Profession: {profile.partnerPreference.profession}</p>
-              )}
-              {profile.partnerPreference.education && (
-                <p>Education: {profile.partnerPreference.education}</p>
-              )}
-            </DetailSection>
-          </div>
-        )}
+        {(() => {
+          const isOwnProfile = !!actorId && actorId === profile.id;
+          const hasPrefs = hasMeaningfulPreferences({
+            partnerPreference: profile.partnerPreference,
+            preferencesUpdatedAt: profile.preferencesUpdatedAt,
+          });
+          // Default to true when the column is missing/null on legacy rows so
+          // existing profiles don't suddenly hide their preferences.
+          const isPublic = profile.showPartnerPreferences !== false;
+
+          // Owner: always show *something* — either the prefs or a CTA nudge.
+          if (isOwnProfile) {
+            if (hasPrefs) {
+              return (
+                <div className="bg-white rounded-2xl p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3 mb-1">
+                    <h3 className="font-semibold text-[var(--foreground)]">Partner Preferences</h3>
+                    {!isPublic && (
+                      <span
+                        className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-gray-100 text-gray-600"
+                        title="Only you can see your preferences"
+                      >
+                        <Lock size={10} />
+                        Private
+                      </span>
+                    )}
+                  </div>
+                  <DetailSection icon={Heart} heading="Preferred">
+                    {profile.partnerPreference?.ageMin != null && profile.partnerPreference?.ageMax != null && (
+                      <p>Age: {profile.partnerPreference.ageMin}–{profile.partnerPreference.ageMax} yrs</p>
+                    )}
+                    {profile.partnerPreference?.heightMin && profile.partnerPreference?.heightMax && (
+                      <p>Height: {profile.partnerPreference.heightMin} – {profile.partnerPreference.heightMax}</p>
+                    )}
+                    {profile.partnerPreference?.maritalStatus && (
+                      <p>Marital status: {profile.partnerPreference.maritalStatus}</p>
+                    )}
+                    {profile.partnerPreference?.education && (
+                      <p>Education: {profile.partnerPreference.education}</p>
+                    )}
+                    {profile.partnerPreference?.profession && (
+                      <p>Profession: {profile.partnerPreference.profession}</p>
+                    )}
+                    {(profile.partnerPreference?.city || profile.partnerPreference?.state) && (
+                      <p>
+                        Location: {[profile.partnerPreference.city, profile.partnerPreference.state]
+                          .filter(Boolean)
+                          .join(", ")}
+                      </p>
+                    )}
+                    {profile.partnerPreference?.foodHabits && (
+                      <p>Food: {profile.partnerPreference.foodHabits}</p>
+                    )}
+                  </DetailSection>
+                  <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between gap-3">
+                    <p className="text-xs text-gray-500">
+                      {isPublic
+                        ? "Visible to other members."
+                        : "Hidden from other members."}
+                    </p>
+                    <Link
+                      href="/profile/preferences"
+                      className="text-xs font-semibold text-[var(--primary)] hover:underline shrink-0"
+                    >
+                      Edit →
+                    </Link>
+                  </div>
+                </div>
+              );
+            }
+            // Owner with no real preferences yet → nudge.
+            return (
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-dashed border-[var(--primary)]/30">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-9 h-9 rounded-xl bg-[var(--primary)]/10 text-[var(--primary)] flex items-center justify-center">
+                    <Heart size={18} />
+                  </div>
+                  <h3 className="font-semibold text-[var(--foreground)]">
+                    {isPublic
+                      ? "Tell us what you're looking for"
+                      : "Your preferences are private"}
+                  </h3>
+                </div>
+                <p className="text-sm text-gray-600 mb-3">
+                  {isPublic
+                    ? "Profiles with partner preferences get more relevant matches. Takes under a minute."
+                    : "Only you can see them. Make them public so others know if you're a good match."}
+                </p>
+                <Link
+                  href="/profile/preferences"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--primary)] text-white text-sm font-semibold hover:bg-[var(--primary-hover)] transition"
+                >
+                  {isPublic ? "Add Partner Preferences" : "Manage Preferences"}
+                  <ChevronRight size={14} />
+                </Link>
+              </div>
+            );
+          }
+
+          // Viewer: only show the card when prefs exist AND are public.
+          if (!hasPrefs) return null;
+          if (!isPublic) {
+            return (
+              <div className="bg-white rounded-2xl p-4 shadow-sm">
+                <h3 className="font-semibold text-[var(--foreground)] mb-1">Partner Preferences</h3>
+                <div className="flex items-start gap-3 mt-2">
+                  <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-500 flex items-center justify-center shrink-0">
+                    <Lock size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-800">
+                      Preferences kept private
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      This member has chosen not to share their partner preferences publicly.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+          return (
+            <div className="bg-white rounded-2xl p-4 shadow-sm">
+              <h3 className="font-semibold text-[var(--foreground)] mb-1">Partner Preferences</h3>
+              <DetailSection icon={Heart} heading="Preferred">
+                {profile.partnerPreference?.ageMin != null && profile.partnerPreference?.ageMax != null && (
+                  <p>Age: {profile.partnerPreference.ageMin}–{profile.partnerPreference.ageMax} yrs</p>
+                )}
+                {profile.partnerPreference?.heightMin && profile.partnerPreference?.heightMax && (
+                  <p>Height: {profile.partnerPreference.heightMin} – {profile.partnerPreference.heightMax}</p>
+                )}
+                {profile.partnerPreference?.maritalStatus && (
+                  <p>Marital status: {profile.partnerPreference.maritalStatus}</p>
+                )}
+                {profile.partnerPreference?.education && (
+                  <p>Education: {profile.partnerPreference.education}</p>
+                )}
+                {profile.partnerPreference?.profession && (
+                  <p>Profession: {profile.partnerPreference.profession}</p>
+                )}
+                {(profile.partnerPreference?.city || profile.partnerPreference?.state) && (
+                  <p>
+                    Location: {[profile.partnerPreference.city, profile.partnerPreference.state]
+                      .filter(Boolean)
+                      .join(", ")}
+                  </p>
+                )}
+                {profile.partnerPreference?.foodHabits && (
+                  <p>Food: {profile.partnerPreference.foodHabits}</p>
+                )}
+              </DetailSection>
+            </div>
+          );
+        })()}
 
         {hasMultiplePhotos && (
           <div className="bg-white rounded-2xl p-4 shadow-sm">
@@ -1179,12 +1451,32 @@ export default function OtherProfilePage() {
           </div>
         )}
 
-        {/* Results */}
+        {/*
+          "More like this" results.
+          Context-aware: a bride's profile should suggest more brides, and a
+          groom's profile should suggest more grooms — the user can always
+          switch tracks via the Brides/Grooms bottom-nav tabs. This mirrors
+          how users typically browse (a matchmaker viewing female profiles
+          continues to compare females; same for males).
+        */}
         <div className="pt-6">
-          <h3 className="font-semibold text-[var(--foreground)] mb-3 text-lg sm:text-xl text-center">Results</h3>
+          <h3 className="font-semibold text-[var(--foreground)] mb-3 text-lg sm:text-xl text-center">
+            {profile.gender === "female"
+              ? "More Brides You May Like"
+              : profile.gender === "male"
+              ? "More Grooms You May Like"
+              : "Results"}
+          </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {profiles
-              .filter((p) => p.id !== profile.id)
+              .filter(
+                (p) =>
+                  p.id !== profile.id &&
+                  // Match source context: if the current profile has a
+                  // gender, only suggest same-gender profiles. Fall back
+                  // to showing all if gender is missing (defensive).
+                  (!profile.gender || p.gender === profile.gender)
+              )
               .slice(0, 6)
               .map((similar) => (
                 <ProfileCard

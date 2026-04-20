@@ -4,15 +4,49 @@ import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Send } from "lucide-react";
+import { Send, MessageCircle, ArrowLeft } from "lucide-react";
 import { useProfiles } from "@/contexts/ProfilesContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getMessages, sendMessage, subscribeToNewMessages, getConversationId } from "@/lib/api/messages";
 import { getProfileById as fetchProfile } from "@/lib/api/profiles";
 import { getProfileSlug } from "@/lib/memberId";
+import { FEATURE_MESSAGING_ENABLED } from "@/lib/featureFlags";
 import type { Message, Profile } from "@/types";
 
 export default function ChatPage() {
+  if (!FEATURE_MESSAGING_ENABLED) {
+    return <ComingSoon />;
+  }
+  return <ChatPageImpl />;
+}
+
+function ComingSoon() {
+  return (
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-16">
+      <div className="max-w-md w-full text-center">
+        <div className="w-20 h-20 mx-auto rounded-full bg-[var(--primary)]/10 flex items-center justify-center mb-5">
+          <MessageCircle size={36} className="text-[var(--primary)]" />
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-[var(--foreground)] mb-3">
+          Messaging — Coming Soon
+        </h1>
+        <p className="text-base text-gray-600 mb-8">
+          In-app chat is on the way. For now, send an Interest and use the
+          contact number on the profile to reach out directly.
+        </p>
+        <Link
+          href="/profiles"
+          className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[var(--primary)] text-white font-semibold hover:bg-[var(--primary-hover)] transition"
+        >
+          <ArrowLeft size={18} />
+          Back to Profiles
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function ChatPageImpl() {
   const params = useParams();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);

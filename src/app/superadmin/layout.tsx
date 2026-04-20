@@ -2,11 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, MessageSquare, CreditCard, Bell, Shield, BarChart3, Settings } from "lucide-react";
+import {
+  LayoutDashboard,
+  Users,
+  MessageSquare,
+  CreditCard,
+  Bell,
+  Shield,
+  BarChart3,
+  Settings,
+  ClipboardCheck,
+} from "lucide-react";
 
 const navItems = [
   { href: "/superadmin", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/superadmin/users", icon: Users, label: "Users" },
+  { href: "/superadmin/moderation", icon: ClipboardCheck, label: "Moderation" },
   { href: "/superadmin/messages", icon: MessageSquare, label: "Messages" },
   { href: "/superadmin/subscriptions", icon: CreditCard, label: "Subscriptions" },
   { href: "/superadmin/notifications", icon: Bell, label: "Notifications" },

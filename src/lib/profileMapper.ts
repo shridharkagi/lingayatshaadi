@@ -67,6 +67,18 @@ export function toProfileRow(p: Partial<Profile>): ProfileRow {
   if (p.nickname != null) row.nickname = p.nickname;
   if (p.role != null) row.role = p.role;
   if (p.partnerPreference != null) row.partner_preference = p.partnerPreference;
+  // Display-only privacy flag — never gate the matching algorithm on this.
+  if (p.showPartnerPreferences != null) row.show_partner_preferences = p.showPartnerPreferences;
+  if (p.preferencesUpdatedAt != null) row.preferences_updated_at = p.preferencesUpdatedAt;
+  // Moderation (Batch 5). Note that `profileStatus` (legacy verified/pending
+  // admin flag) already maps to `profile_status`, so we keep them separate.
+  if (p.moderationStatus != null) row.moderation_status = p.moderationStatus;
+  if (p.approvedSnapshot != null) row.approved_snapshot = p.approvedSnapshot;
+  if (p.approvedAt != null) row.approved_at = p.approvedAt;
+  if (p.lastSubmittedAt != null) row.last_submitted_at = p.lastSubmittedAt;
+  if (p.rejectionReason != null) row.rejection_reason = p.rejectionReason;
+  if (p.reviewedBy != null) row.reviewed_by = p.reviewedBy;
+  if (p.draftCurrentStep != null) row.draft_current_step = p.draftCurrentStep;
   if (p.publicId != null) row.public_id = p.publicId;
   if (p.memberId != null) row.public_id = p.memberId || p.publicId;
   return row;
@@ -83,6 +95,7 @@ export function fromProfileRow(row: ProfileRow): Profile {
     id: String(row.id ?? ""),
     publicId: row.public_id as string | undefined,
     memberId: (row.public_id ?? row.member_id) as string | undefined,
+    userId: row.user_id as string | undefined,
     email: String(row.email ?? ""),
     fullName: String(row.full_name ?? ""),
     dateOfBirth: formatDate(row.date_of_birth),
@@ -135,6 +148,33 @@ export function fromProfileRow(row: ProfileRow): Profile {
     nickname: row.nickname as string | undefined,
     role: (row.role as Profile["role"]) ?? "user",
     partnerPreference: row.partner_preference as Profile["partnerPreference"],
+    // Default to true so legacy rows (column added later, value never set)
+    // continue to display preferences exactly as they did before the toggle
+    // was introduced.
+    showPartnerPreferences: row.show_partner_preferences == null
+      ? true
+      : Boolean(row.show_partner_preferences),
+    preferencesUpdatedAt: row.preferences_updated_at
+      ? new Date(row.preferences_updated_at as string).toISOString()
+      : undefined,
+    // Moderation (Batch 5). Default legacy rows to 'approved' so the
+    // migration period doesn't accidentally hide already-live profiles.
+    // The SQL back-fill also sets this to 'approved' for non-empty rows,
+    // but a JS default is a safety net for untouched rows.
+    moderationStatus: (row.moderation_status as Profile["moderationStatus"]) ?? "approved",
+    approvedSnapshot: row.approved_snapshot as Profile["approvedSnapshot"],
+    approvedAt: row.approved_at
+      ? new Date(row.approved_at as string).toISOString()
+      : undefined,
+    lastSubmittedAt: row.last_submitted_at
+      ? new Date(row.last_submitted_at as string).toISOString()
+      : undefined,
+    rejectionReason: row.rejection_reason as string | undefined,
+    reviewedBy: row.reviewed_by as string | undefined,
+    draftCurrentStep:
+      typeof row.draft_current_step === "number"
+        ? (row.draft_current_step as number)
+        : undefined,
     createdAt: row.created_at ? new Date(row.created_at as string).toISOString().slice(0, 10) : "",
     updatedAt: row.updated_at ? new Date(row.updated_at as string).toISOString().slice(0, 10) : "",
   };

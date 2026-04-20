@@ -29,6 +29,9 @@ import {
   Check,
   X,
   Plus,
+  Eye,
+  EyeOff,
+  Wand2,
   type LucideIcon,
 } from "lucide-react";
 import type { PartnerPreference } from "@/types";
@@ -48,6 +51,24 @@ interface PartnerPreferencesFormProps {
   description?: string;
   /** Hide the inner header (title + reset). Useful when host already provides one. */
   hideHeader?: boolean;
+  /** Visibility flag controlling the "Show on my profile" toggle. */
+  showOnProfile?: boolean;
+  /** Fired when the user flips the visibility toggle. */
+  onShowOnProfileChange?: (next: boolean) => void;
+  /**
+   * When true, renders a dismissable banner explaining that the form was
+   * pre-filled from the user's own profile. Owned by the host so dismissal
+   * state can be persisted to localStorage.
+   */
+  showSmartDefaultsBanner?: boolean;
+  /** Called when the user dismisses the smart-defaults banner. */
+  onDismissSmartDefaultsBanner?: () => void;
+  /**
+   * Optional handler for the "Reset to suggestions" affordance. When provided
+   * the Reset button uses this; otherwise it falls back to clearing all
+   * fields (legacy behavior).
+   */
+  onResetToSuggested?: () => void;
 }
 
 const AGE_MIN = 18;
@@ -531,6 +552,11 @@ export function PartnerPreferencesForm({
   onChange,
   description = "All fields are optional — set only what matters most. You can update these any time.",
   hideHeader = false,
+  showOnProfile,
+  onShowOnProfileChange,
+  showSmartDefaultsBanner = false,
+  onDismissSmartDefaultsBanner,
+  onResetToSuggested,
 }: PartnerPreferencesFormProps) {
   const pref = value || {};
   const [openSection, setOpenSection] = useState<SectionKey | null>("basic");
@@ -598,8 +624,15 @@ export function PartnerPreferencesForm({
 
   const reset = () => {
     seededRef.current = false;
-    onChange({});
+    if (onResetToSuggested) {
+      onResetToSuggested();
+    } else {
+      onChange({});
+    }
   };
+
+  const visibilityToggleAvailable =
+    typeof showOnProfile === "boolean" && typeof onShowOnProfileChange === "function";
 
   return (
     <div className="space-y-4">
@@ -640,6 +673,77 @@ export function PartnerPreferencesForm({
               />
             </div>
           </div>
+
+          {visibilityToggleAvailable && (
+            <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-white/80 px-3 py-2.5 border border-white/60">
+              <div className="min-w-0 flex items-start gap-2.5">
+                <div
+                  className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                    showOnProfile
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-gray-100 text-gray-500"
+                  }`}
+                >
+                  {showOnProfile ? <Eye size={14} /> : <EyeOff size={14} />}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900 leading-tight">
+                    Show on my profile
+                  </p>
+                  <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">
+                    {showOnProfile
+                      ? "Other members will see your preferences when viewing your profile."
+                      : "Your preferences are private. Only you can see them."}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={!!showOnProfile}
+                onClick={() => onShowOnProfileChange?.(!showOnProfile)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 focus:ring-offset-2 ${
+                  showOnProfile ? "bg-[var(--primary)]" : "bg-gray-300"
+                }`}
+                aria-label="Show partner preferences on my profile"
+              >
+                <span
+                  aria-hidden
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
+                    showOnProfile ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {showSmartDefaultsBanner && (
+        <div className="rounded-2xl border border-[var(--primary)]/20 bg-[var(--primary)]/5 px-4 py-3 flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-white text-[var(--primary)] flex items-center justify-center shrink-0 shadow-sm">
+            <Wand2 size={15} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-900">
+              We pre-filled suggestions based on your profile
+            </p>
+            <p className="text-xs text-gray-600 mt-0.5">
+              Edit anything you&apos;d like, or hit{" "}
+              <span className="font-medium text-gray-800">Reset</span> to start
+              from these suggestions again. Caste is left as <em>Any</em> by default.
+            </p>
+          </div>
+          {onDismissSmartDefaultsBanner && (
+            <button
+              type="button"
+              onClick={onDismissSmartDefaultsBanner}
+              className="p-1.5 -mr-1 -mt-0.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-white/60 transition shrink-0"
+              aria-label="Dismiss suggestion banner"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
       )}
 

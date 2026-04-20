@@ -4,6 +4,50 @@ import { generatePublicIdFromExistingIds, genderFlag } from "@/lib/memberId";
 import type { Profile } from "@/types";
 
 /**
+ * For public-facing surfaces (search, home cards, other-member profile
+ * view), we must never display a profile's pending edits. If the row is
+ * not `approved` AND it has a prior approved snapshot, we render from the
+ * snapshot instead. The snapshot is `to_jsonb(profiles.*)` so the keys
+ * already match `ProfileRow` and `fromProfileRow` can rehydrate it.
+ */
+export function profileForPublic(row: ProfileRow): Profile {
+  const status = row.moderation_status as string | undefined;
+  const snapshot = row.approved_snapshot as Record<string, unknown> | null | undefined;
+  if (status === "approved" || !snapshot) {
+    return fromProfileRow(row);
+  }
+  // Preserve the canonical id / public_id / moderation_status from the
+  // live row so routing and "pending" badges keep working even when the
+  // body comes from a stale snapshot.
+  return fromProfileRow({
+    ...(snapshot as ProfileRow),
+    id: row.id,
+    public_id: row.public_id ?? (snapshot as ProfileRow).public_id,
+    user_id: row.user_id ?? (snapshot as ProfileRow).user_id,
+    moderation_status: row.moderation_status,
+    approved_snapshot: null,
+  } as ProfileRow);
+}
+
+/**
+ * Rehydrate an `approved_snapshot` JSONB blob back into a `Profile`.
+ * Snapshots come from `to_jsonb(profiles.*)` so keys already match the
+ * `ProfileRow` shape — we simply pass it through the existing mapper.
+ * Returns null when snapshot is absent so callers can easily branch.
+ */
+export function profileFromSnapshot(
+  snapshot: Record<string, unknown> | null | undefined
+): Profile | null {
+  if (!snapshot) return null;
+  try {
+    return fromProfileRow(snapshot as ProfileRow);
+  } catch (err) {
+    console.warn("[profiles.profileFromSnapshot] could not rehydrate snapshot:", err);
+    return null;
+  }
+}
+
+/**
  * Hard timeout for any single Supabase write operation. Prevents the UI from
  * being stuck on "Saving..." forever when the network or auth lock stalls.
  */
@@ -47,6 +91,19 @@ export async function createProfile(
     const supabase = createSupabaseClient();
     const row = toProfileRow(data);
     row.user_id = userId;
+
+    // Moderation (Batch 5B): every brand-new profile enters the admin
+    // review queue by default. `approved_snapshot` stays NULL until an
+    // admin flips status to 'approved' for the first time — so the public
+    // won't see anything until then. Callers that need to bypass this
+    // (e.g. internal seeding scripts) should write directly via service
+    // role + explicit `moderation_status`.
+    if (row.moderation_status == null) {
+      row.moderation_status = "pending_review";
+    }
+    if (row.last_submitted_at == null) {
+      row.last_submitted_at = new Date().toISOString();
+    }
 
     // Generate the next public_id in the "L[BG]YYMMNNNNN" scheme using a
     // GLOBAL counter — the next number is `max(seq across ALL existing
@@ -106,17 +163,80 @@ export async function createProfile(
   }
 }
 
-/** Update an existing profile by profile id */
+/**
+ * Update an existing profile by profile id.
+ *
+ * Batch 5B: every edit by a non-admin re-enters the moderation queue.
+ * Callers that are performing an admin action (approve / reject) must pass
+ * `options.skipModeration = true` to avoid flipping their own approval
+ * back to `pending_review`. Edits that only touch already-admin columns
+ * (moderation_status, approved_snapshot, etc.) also get this treatment
+ * automatically so callers don't need to remember the flag.
+ */
+const ADMIN_ONLY_ROW_KEYS = new Set([
+  "moderation_status",
+  "approved_snapshot",
+  "approved_at",
+  "last_submitted_at",
+  "rejection_reason",
+  "reviewed_by",
+  // Verification + trust are admin-managed.
+  "verified",
+  "profile_status",
+  "trust_score",
+  "role",
+]);
+
 export async function updateProfileById(
   profileId: string,
-  data: Partial<Profile>
+  data: Partial<Profile>,
+  options: { skipModeration?: boolean } = {}
 ): Promise<{ data: Profile | null; error: string | null }> {
   try {
     const supabase = createSupabaseClient();
     const row = toProfileRow(data);
 
+    // Decide whether this edit counts as "content change" (= requires
+    // re-approval) or is a pure admin field update (= leave status alone).
+    //
+    // If the caller has explicitly set `moderation_status` (e.g. the
+    // autosave flow saving as 'draft'), that value is respected as-is —
+    // we never override an explicit intent. Pure admin-field updates
+    // (verification toggles etc.) also skip the flip.
+    const touchesOwnerFields = Object.keys(row).some(
+      (k) => !ADMIN_ONLY_ROW_KEYS.has(k)
+    );
+    const explicitStatus = row.moderation_status as string | undefined;
+    // Decision matrix:
+    //   - explicit "draft" (autosave) → respect, no pending flip
+    //   - explicit "pending_review" (submit-from-draft) → treat as submission:
+    //     stamp last_submitted_at, clear rejection_reason, drop draft step
+    //   - no explicit status + owner field changed → auto-flip to
+    //     pending_review (normal edit-after-approval)
+    //   - options.skipModeration (admin tools) → never change status
+    const isSubmission =
+      !options.skipModeration &&
+      (explicitStatus === "pending_review" ||
+        (explicitStatus == null && touchesOwnerFields));
+    if (isSubmission) {
+      row.moderation_status = "pending_review";
+      row.last_submitted_at = new Date().toISOString();
+      // Explicitly clear a previous rejection reason since the user is
+      // re-submitting; otherwise the stale reason would linger.
+      row.rejection_reason = null;
+      // A submitted profile is no longer a draft — nuke the resume step
+      // so /account stops listing it under "Continue creating".
+      row.draft_current_step = null;
+    }
+
     if (typeof window !== "undefined") {
-      console.info("[profiles.updateProfileById] updating row", { profileId, keys: Object.keys(row) });
+      console.info("[profiles.updateProfileById] updating row", {
+        profileId,
+        keys: Object.keys(row),
+        skipModeration: options.skipModeration,
+        touchesOwnerFields,
+        isSubmission,
+      });
     }
 
     const { data: updated, error } = await withTimeout(
@@ -280,11 +400,21 @@ export async function searchProfiles(
       query = query.gte("date_of_birth", minDob.toISOString().slice(0, 10));
     }
 
+    // Moderation (Batch 5B): a profile is publicly listable if EITHER its
+    // live moderation_status is 'approved' OR it has a prior approved
+    // snapshot to fall back to. Anything else (brand-new pending, draft,
+    // rejected with no history) is hidden from the public feed.
+    query = query.or(
+      "moderation_status.eq.approved,approved_snapshot.not.is.null"
+    );
+
     const { data, error } = await query.order("created_at", { ascending: false }).limit(limit);
 
     if (error) return { data: [], error: error.message };
     return {
-      data: (data || []).map((r) => fromProfileRow(r as ProfileRow)),
+      // Public consumers always see the approved version of the data,
+      // even when there are pending edits on the live row.
+      data: (data || []).map((r) => profileForPublic(r as ProfileRow)),
       error: null,
     };
   } catch (err) {

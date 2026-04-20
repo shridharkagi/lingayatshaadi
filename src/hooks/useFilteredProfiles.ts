@@ -7,12 +7,19 @@ import type { SearchFiltersState } from "@/components/SearchFilters";
 export function useFilteredProfiles(
   profiles: Profile[],
   filters: SearchFiltersState,
-  query?: string
+  query?: string,
+  /**
+   * Hard-coded gender filter that is applied in addition to (and cannot be
+   * overridden by) the user's own filter selections. Used by the dedicated
+   * /brides and /grooms routes.
+   */
+  forceGender?: "male" | "female"
 ): Profile[] {
   return useMemo(() => {
     return profiles.filter((profile) => {
+      const gender = profile.gender?.toLowerCase();
+      if (forceGender && gender !== forceGender) return false;
       if (filters.profileType) {
-        const gender = profile.gender?.toLowerCase();
         if (filters.profileType === "bride" && gender !== "female") return false;
         if (filters.profileType === "groom" && gender !== "male") return false;
       }
@@ -39,5 +46,5 @@ export function useFilteredProfiles(
 
       return true;
     });
-  }, [profiles, filters, query]);
+  }, [profiles, filters, query, forceGender]);
 }

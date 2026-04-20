@@ -45,6 +45,13 @@ export interface Profile {
   publicId?: string;
   /** @deprecated Use publicId. Kept for backward compatibility. */
   memberId?: string;
+  /**
+   * auth.users.id of the account owner for this profile. One account can
+   * own many profiles (self/son/daughter/etc.) — this is what the UI uses
+   * to answer "does the current auth user own this profile?" for gating
+   * owner-only affordances (banners, edit CTA, pending-review view).
+   */
+  userId?: string;
   email: string;
   fullName: string;
   dateOfBirth: string;
@@ -116,6 +123,71 @@ export interface Profile {
   updatedAt: string;
   // Partner preferences (stored with profile)
   partnerPreference?: PartnerPreference;
+  /**
+   * Owner-controlled visibility for the Partner Preferences card on the
+   * public profile. Defaults to true. Purely a display flag — the matching
+   * algorithm continues to use partnerPreference regardless of this value.
+   */
+  showPartnerPreferences?: boolean;
+  /**
+   * ISO timestamp of the most recent explicit save of partnerPreference.
+   * Undefined / null means the user has never opened-and-saved the form,
+   * which lets the UI tell auto-defaulted values apart from real intent.
+   */
+  preferencesUpdatedAt?: string;
+  // -----------------------------------------------------------------------
+  // Moderation (Batch 5). See supabase-moderation-schema.sql.
+  // `moderationStatus` drives whether the public sees the current row
+  // (approved) or the last-approved snapshot (pending_review / rejected).
+  // -----------------------------------------------------------------------
+  /**
+   * Moderation lifecycle. `draft` = owner is still filling in details;
+   * `pending_review` = submitted and waiting for an admin; `approved` = live;
+   * `rejected` = needs fixes (see `rejectionReason`).
+   */
+  moderationStatus?: "draft" | "pending_review" | "approved" | "rejected";
+  /**
+   * Frozen JSONB snapshot of the profile at the moment it was last
+   * approved. Public pages render from this column so an owner's pending
+   * edits stay private until re-approved. Shape matches a `Profile`-ish
+   * object with snake_case keys (whatever `to_jsonb(profiles.*)` emits).
+   */
+  approvedSnapshot?: Record<string, unknown>;
+  /** ISO timestamp of the most recent approval. */
+  approvedAt?: string;
+  /** ISO timestamp of when the owner last submitted the profile for review. */
+  lastSubmittedAt?: string;
+  /** Admin-supplied reason when moderationStatus === 'rejected'. */
+  rejectionReason?: string;
+  /** auth.users.id of the admin who last approved or rejected this profile. */
+  reviewedBy?: string;
+  /**
+   * Wizard step the owner was on when they last left profile creation.
+   * Only meaningful while `moderationStatus === 'draft'` — once the
+   * profile is submitted this is cleared. Enables cross-device resume.
+   */
+  draftCurrentStep?: number;
+}
+
+/**
+ * A single uploaded photo with its own moderation lifecycle. One primary
+ * photo is allowed per profile (enforced at the DB layer via a partial
+ * unique index). Deleting a photo is immediate and does NOT require admin
+ * approval; uploads start in `pending` state.
+ */
+export interface ProfilePhoto {
+  id: string;
+  profileId: string;
+  url: string;
+  storagePath?: string;
+  isPrimary: boolean;
+  status: "pending" | "approved" | "rejected";
+  rejectionReason?: string;
+  sortOrder: number;
+  uploadedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  createdAt: string;
 }
 
 export interface User {

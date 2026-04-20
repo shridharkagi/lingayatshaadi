@@ -17,6 +17,7 @@ import { getNotes } from "@/lib/api/notes";
 import { getContactViews } from "@/lib/api/contactViews";
 import { getAge } from "@/lib/utils";
 import { getProfileSlug } from "@/lib/memberId";
+import { FEATURE_MESSAGING_ENABLED } from "@/lib/featureFlags";
 import type { Profile } from "@/types";
 import {
   loadContactViewHistory,
@@ -345,18 +346,18 @@ export default function ActivitiesPage() {
                     </p>
                     {message && <p className="text-sm text-gray-600 mt-1">&quot;{message}&quot;</p>}
                     <div className="flex gap-2 mt-2">
-                      <Link
-                        href={`/messages/${profile!.id}`}
-                        onClick={async (e) => {
-                          e.preventDefault();
+                      <button
+                        onClick={async () => {
                           await acceptInterest(id, { accepterName: user?.fullName });
                           loadInterests();
-                          router.push(`/messages/${profile!.id}`);
+                          if (FEATURE_MESSAGING_ENABLED) {
+                            router.push(`/messages/${profile!.id}`);
+                          }
                         }}
                         className="px-4 py-1.5 rounded-lg bg-[var(--primary)] text-white text-sm font-medium"
                       >
                         Accept
-                      </Link>
+                      </button>
                       <button
                         onClick={async () => {
                           await declineInterest(id);

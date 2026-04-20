@@ -23,7 +23,10 @@ export default function LoginPage() {
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resendIn, setResendIn] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -38,49 +41,85 @@ export default function LoginPage() {
     return () => document.removeEventListener("click", handleClick, true);
   }, []);
 
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = window.setInterval(() => {
+      setResendIn((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [resendIn]);
+
   const phoneE164 = () => `+91${mobile.replace(/\D/g, "")}`;
+
+  const redirectAfterLogin = () => {
+    router.replace("/home");
+    // Fallback for cases where client-side navigation stalls in dev (HMR compile).
+    window.setTimeout(() => {
+      if (window.location.pathname === "/login") {
+        window.location.assign("/home");
+      }
+    }, 1200);
+  };
 
   const switchMode = (mode: LoginMode) => {
     setLoginMode(mode);
     setError("");
+    setInfo("");
+    setSuccess("");
     setOtpSent(false);
     setOtp("");
+    setResendIn(0);
     setPassword("");
   };
 
-  const handleSendPhoneOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const sendOtpRequest = async () => {
+    if (loading) return;
     setError("");
+    setInfo("");
+    setSuccess("");
     if (!mobile?.trim() || mobile.replace(/\D/g, "").length !== 10) {
       setError("Please enter a valid 10-digit mobile number");
       return;
     }
     setLoading(true);
-    const result = await sendPhoneOtp(phoneE164());
+    const result = await sendPhoneOtp(phoneE164(), "login");
     setLoading(false);
 
     if (result.error) {
       setError(result.error);
+      if (result.retryAfter) setResendIn(result.retryAfter);
     } else {
       setOtpSent(true);
+      const cooldown = result.cooldownSeconds ?? 30;
+      setResendIn(cooldown);
+      setInfo("OTP sent. It is valid for 10 minutes.");
     }
+  };
+
+  const handleSendPhoneOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await sendOtpRequest();
   };
 
   const handleVerifyPhoneOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setError("");
     if (!otp || otp.length !== 6) {
       setError("Please enter 6-digit OTP");
       return;
     }
+    setInfo("");
     setLoading(true);
     const result = await verifyPhoneOtp(phoneE164(), otp);
-    setLoading(false);
 
     if (result.error) {
+      setLoading(false);
       setError(result.error);
     } else {
-      router.push("/profiles");
+      setSuccess("Verified successfully. Redirecting...");
+      setLoading(false);
+      redirectAfterLogin();
     }
   };
 
@@ -242,6 +281,7 @@ export default function LoginPage() {
                     autoComplete="tel-national"
                   />
                   {error && <p className="text-red-500 text-sm">{error}</p>}
+                  {info && <p className="text-blue-600 text-sm">{info}</p>}
                   <Button type="submit" fullWidth size="lg" disabled={loading}>
                     {loading ? "Sending OTP..." : "Send OTP"}
                   </Button>
@@ -250,6 +290,9 @@ export default function LoginPage() {
                 <form onSubmit={handleVerifyPhoneOtp} className="space-y-4" aria-label="Enter OTP">
                   <p className="text-sm text-[var(--color-text-muted)]">
                     OTP sent to +91 {mobile}
+                  </p>
+                  <p className="text-xs text-[var(--color-text-muted)]">
+                    OTP is valid for 10 minutes.
                   </p>
                   <Input
                     label="Enter OTP"
@@ -263,15 +306,28 @@ export default function LoginPage() {
                     autoComplete="one-time-code"
                   />
                   {error && <p className="text-red-500 text-sm">{error}</p>}
+                  {info && <p className="text-blue-600 text-sm">{info}</p>}
+                  {success && <p className="text-green-600 text-sm">{success}</p>}
                   <Button type="submit" fullWidth size="lg" disabled={loading}>
                     {loading ? "Verifying..." : "Verify & Sign In"}
                   </Button>
+                  <button
+                    type="button"
+                    onClick={sendOtpRequest}
+                    disabled={loading || resendIn > 0}
+                    className="w-full text-sm text-[var(--primary)] font-medium py-1 disabled:text-[var(--color-text-muted)] disabled:cursor-not-allowed"
+                  >
+                    {resendIn > 0 ? `Resend OTP in ${resendIn}s` : "Resend OTP"}
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
                       setOtpSent(false);
                       setOtp("");
                       setError("");
+                      setInfo("");
+                      setSuccess("");
+                      setResendIn(0);
                     }}
                     className="w-full text-sm text-[var(--primary)] font-medium py-2"
                   >

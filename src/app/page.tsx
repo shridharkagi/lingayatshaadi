@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -15,6 +15,9 @@ import {
   Minus,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { searchProfiles } from "@/lib/api/profiles";
+import { calculateAge } from "@/lib/partnerPreferenceDefaults";
+import type { Profile } from "@/types";
 
 // Indian traditional couple and matrimony images
 const HERO_IMAGE =
@@ -134,6 +137,7 @@ export default function LandingPage() {
   const { isLoggedIn, profileComplete, loading } = useAuth();
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [livePreviewProfiles, setLivePreviewProfiles] = useState<Profile[] | null>(null);
 
   useEffect(() => {
     if (loading) return;
@@ -141,6 +145,61 @@ export default function LandingPage() {
       router.replace("/home");
     }
   }, [loading, isLoggedIn, profileComplete, router]);
+
+  // Load a small batch of real, recently-created profiles so the landing
+  // page showcases actual members (and cards can deep-link to their
+  // profile pages). Silently falls back to the curated mock list below
+  // when Supabase isn't configured or the query fails.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await searchProfiles({}, 5);
+        if (cancelled) return;
+        if (error || !data || data.length === 0) {
+          setLivePreviewProfiles([]);
+          return;
+        }
+        setLivePreviewProfiles(data);
+      } catch {
+        if (!cancelled) setLivePreviewProfiles([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Build a uniform card list from either live data or the mock fallback,
+  // preserving the existing design. When live data is available we route
+  // each card to the specific profile detail page (publicId preferred, id
+  // fallback). Mock rows keep a safe fallback link to the generic listing.
+  const previewCards = useMemo(() => {
+    const hasLive = livePreviewProfiles && livePreviewProfiles.length > 0;
+    if (hasLive) {
+      return livePreviewProfiles!.slice(0, 5).map((p, i) => {
+        const age = calculateAge(p.dateOfBirth);
+        const image = p.profilePhoto || p.photos?.[0] || LATEST_PROFILE_IMAGES[i % LATEST_PROFILE_IMAGES.length];
+        const slug = p.publicId || p.id;
+        return {
+          href: slug ? `/profile/${slug}` : "/profiles",
+          name: p.fullName?.split(" ")[0] || "Member",
+          age: age ?? undefined,
+          profession: p.profession || p.qualification || "",
+          location: [p.city, p.district].filter(Boolean).join(", ") || p.state || "",
+          image,
+        };
+      });
+    }
+    return latestProfiles.map((p) => ({
+      href: "/profiles",
+      name: p.name,
+      age: p.age as number | undefined,
+      profession: p.profession,
+      location: p.location,
+      image: p.image,
+    }));
+  }, [livePreviewProfiles]);
 
   // Native DOM event delegation - works around Turbopack breaking React onClick in dev
   useEffect(() => {
@@ -185,30 +244,62 @@ export default function LandingPage() {
             >
               Help
             </Link>
-            <Link
-              href="/login"
-              className="text-[var(--color-text-muted)] hover:text-[var(--primary)] transition"
-            >
-              Sign In
-            </Link>
-            <Link href="/signup">
-              <Button size="sm">Register</Button>
-            </Link>
+            {!loading && isLoggedIn ? (
+              <>
+                <Link
+                  href="/home"
+                  className="text-[var(--color-text-muted)] hover:text-[var(--primary)] transition"
+                >
+                  Home
+                </Link>
+                <Link href="/account">
+                  <Button size="sm">My Account</Button>
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="text-[var(--color-text-muted)] hover:text-[var(--primary)] transition"
+                >
+                  Sign In
+                </Link>
+                <Link href="/signup">
+                  <Button size="sm">Register</Button>
+                </Link>
+              </>
+            )}
           </nav>
-          <button
-            type="button"
-            id="mobile-menu-btn"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setMobileMenuOpen((prev) => !prev);
-            }}
-            className="md:hidden p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center -mr-1 rounded-lg hover:bg-[var(--color-border)]/50 active:bg-[var(--color-border)] transition-colors touch-manipulation"
-            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-            aria-expanded={mobileMenuOpen}
-          >
-            <Menu size={24} strokeWidth={2} />
-          </button>
+          {/* Mobile: keep a persistent Register CTA next to the hamburger so
+              visitors don't have to open the menu to find signup. */}
+          <div className="md:hidden flex items-center gap-1">
+            <Link href="/signup" aria-label="Register">
+              <Button
+                size="sm"
+                className="px-3 py-1.5 text-sm rounded-full shadow-sm"
+              >
+                Register
+              </Button>
+            </Link>
+            {/*
+              Hamburger toggle.
+              NOTE: toggle is handled exclusively by the document-level
+              click delegate in useEffect below (capture phase) — we do NOT
+              attach a React onClick here. Having both caused a
+              double-toggle race (capture handler runs first and flips the
+              state, then the React bubble-phase handler flips it back),
+              which is why the menu appeared broken on mobile.
+            */}
+            <button
+              type="button"
+              id="mobile-menu-btn"
+              className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-[var(--color-border)]/50 active:bg-[var(--color-border)] transition-colors touch-manipulation"
+              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={mobileMenuOpen}
+            >
+              <Menu size={22} strokeWidth={2} />
+            </button>
+          </div>
         </div>
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-[var(--color-border)] bg-white p-4 flex flex-col gap-2 shadow-lg relative z-[60]">
@@ -218,12 +309,25 @@ export default function LandingPage() {
             <Link href="/contact" onClick={() => setMobileMenuOpen(false)}>
               Help
             </Link>
-            <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-              Sign In
-            </Link>
-            <Link href="/signup" onClick={() => setMobileMenuOpen(false)}>
-              <Button fullWidth>Register</Button>
-            </Link>
+            {!loading && isLoggedIn ? (
+              <>
+                <Link href="/home" onClick={() => setMobileMenuOpen(false)}>
+                  Home
+                </Link>
+                <Link href="/account" onClick={() => setMobileMenuOpen(false)}>
+                  <Button fullWidth>My Account</Button>
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
+                  Sign In
+                </Link>
+                <Link href="/signup" onClick={() => setMobileMenuOpen(false)}>
+                  <Button fullWidth>Register</Button>
+                </Link>
+              </>
+            )}
           </div>
         )}
       </header>
@@ -321,10 +425,10 @@ export default function LandingPage() {
           </p>
           <div className="overflow-x-auto pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible">
             <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-5 min-w-max sm:min-w-0">
-              {latestProfiles.map((profile, i) => (
+              {previewCards.map((profile, i) => (
                 <Link
-                  key={i}
-                  href="/profiles"
+                  key={`${profile.href}-${i}`}
+                  href={profile.href}
                   className="flex-shrink-0 w-[260px] sm:w-auto bg-[var(--color-bg)] rounded-2xl overflow-hidden shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-card)] transition-all border border-[var(--color-border)]/50 group"
                 >
                   <div className="relative aspect-[3/4]">
@@ -342,10 +446,11 @@ export default function LandingPage() {
                       {profile.name}
                     </h3>
                     <p className="text-sm text-[var(--color-text-muted)] mt-0.5">
-                      {profile.age} yrs • {profile.profession}
+                      {profile.age ? `${profile.age} yrs` : "—"}
+                      {profile.profession ? ` • ${profile.profession}` : ""}
                     </p>
                     <p className="text-xs text-[var(--color-text-muted)] mt-1 truncate">
-                      {profile.location}
+                      {profile.location || ""}
                     </p>
                     <span className="inline-block mt-3 text-sm font-medium text-[var(--primary)] group-hover:underline">
                       View Profile →

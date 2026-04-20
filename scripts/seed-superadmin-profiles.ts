@@ -165,7 +165,7 @@ function toRow(p: Profile, userId: string): Record<string, unknown> {
     profile_type: p.profileType || "premium",
     trust_score: p.trustScore ?? 80,
     managed_by: "admin",
-    account_holder_name: "Super Admin",
+    account_holder_name: "Admin",
     relationship: "other",
     nickname: p.fullName,
     partner_preference: p.partnerPreference || null,

@@ -2,15 +2,41 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { ComponentType, SVGProps } from "react";
 import { Search, MessageCircle, User, Bell, Users2 } from "lucide-react";
 import { mockNotifications } from "@/data/mock";
+import { FEATURE_MESSAGING_ENABLED } from "@/lib/featureFlags";
+import { BrideIcon, GroomIcon } from "@/components/ui/icons/BrideGroomIcons";
 
-const navItems = [
-  { href: "/profiles", icon: Users2, label: "Profiles" },
-  { href: "/search", icon: Search, label: "Search" },
-  { href: "/messages", icon: MessageCircle, label: "Messages" },
-  { href: "/activities", icon: Bell, label: "Activities" },
-  { href: "/account", icon: User, label: "Account" },
+type NavIcon = ComponentType<SVGProps<SVGSVGElement> & { size?: number; strokeWidth?: number }>;
+
+type NavItem = {
+  href: string;
+  icon: NavIcon;
+  label: string;
+};
+
+const baseNavItems: NavItem[] = [
+  { href: "/profiles", icon: Users2 as NavIcon, label: "Profiles" },
+  { href: "/search", icon: Search as NavIcon, label: "Search" },
+];
+
+const messagingItem: NavItem = { href: "/messages", icon: MessageCircle as NavIcon, label: "Messages" };
+
+const brideGroomItems: NavItem[] = [
+  { href: "/brides", icon: BrideIcon, label: "Brides" },
+  { href: "/grooms", icon: GroomIcon, label: "Grooms" },
+];
+
+const tailItems: NavItem[] = [
+  { href: "/activities", icon: Bell as NavIcon, label: "Activities" },
+  { href: "/account", icon: User as NavIcon, label: "Account" },
+];
+
+const navItems: NavItem[] = [
+  ...baseNavItems,
+  ...(FEATURE_MESSAGING_ENABLED ? [messagingItem] : brideGroomItems),
+  ...tailItems,
 ];
 
 export function BottomNav() {

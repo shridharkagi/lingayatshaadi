@@ -43,7 +43,10 @@ interface AuthContextType {
   profileComplete: boolean;
   loading: boolean;
   sendOtp: (email: string) => Promise<{ error?: string }>;
-  sendPhoneOtp: (phone: string) => Promise<{ error?: string }>;
+  sendPhoneOtp: (
+    phone: string,
+    purpose?: "login" | "signup" | "password_reset"
+  ) => Promise<{ error?: string; cooldownSeconds?: number; retryAfter?: number }>;
   verifyOtp: (email: string, token: string) => Promise<{ error?: string }>;
   /** Optional password (signup) and meta (signup). Omit both for OTP login. */
   verifyPhoneOtp: (
@@ -186,34 +189,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setAuthUser(session.user);
-        setAccountMeta(deriveAccountMeta(session.user));
-        setIsLoggedIn(true);
-        fetchProfile(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+    supabase.auth
+      .getSession()
+      .then(async ({ data: { session } }) => {
         if (session?.user) {
           setAuthUser(session.user);
           setAccountMeta(deriveAccountMeta(session.user));
           setIsLoggedIn(true);
           await fetchProfile(session.user.id);
-        } else {
-          setAuthUser(null);
-          setAccountMeta(null);
-          setUser(null);
-          setIsLoggedIn(false);
-          setProfileComplete(false);
         }
+      })
+      .catch(() => {
+        setAuthUser(null);
+        setAccountMeta(null);
+        setUser(null);
+        setIsLoggedIn(false);
+        setProfileComplete(false);
+      })
+      .finally(() => {
+        // Keep bootstrap deterministic: even if auth state callback is delayed,
+        // pages depending on authLoading should not hang on a perpetual spinner.
         setLoading(false);
+      });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setAuthUser(session.user);
+        setAccountMeta(deriveAccountMeta(session.user));
+        setIsLoggedIn(true);
+        // Keep callback non-blocking to avoid auth-lock contention.
+        void fetchProfile(session.user.id);
+      } else {
+        setAuthUser(null);
+        setAccountMeta(null);
+        setUser(null);
+        setIsLoggedIn(false);
+        setProfileComplete(false);
       }
-    );
+      setLoading(false);
+    });
 
     return () => subscription.unsubscribe();
     // `supabase` client and `fetchProfile` are stable for the provider lifetime.
@@ -257,16 +271,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const sendPhoneOtp = async (phone: string) => {
+  const sendPhoneOtp = async (
+    phone: string,
+    purpose: "login" | "signup" | "password_reset" = "login"
+  ) => {
     try {
       const res = await fetch("/api/auth/phone/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone }),
+        body: JSON.stringify({ phone, purpose }),
       });
-      const data = (await res.json()) as { error?: string };
-      if (!res.ok) return { error: data.error || "Failed to send SMS OTP" };
-      return {};
+      const data = (await res.json()) as {
+        error?: string;
+        cooldown_seconds?: number;
+        retry_after?: number;
+      };
+      if (!res.ok) {
+        return {
+          error: data.error || "Failed to send SMS OTP",
+          retryAfter: data.retry_after,
+        };
+      }
+      return { cooldownSeconds: data.cooldown_seconds };
     } catch {
       return { error: "Failed to send SMS OTP" };
     }
@@ -334,15 +360,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!data.access_token || !data.refresh_token) {
         return { error: "Invalid response from server (missing tokens)" };
       }
-      try {
-        const { error } = await supabase.auth.setSession({
-          access_token: data.access_token,
-          refresh_token: data.refresh_token,
-        });
-        if (error) return { error: `Session error: ${error.message}` };
-      } catch (sessionErr) {
-        const msg = sessionErr instanceof Error ? sessionErr.message : String(sessionErr);
-        return { error: `Could not establish session: ${msg}` };
+      const lockErrorPattern = /lock:ls\.auth\.token|another request stole it/i;
+      let lastSessionError: string | null = null;
+      const withTimeout = async <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+        return await Promise.race([
+          promise,
+          new Promise<T>((_, reject) =>
+            setTimeout(() => reject(new Error("Session setup timed out")), ms)
+          ),
+        ]);
+      };
+
+      // Supabase can briefly throw a lock contention error if another auth request
+      // (token refresh / auth listener) touches storage at the same time.
+      // Retry a few times, then fallback to checking whether a valid session exists.
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        try {
+          const { error } = await withTimeout(
+            supabase.auth.setSession({
+              access_token: data.access_token,
+              refresh_token: data.refresh_token,
+            }),
+            3000
+          );
+          if (!error) {
+            lastSessionError = null;
+            break;
+          }
+          lastSessionError = error.message || "Unknown session error";
+          if (!lockErrorPattern.test(lastSessionError)) {
+            return { error: `Session error: ${lastSessionError}` };
+          }
+        } catch (sessionErr) {
+          lastSessionError = sessionErr instanceof Error ? sessionErr.message : String(sessionErr);
+          if (!lockErrorPattern.test(lastSessionError)) {
+            return { error: `Could not establish session: ${lastSessionError}` };
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, attempt * 120));
+      }
+
+      if (lastSessionError) {
+        const { data: sessionData, error: sessionReadError } = await supabase.auth.getSession();
+        if (sessionReadError || !sessionData.session?.access_token) {
+          return { error: `Could not establish session: ${lastSessionError}` };
+        }
       }
       return {};
     } catch (e) {
