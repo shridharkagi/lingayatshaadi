@@ -57,7 +57,6 @@ export function AuthModal({ open, initialMode, onClose }: AuthModalProps) {
   const [signup, setSignup] = useState<SignupForm>(initialSignup);
   const [signupOtp, setSignupOtp] = useState("");
   const [signupStep, setSignupStep] = useState<1 | 2>(1);
-  const compactInputClass = "py-2.5";
 
   useEffect(() => {
     if (!open) return;
@@ -217,7 +216,7 @@ export function AuthModal({ open, initialMode, onClose }: AuthModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-[80] bg-black/45 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-4"
+      className="fixed inset-0 z-[80] bg-black/45 backdrop-blur-[2px] flex items-center justify-center p-2 sm:p-4"
       onClick={() => {
         if (!loading) onClose();
       }}
@@ -226,11 +225,11 @@ export function AuthModal({ open, initialMode, onClose }: AuthModalProps) {
       aria-label="Authentication"
     >
       <div
-        className="w-full max-w-md rounded-2xl border border-[var(--color-border)] bg-white shadow-2xl overflow-hidden max-h-[92vh] flex flex-col"
+        className="w-full max-w-md rounded-2xl border border-[var(--color-border)] bg-white shadow-2xl overflow-hidden flex flex-col max-h-[min(92dvh,92vh)] min-h-0"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)]">
-          <div className="inline-flex p-1 rounded-xl bg-[var(--color-border)]/60">
+        <div className="flex items-center justify-between px-3 py-2 sm:px-4 sm:py-3 border-b border-[var(--color-border)] shrink-0">
+          <div className="inline-flex p-0.5 sm:p-1 rounded-lg sm:rounded-xl bg-[var(--color-border)]/60">
             <button
               type="button"
               onClick={() => {
@@ -239,7 +238,7 @@ export function AuthModal({ open, initialMode, onClose }: AuthModalProps) {
                 setInfo("");
                 setSuccess("");
               }}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+              className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-md sm:rounded-lg text-sm font-medium transition ${
                 mode === "login" ? "bg-[var(--primary)] text-white" : "text-gray-600"
               }`}
             >
@@ -253,7 +252,7 @@ export function AuthModal({ open, initialMode, onClose }: AuthModalProps) {
                 setInfo("");
                 setSuccess("");
               }}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+              className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-md sm:rounded-lg text-sm font-medium transition ${
                 mode === "signup" ? "bg-[var(--primary)] text-white" : "text-gray-600"
               }`}
             >
@@ -264,211 +263,252 @@ export function AuthModal({ open, initialMode, onClose }: AuthModalProps) {
             type="button"
             onClick={onClose}
             disabled={loading}
-            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500"
+            className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 text-gray-500"
             aria-label="Close"
           >
             <X size={18} />
           </button>
         </div>
 
-        <div className="p-3 sm:p-4 space-y-2.5 overflow-y-auto">
-          {mode === "login" ? (
-            <>
-              <div className="inline-flex p-1 rounded-lg bg-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setLoginMode("otp")}
-                  className={`px-3 py-1 text-xs rounded-md ${loginMode === "otp" ? "bg-white shadow-sm" : "text-gray-500"}`}
-                >
-                  OTP
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLoginMode("password")}
-                  className={`px-3 py-1 text-xs rounded-md ${loginMode === "password" ? "bg-white shadow-sm" : "text-gray-500"}`}
-                >
-                  Password
-                </button>
-              </div>
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-2 sm:p-4 space-y-1.5 sm:space-y-2.5">
+            {mode === "login" ? (
+              <>
+                <div className="inline-flex p-0.5 rounded-lg bg-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setLoginMode("otp")}
+                    className={`px-2.5 py-0.5 sm:px-3 sm:py-1 text-[11px] sm:text-xs rounded-md ${loginMode === "otp" ? "bg-white shadow-sm" : "text-gray-500"}`}
+                  >
+                    OTP
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLoginMode("password")}
+                    className={`px-2.5 py-0.5 sm:px-3 sm:py-1 text-[11px] sm:text-xs rounded-md ${loginMode === "password" ? "bg-white shadow-sm" : "text-gray-500"}`}
+                  >
+                    Password
+                  </button>
+                </div>
 
-              <Input
-                label="Mobile Number"
-                type="tel"
-                value={loginMobile}
-                onChange={(e) => setLoginMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                placeholder="10-digit mobile number"
-                className={compactInputClass}
-              />
-
-              {loginMode === "otp" && otpSent && (
-                <>
-                  <p className="text-xs text-gray-500">OTP is valid for 10 minutes.</p>
-                  <Input
-                    label="Enter OTP"
-                    value={loginOtp}
-                    onChange={(e) => setLoginOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    placeholder="6-digit OTP"
-                    inputMode="numeric"
-                    className={compactInputClass}
-                  />
-                </>
-              )}
-
-              {loginMode === "password" && (
                 <Input
-                  label="Password"
-                  type="password"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  placeholder="Your password"
-                  className={compactInputClass}
+                  compact
+                  label="Mobile Number"
+                  type="tel"
+                  value={loginMobile}
+                  onChange={(e) => setLoginMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  placeholder="10-digit mobile number"
                 />
-              )}
 
-              {error && <p className="text-sm text-red-500">{error}</p>}
-              {info && <p className="text-sm text-blue-600">{info}</p>}
-              {success && <p className="text-sm text-green-600">{success}</p>}
+                {loginMode === "otp" && otpSent && (
+                  <>
+                    <p className="text-[11px] sm:text-xs text-gray-500">OTP is valid for 10 minutes.</p>
+                    <Input
+                      compact
+                      label="Enter OTP"
+                      value={loginOtp}
+                      onChange={(e) => setLoginOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      placeholder="6-digit OTP"
+                      inputMode="numeric"
+                    />
+                  </>
+                )}
 
-              {loginMode === "otp" ? (
+                {loginMode === "password" && (
+                  <Input
+                    compact
+                    label="Password"
+                    type="password"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="Your password"
+                  />
+                )}
+              </>
+            ) : (
+              <>
+                {signupStep === 1 ? (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
+                      <Input
+                        compact
+                        label="First Name"
+                        value={signup.firstName}
+                        onChange={(e) => setSignup((s) => ({ ...s, firstName: e.target.value }))}
+                      />
+                      <Input
+                        compact
+                        label="Last Name"
+                        value={signup.lastName}
+                        onChange={(e) => setSignup((s) => ({ ...s, lastName: e.target.value }))}
+                      />
+                    </div>
+
+                    <Input
+                      compact
+                      label="City"
+                      value={signup.city}
+                      onChange={(e) => setSignup((s) => ({ ...s, city: e.target.value }))}
+                    />
+
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-0.5 sm:mb-1">
+                        Gender
+                      </label>
+                      <div className="flex gap-3 sm:gap-4">
+                        {(["male", "female"] as const).map((g) => (
+                          <label key={g} className="flex items-center gap-1.5 text-xs sm:text-sm">
+                            <input
+                              type="radio"
+                              name="signup-gender"
+                              checked={signup.gender === g}
+                              onChange={() => setSignup((s) => ({ ...s, gender: g }))}
+                              className="shrink-0"
+                            />
+                            <span className="capitalize">{g}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <Input
+                      compact
+                      label="Date of Birth"
+                      type="date"
+                      value={signup.dateOfBirth}
+                      onChange={(e) => setSignup((s) => ({ ...s, dateOfBirth: e.target.value }))}
+                      max={new Date().toISOString().slice(0, 10)}
+                    />
+
+                    <Input
+                      compact
+                      label="Mobile Number"
+                      type="tel"
+                      value={signup.mobile}
+                      onChange={(e) =>
+                        setSignup((s) => ({ ...s, mobile: e.target.value.replace(/\D/g, "").slice(0, 10) }))
+                      }
+                      placeholder="10-digit mobile number"
+                    />
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
+                      <Input
+                        compact
+                        label="Password"
+                        type="password"
+                        value={signup.password}
+                        onChange={(e) => setSignup((s) => ({ ...s, password: e.target.value }))}
+                        placeholder="Min 8 chars"
+                      />
+                      <Input
+                        compact
+                        label="Confirm Password"
+                        type="password"
+                        value={signup.confirmPassword}
+                        onChange={(e) => setSignup((s) => ({ ...s, confirmPassword: e.target.value }))}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[11px] sm:text-xs text-gray-500">
+                      OTP sent to +91 {signup.mobile}. Valid for 10 minutes.
+                    </p>
+                    <Input
+                      compact
+                      label="Enter OTP"
+                      value={signupOtp}
+                      onChange={(e) => setSignupOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      placeholder="6-digit OTP"
+                      inputMode="numeric"
+                    />
+                  </>
+                )}
+              </>
+            )}
+          </div>
+
+          <div className="shrink-0 border-t border-[var(--color-border)] bg-white px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-4 sm:pt-3 sm:pb-4 space-y-2">
+            {error && <p className="text-xs sm:text-sm text-red-500 leading-snug">{error}</p>}
+            {info && <p className="text-xs sm:text-sm text-blue-600 leading-snug">{info}</p>}
+            {success && <p className="text-xs sm:text-sm text-green-600 leading-snug">{success}</p>}
+
+            {mode === "login" ? (
+              loginMode === "otp" ? (
                 !otpSent ? (
-                  <Button fullWidth onClick={sendLoginOtp} disabled={loading}>
+                  <Button
+                    fullWidth
+                    size="sm"
+                    onClick={sendLoginOtp}
+                    disabled={loading}
+                    className="!py-2.5 sm:!py-3 text-sm"
+                  >
                     {loading ? "Sending OTP..." : "Send OTP"}
                   </Button>
                 ) : (
-                  <div className="space-y-2">
-                    <Button fullWidth onClick={verifyLoginOtp} disabled={loading} className="py-2.5">
+                  <div className="space-y-1.5">
+                    <Button
+                      fullWidth
+                      size="sm"
+                      onClick={verifyLoginOtp}
+                      disabled={loading}
+                      className="!py-2.5 sm:!py-3 text-sm"
+                    >
                       {loading ? "Verifying..." : "Verify & Sign In"}
                     </Button>
                     <button
                       type="button"
                       onClick={sendLoginOtp}
                       disabled={loading || resendIn > 0}
-                      className="w-full text-xs text-[var(--primary)] disabled:text-gray-400"
+                      className="w-full text-[11px] sm:text-xs text-[var(--primary)] disabled:text-gray-400 py-0.5"
                     >
                       {resendIn > 0 ? `Resend OTP in ${resendIn}s` : "Resend OTP"}
                     </button>
                   </div>
                 )
               ) : (
-                <Button fullWidth onClick={doPasswordLogin} disabled={loading}>
+                <Button
+                  fullWidth
+                  size="sm"
+                  onClick={doPasswordLogin}
+                  disabled={loading}
+                  className="!py-2.5 sm:!py-3 text-sm"
+                >
                   {loading ? "Signing in..." : "Sign In"}
                 </Button>
-              )}
-            </>
-          ) : (
-            <>
-              {signupStep === 1 ? (
-                <>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      label="First Name"
-                      value={signup.firstName}
-                      onChange={(e) => setSignup((s) => ({ ...s, firstName: e.target.value }))}
-                      className={compactInputClass}
-                    />
-                    <Input
-                      label="Last Name"
-                      value={signup.lastName}
-                      onChange={(e) => setSignup((s) => ({ ...s, lastName: e.target.value }))}
-                      className={compactInputClass}
-                    />
-                  </div>
-
-                  <Input
-                    label="City"
-                    value={signup.city}
-                    onChange={(e) => setSignup((s) => ({ ...s, city: e.target.value }))}
-                    className={compactInputClass}
-                  />
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
-                    <div className="flex gap-4">
-                      {(["male", "female"] as const).map((g) => (
-                        <label key={g} className="flex items-center gap-2 text-sm">
-                          <input
-                            type="radio"
-                            name="signup-gender"
-                            checked={signup.gender === g}
-                            onChange={() => setSignup((s) => ({ ...s, gender: g }))}
-                          />
-                          <span className="capitalize">{g}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <Input
-                    label="Date of Birth"
-                    type="date"
-                    value={signup.dateOfBirth}
-                    onChange={(e) => setSignup((s) => ({ ...s, dateOfBirth: e.target.value }))}
-                    max={new Date().toISOString().slice(0, 10)}
-                    className={compactInputClass}
-                  />
-
-                  <Input
-                    label="Mobile Number"
-                    type="tel"
-                    value={signup.mobile}
-                    onChange={(e) => setSignup((s) => ({ ...s, mobile: e.target.value.replace(/\D/g, "").slice(0, 10) }))}
-                    placeholder="10-digit mobile number"
-                    className={compactInputClass}
-                  />
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      label="Password"
-                      type="password"
-                      value={signup.password}
-                      onChange={(e) => setSignup((s) => ({ ...s, password: e.target.value }))}
-                      placeholder="Min 8 chars"
-                      className={compactInputClass}
-                    />
-                    <Input
-                      label="Confirm Password"
-                      type="password"
-                      value={signup.confirmPassword}
-                      onChange={(e) => setSignup((s) => ({ ...s, confirmPassword: e.target.value }))}
-                      className={compactInputClass}
-                    />
-                  </div>
-
-                  {error && <p className="text-sm text-red-500">{error}</p>}
-                  {info && <p className="text-sm text-blue-600">{info}</p>}
-                  <Button fullWidth onClick={sendSignupOtp} disabled={loading}>
-                    {loading ? "Sending OTP..." : "Continue"}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <p className="text-xs text-gray-500">OTP sent to +91 {signup.mobile}. Valid for 10 minutes.</p>
-                  <Input
-                    label="Enter OTP"
-                    value={signupOtp}
-                    onChange={(e) => setSignupOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    placeholder="6-digit OTP"
-                    inputMode="numeric"
-                    className={compactInputClass}
-                  />
-                  {error && <p className="text-sm text-red-500">{error}</p>}
-                  {info && <p className="text-sm text-blue-600">{info}</p>}
-                  {success && <p className="text-sm text-green-600">{success}</p>}
-                  <Button fullWidth onClick={verifySignupOtp} disabled={loading}>
-                    {loading ? "Verifying..." : "Verify & Create Account"}
-                  </Button>
-                  <button
-                    type="button"
-                    onClick={sendSignupOtp}
-                    disabled={loading || resendIn > 0}
-                    className="w-full text-xs text-[var(--primary)] disabled:text-gray-400"
-                  >
-                    {resendIn > 0 ? `Resend OTP in ${resendIn}s` : "Resend OTP"}
-                  </button>
-                </>
-              )}
-            </>
-          )}
+              )
+            ) : signupStep === 1 ? (
+              <Button
+                fullWidth
+                size="sm"
+                onClick={sendSignupOtp}
+                disabled={loading}
+                className="!py-2.5 sm:!py-3 text-sm"
+              >
+                {loading ? "Sending OTP..." : "Continue"}
+              </Button>
+            ) : (
+              <div className="space-y-1.5">
+                <Button
+                  fullWidth
+                  size="sm"
+                  onClick={verifySignupOtp}
+                  disabled={loading}
+                  className="!py-2.5 sm:!py-3 text-sm"
+                >
+                  {loading ? "Verifying..." : "Verify & Create Account"}
+                </Button>
+                <button
+                  type="button"
+                  onClick={sendSignupOtp}
+                  disabled={loading || resendIn > 0}
+                  className="w-full text-[11px] sm:text-xs text-[var(--primary)] disabled:text-gray-400 py-0.5"
+                >
+                  {resendIn > 0 ? `Resend OTP in ${resendIn}s` : "Resend OTP"}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

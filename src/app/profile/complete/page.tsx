@@ -521,7 +521,10 @@ function ProfileCompleteInner() {
       if (hasUrlProfileId) {
         setHydrating(true);
         const { data, error: fetchErr } = await getProfileById(profileIdParam);
-        if (cancelled) return;
+        if (cancelled) {
+          setHydrating(false);
+          return;
+        }
         if (fetchErr || !data) {
           setError(fetchErr || "Profile not found");
           setHydrating(false);
@@ -550,7 +553,10 @@ function ProfileCompleteInner() {
           authUser.id,
           relationshipFromUrl
         );
-        if (cancelled) return;
+        if (cancelled) {
+          setHydrating(false);
+          return;
+        }
         if (existingDraft) {
           setProfile({ ...initialProfile, ...existingDraft });
           setDraftId(existingDraft.id);
@@ -594,6 +600,7 @@ function ProfileCompleteInner() {
 
       setProfile(base);
       setIsDraftFlow(true);
+      setHydrating(false);
     };
     init();
     return () => {
