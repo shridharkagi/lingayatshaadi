@@ -25,6 +25,8 @@ import {
 import type { ComponentType, SVGProps } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/Input";
+import { isSyntheticAuthEmail } from "@/lib/phoneAuth";
+import type { User } from "@supabase/supabase-js";
 import {
   listProfilesByUserId,
   deleteProfileById,
@@ -76,9 +78,23 @@ function managedByFor(rel: RelationshipValue): NonNullable<Profile["managedBy"]>
   return "parent";
 }
 
+function pendingAuthEmail(u: User): string | null {
+  const raw = (u as User & { new_email?: string | null }).new_email;
+  return typeof raw === "string" && raw.trim() ? raw.trim() : null;
+}
+
 export default function AccountPage() {
   const router = useRouter();
-  const { authUser, accountMeta, isLoggedIn, loading, logout, updateAccountMeta } = useAuth();
+  const {
+    authUser,
+    accountMeta,
+    isLoggedIn,
+    loading,
+    logout,
+    updateAccountMeta,
+    requestEmailChange,
+    verifyEmailChangeOtp,
+  } = useAuth();
 
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loadingProfiles, setLoadingProfiles] = useState(true);
@@ -98,6 +114,13 @@ export default function AccountPage() {
     gender: "" as "" | "male" | "female",
     dateOfBirth: "",
   });
+
+  const [contactEmailInput, setContactEmailInput] = useState("");
+  const [contactEmailOtp, setContactEmailOtp] = useState("");
+  const [contactEmailStep, setContactEmailStep] = useState<"idle" | "sent">("idle");
+  const [contactEmailBusy, setContactEmailBusy] = useState(false);
+  const [contactEmailErr, setContactEmailErr] = useState("");
+  const [contactEmailInfo, setContactEmailInfo] = useState("");
 
   const refreshProfiles = useCallback(async () => {
     if (!authUser) return;
@@ -160,6 +183,14 @@ export default function AccountPage() {
       refreshProfiles();
     }
   }, [authUser, refreshProfiles]);
+
+  const pendingEmailForEffect = authUser ? pendingAuthEmail(authUser) : null;
+  useEffect(() => {
+    if (pendingEmailForEffect) {
+      setContactEmailInput(pendingEmailForEffect);
+      setContactEmailStep("sent");
+    }
+  }, [pendingEmailForEffect]);
 
   const startEditing = () => {
     setMetaForm({
@@ -237,6 +268,52 @@ export default function AccountPage() {
     );
   }
 
+  const pendingEmail = pendingAuthEmail(authUser);
+  const hasRealVerifiedEmail =
+    !!authUser.email &&
+    !isSyntheticAuthEmail(authUser.email) &&
+    !!authUser.email_confirmed_at &&
+    !pendingEmail;
+  const accountHolderCompletion = hasRealVerifiedEmail ? 100 : 90;
+  const emailRowValue = pendingEmail
+    ? `${pendingEmail} (check inbox to verify)`
+    : hasRealVerifiedEmail
+      ? authUser.email ?? "—"
+      : "—";
+
+  const sendContactEmailCode = async () => {
+    setContactEmailErr("");
+    setContactEmailInfo("");
+    setContactEmailBusy(true);
+    const result = await requestEmailChange(contactEmailInput);
+    setContactEmailBusy(false);
+    if (result.error) {
+      setContactEmailErr(result.error);
+      return;
+    }
+    setContactEmailStep("sent");
+    setContactEmailInfo("Enter the 6-digit code from your email below.");
+  };
+
+  const confirmContactEmail = async () => {
+    setContactEmailErr("");
+    setContactEmailInfo("");
+    setContactEmailBusy(true);
+    const email =
+      pendingEmail ||
+      contactEmailInput.trim().toLowerCase();
+    const result = await verifyEmailChangeOtp(email, contactEmailOtp);
+    setContactEmailBusy(false);
+    if (result.error) {
+      setContactEmailErr(result.error);
+      return;
+    }
+    setContactEmailStep("idle");
+    setContactEmailOtp("");
+    setContactEmailInput("");
+    setContactEmailInfo("Email verified. You can sign in with this email and your password.");
+  };
+
   return (
     <div className="max-w-2xl mx-auto pb-10 space-y-4">
       <header className="bg-[var(--primary)] text-white px-6 py-4 rounded-2xl shadow-sm flex items-center justify-between">
@@ -253,6 +330,23 @@ export default function AccountPage() {
       <div className="px-0 space-y-4">
         {/* Account-holder basic details */}
         <section className="bg-white rounded-2xl shadow-sm p-5">
+          {accountHolderCompletion < 100 && (
+            <div className="mb-4 rounded-xl border border-amber-100 bg-amber-50/80 px-3 py-2.5">
+              <div className="flex items-center justify-between text-xs font-medium text-amber-900">
+                <span>Account completeness</span>
+                <span>{accountHolderCompletion}%</span>
+              </div>
+              <div className="mt-1.5 h-2 rounded-full bg-amber-100/80 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-amber-500 transition-all"
+                  style={{ width: `${accountHolderCompletion}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-amber-900/80 mt-1.5">
+                Add and verify an email to reach 100%. Phone signup doesn&apos;t require email; this is optional.
+              </p>
+            </div>
+          )}
           <div className="flex items-start justify-between mb-4">
             <div>
               <h2 className="text-lg font-semibold text-[var(--foreground)]">Account Holder</h2>
@@ -291,13 +385,89 @@ export default function AccountPage() {
           </div>
 
           {!editing ? (
-            <dl className="divide-y divide-gray-100 text-sm">
-              <Row label="Full Name" value={accountMeta?.fullName || "—"} />
-              <Row label="Gender" value={accountMeta?.gender ? capitalize(accountMeta.gender) : "—"} />
-              <Row label="City" value={accountMeta?.city || "—"} />
-              <Row label="Phone" value={accountMeta?.phone || "—"} />
-              <Row label="Date of Birth" value={accountMeta?.dateOfBirth || "—"} />
-            </dl>
+            <>
+              <dl className="divide-y divide-gray-100 text-sm">
+                <Row label="Full Name" value={accountMeta?.fullName || "—"} />
+                <Row label="Gender" value={accountMeta?.gender ? capitalize(accountMeta.gender) : "—"} />
+                <Row label="City" value={accountMeta?.city || "—"} />
+                <Row label="Phone" value={accountMeta?.phone || "—"} />
+                <Row
+                  label="Email"
+                  value={emailRowValue}
+                  sub={
+                    hasRealVerifiedEmail
+                      ? "Verified — you can sign in with this email and your password."
+                      : "Optional. Not collected at signup."
+                  }
+                />
+                <Row label="Date of Birth" value={accountMeta?.dateOfBirth || "—"} />
+              </dl>
+
+              {!hasRealVerifiedEmail && (
+                <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+                  <p className="text-sm font-medium text-gray-900">Add email (optional)</p>
+                  <p className="text-xs text-gray-500">
+                    We only use this for login and account recovery. Your signup mobile OTP flow stays the same.
+                  </p>
+                  <Input
+                    label="Email address"
+                    type="email"
+                    autoComplete="email"
+                    value={contactEmailInput}
+                    onChange={(e) => setContactEmailInput(e.target.value)}
+                    placeholder="you@example.com"
+                    disabled={contactEmailBusy}
+                  />
+                  {contactEmailStep === "sent" && (
+                    <Input
+                      label="6-digit code from email"
+                      inputMode="numeric"
+                      value={contactEmailOtp}
+                      onChange={(e) => setContactEmailOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      placeholder="Enter code"
+                    />
+                  )}
+                  {contactEmailErr && <p className="text-sm text-red-600">{contactEmailErr}</p>}
+                  {contactEmailInfo && <p className="text-xs text-blue-700">{contactEmailInfo}</p>}
+                  <div className="flex flex-wrap gap-2">
+                    {contactEmailStep !== "sent" ? (
+                      <button
+                        type="button"
+                        disabled={contactEmailBusy || !contactEmailInput.trim()}
+                        onClick={sendContactEmailCode}
+                        className="px-4 py-2 rounded-xl text-sm font-medium bg-[var(--primary)] text-white disabled:opacity-50"
+                      >
+                        {contactEmailBusy ? "Sending…" : "Send verification code"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={contactEmailBusy || contactEmailOtp.length !== 6}
+                        onClick={confirmContactEmail}
+                        className="px-4 py-2 rounded-xl text-sm font-medium bg-[var(--primary)] text-white disabled:opacity-50"
+                      >
+                        {contactEmailBusy ? "Verifying…" : "Verify email"}
+                      </button>
+                    )}
+                    {contactEmailStep === "sent" && (
+                      <button
+                        type="button"
+                        disabled={contactEmailBusy}
+                        onClick={() => {
+                          setContactEmailStep("idle");
+                          setContactEmailOtp("");
+                          setContactEmailErr("");
+                          setContactEmailInfo("");
+                        }}
+                        className="px-4 py-2 rounded-xl text-sm font-medium border border-gray-200 text-gray-700"
+                      >
+                        Edit email
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -447,11 +617,14 @@ export default function AccountPage() {
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="flex items-center justify-between py-2.5">
-      <span className="text-gray-500">{label}</span>
-      <span className="font-medium text-[var(--foreground)] text-right">{value}</span>
+    <div className="py-2.5">
+      <div className="flex items-start justify-between gap-3">
+        <span className="text-gray-500 shrink-0">{label}</span>
+        <span className="font-medium text-[var(--foreground)] text-right break-all">{value}</span>
+      </div>
+      {sub && <p className="text-[11px] text-gray-500 mt-1 text-right">{sub}</p>}
     </div>
   );
 }

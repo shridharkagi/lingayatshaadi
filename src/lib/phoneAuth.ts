@@ -18,6 +18,14 @@ export function syntheticEmailForPhone(digits10: string): string {
   return `phone_${digits10}@phone.otp.lingayatshaadi`;
 }
 
+const SYNTHETIC_EMAIL_RE = /^phone_\d+@phone\.otp\.lingayatshaadi$/i;
+
+/** True when this is our internal phone-placeholder row (hide in UI; not a customer email). */
+export function isSyntheticAuthEmail(email: string | null | undefined): boolean {
+  if (!email || typeof email !== "string") return false;
+  return SYNTHETIC_EMAIL_RE.test(email.trim());
+}
+
 export function hashPhoneOtp(phoneE164: string, otp: string, secret: string): string {
   return createHash("sha256")
     .update(`${secret}|${phoneE164}|${otp}`, "utf8")
