@@ -140,6 +140,13 @@ function DetailSection({
 const SWIPE_EXIT_ROUTE_MS = 470;
 const SWIPE_ENTER_SETTLE_MS = 830;
 
+/** Full-screen gallery: horizontal swipe must clearly dominate vertical movement
+ * so scrolling the page on the image does not advance photos. */
+const GALLERY_SWIPE_MIN_DX = 56;
+const GALLERY_SWIPE_DOMINANCE = 1.35;
+/** Slight crossfade when changing the active gallery photo (ms). */
+const GALLERY_IMG_TRANSITION_MS = 340;
+
 function swipeVelocityFromSamples(pts: Array<{ x: number; t: number }>): number {
   if (pts.length < 2) return 0;
   const end = pts[pts.length - 1];
@@ -171,6 +178,9 @@ export default function OtherProfilePage() {
   const [showContact, setShowContact] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [galleryImgOpacity, setGalleryImgOpacity] = useState(1);
+  const galleryTouchStart = useRef<{ x: number; y: number } | null>(null);
+  const galleryIndexCommitted = useRef<number | null>(null);
   const [hasShownInterest, setHasShownInterest] = useState(false);
   const [interestAccepted, setInterestAccepted] = useState(false);
   const [sendingInterest, setSendingInterest] = useState(false);
@@ -556,6 +566,24 @@ export default function OtherProfilePage() {
     }
   }, [currentIdx, profiles, router]);
 
+  useEffect(() => {
+    if (!showGallery) {
+      galleryIndexCommitted.current = null;
+      setGalleryImgOpacity(1);
+      return;
+    }
+    if (galleryIndexCommitted.current === null) {
+      galleryIndexCommitted.current = currentImageIndex;
+      setGalleryImgOpacity(1);
+      return;
+    }
+    if (galleryIndexCommitted.current === currentImageIndex) return;
+    galleryIndexCommitted.current = currentImageIndex;
+    setGalleryImgOpacity(0.42);
+    const id = window.setTimeout(() => setGalleryImgOpacity(1), 48);
+    return () => window.clearTimeout(id);
+  }, [currentImageIndex, showGallery]);
+
   const swipeMotion = useMemo(() => {
     const wPx = Math.max(cardWidth, 260);
     const norm = wPx > 0 ? swipeOffset / wPx : 0;
@@ -740,29 +768,39 @@ export default function OtherProfilePage() {
               <ChevronLeft size={28} strokeWidth={2.5} />
             </button>
             
-            {/* Current image */}
-            <div 
-              className="relative w-full h-full flex items-center justify-center px-16"
+            {/* Current image: vertical scroll must not change photo — require horizontal-dominant swipe. */}
+            <div
+              className="relative w-full h-full flex items-center justify-center px-16 touch-pan-y"
+              style={{ touchAction: "pan-y" }}
               onTouchStart={(e) => {
-                const touch = e.touches[0];
-                (e.currentTarget as HTMLElement).dataset.touchStartX = String(touch.clientX);
+                const t = e.touches[0];
+                galleryTouchStart.current = { x: t.clientX, y: t.clientY };
               }}
               onTouchEnd={(e) => {
-                const startX = parseFloat((e.currentTarget as HTMLElement).dataset.touchStartX || "0");
-                const endX = e.changedTouches[0].clientX;
-                const diff = startX - endX;
-                if (Math.abs(diff) > 50) {
-                  if (diff > 0) {
-                    // Swipe left - next image
-                    setCurrentImageIndex((prev) => (prev < allPhotos.length - 1 ? prev + 1 : 0));
-                  } else {
-                    // Swipe right - previous image
-                    setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : allPhotos.length - 1));
-                  }
+                const start = galleryTouchStart.current;
+                galleryTouchStart.current = null;
+                if (!start) return;
+                const t = e.changedTouches[0];
+                const dx = start.x - t.clientX;
+                const dy = start.y - t.clientY;
+                const horizDominant =
+                  Math.abs(dx) >= Math.abs(dy) * GALLERY_SWIPE_DOMINANCE &&
+                  Math.abs(dx) >= GALLERY_SWIPE_MIN_DX;
+                if (!horizDominant) return;
+                if (dx > 0) {
+                  setCurrentImageIndex((prev) => (prev < allPhotos.length - 1 ? prev + 1 : 0));
+                } else {
+                  setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : allPhotos.length - 1));
                 }
               }}
             >
-              <div className="relative max-w-4xl max-h-[80vh] w-full h-full">
+              <div
+                className="relative max-w-4xl max-h-[80vh] w-full h-full"
+                style={{
+                  opacity: galleryImgOpacity,
+                  transition: `opacity ${GALLERY_IMG_TRANSITION_MS}ms ease-out`,
+                }}
+              >
                 <Image
                   src={allPhotos[currentImageIndex]}
                   alt={`${profile.fullName} photo ${currentImageIndex + 1}`}
@@ -792,7 +830,7 @@ export default function OtherProfilePage() {
                 <button
                   key={i}
                   onClick={() => setCurrentImageIndex(i)}
-                  className={`relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden transition ${
+                  className={`relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden transition-all duration-300 ease-out ${
                     i === currentImageIndex ? "ring-2 ring-white scale-110" : "opacity-60 hover:opacity-100"
                   }`}
                 >
