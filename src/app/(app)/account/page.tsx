@@ -121,6 +121,7 @@ export default function AccountPage() {
   const [contactEmailBusy, setContactEmailBusy] = useState(false);
   const [contactEmailErr, setContactEmailErr] = useState("");
   const [contactEmailInfo, setContactEmailInfo] = useState("");
+  const [contactEmailCooldown, setContactEmailCooldown] = useState(0);
 
   const refreshProfiles = useCallback(async () => {
     if (!authUser) return;
@@ -191,6 +192,14 @@ export default function AccountPage() {
       setContactEmailStep("sent");
     }
   }, [pendingEmailForEffect]);
+
+  useEffect(() => {
+    if (contactEmailCooldown <= 0) return;
+    const id = window.setInterval(() => {
+      setContactEmailCooldown((c) => Math.max(0, c - 1));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [contactEmailCooldown]);
 
   const startEditing = () => {
     setMetaForm({
@@ -296,6 +305,7 @@ export default function AccountPage() {
       : "—";
 
   const sendContactEmailCode = async () => {
+    if (contactEmailCooldown > 0) return;
     setContactEmailErr("");
     setContactEmailInfo("");
     setContactEmailBusy(true);
@@ -303,6 +313,9 @@ export default function AccountPage() {
     setContactEmailBusy(false);
     if (result.error) {
       setContactEmailErr(result.error);
+      if (result.rateLimited) {
+        setContactEmailCooldown(60);
+      }
       return;
     }
     setContactEmailStep("sent");
@@ -447,11 +460,19 @@ export default function AccountPage() {
                     {contactEmailStep !== "sent" ? (
                       <button
                         type="button"
-                        disabled={contactEmailBusy || !contactEmailInput.trim()}
+                        disabled={
+                          contactEmailBusy ||
+                          !contactEmailInput.trim() ||
+                          contactEmailCooldown > 0
+                        }
                         onClick={sendContactEmailCode}
                         className="px-4 py-2 rounded-xl text-sm font-medium bg-[var(--primary)] text-white disabled:opacity-50"
                       >
-                        {contactEmailBusy ? "Sending…" : "Send verification code"}
+                        {contactEmailBusy
+                          ? "Sending…"
+                          : contactEmailCooldown > 0
+                            ? `Wait ${contactEmailCooldown}s to retry`
+                            : "Send verification code"}
                       </button>
                     ) : (
                       <button
@@ -472,6 +493,7 @@ export default function AccountPage() {
                           setContactEmailOtp("");
                           setContactEmailErr("");
                           setContactEmailInfo("");
+                          setContactEmailCooldown(0);
                         }}
                         className="px-4 py-2 rounded-xl text-sm font-medium border border-gray-200 text-gray-700"
                       >
@@ -568,11 +590,19 @@ export default function AccountPage() {
                     {contactEmailStep !== "sent" ? (
                       <button
                         type="button"
-                        disabled={contactEmailBusy || !contactEmailInput.trim()}
+                        disabled={
+                          contactEmailBusy ||
+                          !contactEmailInput.trim() ||
+                          contactEmailCooldown > 0
+                        }
                         onClick={sendContactEmailCode}
                         className="px-4 py-2 rounded-xl text-sm font-medium bg-[var(--primary)] text-white disabled:opacity-50"
                       >
-                        {contactEmailBusy ? "Sending…" : "Send verification code"}
+                        {contactEmailBusy
+                          ? "Sending…"
+                          : contactEmailCooldown > 0
+                            ? `Wait ${contactEmailCooldown}s to retry`
+                            : "Send verification code"}
                       </button>
                     ) : (
                       <button
@@ -593,6 +623,7 @@ export default function AccountPage() {
                           setContactEmailOtp("");
                           setContactEmailErr("");
                           setContactEmailInfo("");
+                          setContactEmailCooldown(0);
                         }}
                         className="px-4 py-2 rounded-xl text-sm font-medium border border-gray-200 text-gray-700"
                       >

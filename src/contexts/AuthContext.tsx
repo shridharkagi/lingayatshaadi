@@ -6,6 +6,7 @@ import { createSupabaseClientSafe } from "@/lib/supabase";
 import { fromProfileRow } from "@/lib/profileMapper";
 import { upsertProfile } from "@/lib/api/profiles";
 import { normalizeIndianPhone, syntheticEmailForPhone } from "@/lib/phoneAuth";
+import { friendlyEmailChangeError, isAuthEmailRateLimitedMessage } from "@/lib/authUserFacingErrors";
 import type { User } from "@supabase/supabase-js";
 
 /** Account-holder basic details captured at signup and stored in auth user_metadata. */
@@ -65,7 +66,7 @@ interface AuthContextType {
     newPassword: string
   ) => Promise<{ error?: string }>;
   /** Sends Supabase email change message to this address (optional account email). */
-  requestEmailChange: (email: string) => Promise<{ error?: string }>;
+  requestEmailChange: (email: string) => Promise<{ error?: string; rateLimited?: boolean }>;
   /** Enter 6-digit code from email (type email_change). */
   verifyEmailChangeOtp: (email: string, token: string) => Promise<{ error?: string }>;
   logout: () => Promise<void>;
@@ -452,7 +453,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     try {
       const { data, error } = await supabase.auth.updateUser({ email: trimmed });
-      if (error) return { error: error.message };
+      if (error) {
+        return {
+          error: friendlyEmailChangeError(error.message),
+          rateLimited: isAuthEmailRateLimitedMessage(error.message),
+        };
+      }
       if (data.user) {
         setAuthUser(data.user);
         setAccountMeta(deriveAccountMeta(data.user));
@@ -460,7 +466,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return {};
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      return { error: msg };
+      return {
+        error: friendlyEmailChangeError(msg),
+        rateLimited: isAuthEmailRateLimitedMessage(msg),
+      };
     }
   };
 
