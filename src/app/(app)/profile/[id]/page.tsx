@@ -3,7 +3,15 @@
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { useState, useCallback, useEffect } from "react";
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  startTransition,
+} from "react";
 import {
   Heart,
   MessageCircle,
@@ -128,6 +136,10 @@ function DetailSection({
   );
 }
 
+/** Profile stack: `setTimeout` values align with swipe card CSS transitions (exit → route → enter). */
+const SWIPE_EXIT_ROUTE_MS = 470;
+const SWIPE_ENTER_SETTLE_MS = 830;
+
 export default function OtherProfilePage() {
   const params = useParams();
   const router = useRouter();
@@ -176,17 +188,18 @@ export default function OtherProfilePage() {
     setDisplayedSlug(slugFromParams);
   }, [slugFromParams]);
 
-  const publicIdFromSlug = parseProfileSlug(slugFromParams);
+  /** Resolve profile from local slug first so stack navigation updates before the URL catches up (avoids flash / loading). */
+  const lookupPublicId = useMemo(() => parseProfileSlug(displayedSlug), [displayedSlug]);
 
-  const profileFromContext = (() => {
-    if (publicIdFromSlug) {
+  const profileFromContext = useMemo(() => {
+    if (lookupPublicId) {
       return profiles.find(
         (p) =>
-          (p.publicId || p.memberId || "").toUpperCase().replace(/-/g, "") === publicIdFromSlug.replace(/-/g, "")
+          (p.publicId || p.memberId || "").toUpperCase().replace(/-/g, "") === lookupPublicId.replace(/-/g, "")
       );
     }
-    return profiles.find((p) => p.id === slugFromParams);
-  })();
+    return profiles.find((p) => p.id === displayedSlug);
+  }, [profiles, displayedSlug, lookupPublicId]);
 
   // `rawProfile` holds whatever the DB / context gave us — which for the
   // owner is always their live, possibly-pending-edits data. Public
@@ -197,8 +210,8 @@ export default function OtherProfilePage() {
   const rawProfile =
     profileFromContext ||
     (fallbackProfile &&
-    publicIdFromSlug &&
-    (fallbackProfile.publicId || "").toUpperCase() === publicIdFromSlug
+    lookupPublicId &&
+    (fallbackProfile.publicId || "").toUpperCase() === lookupPublicId
       ? fallbackProfile
       : undefined);
 
@@ -233,17 +246,17 @@ export default function OtherProfilePage() {
   // "Profile not found" on the first navigation.
   useEffect(() => {
     if (profileFromContext) return;
-    if (profilesLoading) return;
-    if (!publicIdFromSlug) return;
+    if (profilesLoading && profiles.length === 0) return;
+    if (!lookupPublicId) return;
     if (
       fallbackProfile &&
-      (fallbackProfile.publicId || "").toUpperCase() === publicIdFromSlug
+      (fallbackProfile.publicId || "").toUpperCase() === lookupPublicId
     ) {
       return;
     }
     let cancelled = false;
     setFallbackLoading(true);
-    getProfileByPublicId(publicIdFromSlug).then(({ data }) => {
+    getProfileByPublicId(lookupPublicId).then(({ data }) => {
       if (cancelled) return;
       setFallbackProfile(data);
       setFallbackLoading(false);
@@ -251,12 +264,25 @@ export default function OtherProfilePage() {
     return () => {
       cancelled = true;
     };
-  }, [profileFromContext, profilesLoading, publicIdFromSlug, fallbackProfile]);
+  }, [profileFromContext, profilesLoading, profiles.length, lookupPublicId, fallbackProfile]);
 
   const currentIdx = profile ? profiles.findIndex((p) => p.id === profile.id) : -1;
   const displayedId = profile?.id ?? displayedSlug;
-  const [animClass, setAnimClass] = useState("");
   const [isTransitioning, setIsTransitioning] = useState(false);
+
+  const swipeCardRef = useRef<HTMLDivElement>(null);
+  const swipePointerId = useRef<number | null>(null);
+  const swipeStartX = useRef(0);
+  /** Recent pointer samples for fling velocity (px/ms), Tinder-style. */
+  const swipeSamplesRef = useRef<Array<{ x: number; t: number }>>([]);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [swipeDragging, setSwipeDragging] = useState(false);
+  const [swipeExiting, setSwipeExiting] = useState(false);
+  const [slideEnterInstant, setSlideEnterInstant] = useState(false);
+  const [isEnteringSlide, setIsEnteringSlide] = useState(false);
+  const [cardWidth, setCardWidth] = useState(0);
+  /** Which neighbor card to show under the hero during prev/next (fixes wrong "next" peek when going back). */
+  const [stackNavIntent, setStackNavIntent] = useState<"idle" | "next" | "prev">("idle");
 
   // Reset showContact when profile changes
   useEffect(() => {
@@ -284,60 +310,235 @@ export default function OtherProfilePage() {
     getNote(actorId, profile.id).then(({ data }) => setMyNote(data || ""));
   }, [profile?.id, actorId]);
 
+  /** Slide direction after route change (enter-from side). Consumed in useLayoutEffect. */
+  const pendingEnterRef = useRef<"next" | "prev" | null>(null);
+  const enterHandledForProfileRef = useRef<string | null>(null);
+
+  const cardSlideDistance = useCallback(() => {
+    const el = swipeCardRef.current;
+    const w = el?.offsetWidth ?? 0;
+    const vw = typeof window !== "undefined" ? window.innerWidth : 400;
+    return Math.min(Math.max(w * 1.12, 280), vw * 0.92);
+  }, []);
+
   const goPrev = useCallback(() => {
     if (currentIdx <= 0 || isTransitioning) return;
+    setStackNavIntent("prev");
     setIsTransitioning(true);
-    setAnimClass("opacity-0 scale-95");
-    const prevProfile = profiles[currentIdx - 1];
-    const prevSlug = getProfileSlug(prevProfile);
-    setTimeout(() => {
+    setSwipeExiting(true);
+    const dist = cardSlideDistance();
+    setSwipeOffset(dist);
+    window.setTimeout(() => {
+      pendingEnterRef.current = "prev";
+      const prevProfile = profiles[currentIdx - 1];
+      const prevSlug = getProfileSlug(prevProfile);
       setDisplayedSlug(prevSlug);
-      router.replace(`/profile/${prevSlug}`, { scroll: false });
-      requestAnimationFrame(() => {
-        setAnimClass("opacity-0 scale-105");
-        requestAnimationFrame(() => {
-          setAnimClass("opacity-100 scale-100");
-          setTimeout(() => setIsTransitioning(false), 300);
-        });
+      startTransition(() => {
+        router.replace(`/profile/${prevSlug}`, { scroll: false });
       });
-    }, 200);
-  }, [currentIdx, router, isTransitioning, profiles]);
+    }, SWIPE_EXIT_ROUTE_MS);
+  }, [currentIdx, router, isTransitioning, profiles, cardSlideDistance]);
 
   const goNext = useCallback(() => {
     if (currentIdx < 0 || currentIdx >= profiles.length - 1 || isTransitioning) return;
+    setStackNavIntent("next");
     setIsTransitioning(true);
-    setAnimClass("opacity-0 scale-95");
-    const nextProfile = profiles[currentIdx + 1];
-    const nextSlug = getProfileSlug(nextProfile);
-    setTimeout(() => {
+    setSwipeExiting(true);
+    const dist = cardSlideDistance();
+    setSwipeOffset(-dist);
+    window.setTimeout(() => {
+      pendingEnterRef.current = "next";
+      const nextProfile = profiles[currentIdx + 1];
+      const nextSlug = getProfileSlug(nextProfile);
       setDisplayedSlug(nextSlug);
-      router.replace(`/profile/${nextSlug}`, { scroll: false });
+      startTransition(() => {
+        router.replace(`/profile/${nextSlug}`, { scroll: false });
+      });
+    }, SWIPE_EXIT_ROUTE_MS);
+  }, [currentIdx, router, isTransitioning, profiles, cardSlideDistance]);
+
+  useEffect(() => {
+    const el = swipeCardRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setCardWidth(el.offsetWidth));
+    ro.observe(el);
+    setCardWidth(el.offsetWidth);
+    return () => ro.disconnect();
+  }, [profile?.id]);
+
+  /** Enter-from-side after route commit (pairs with pendingEnterRef set in goNext/goPrev / thumb commit). */
+  useLayoutEffect(() => {
+    if (!profile?.id) return;
+    const dir = pendingEnterRef.current;
+    if (dir === "next" || dir === "prev") {
+      if (enterHandledForProfileRef.current === profile.id) return;
+      pendingEnterRef.current = null;
+      enterHandledForProfileRef.current = profile.id;
+      const w =
+        swipeCardRef.current?.offsetWidth ??
+        Math.min(typeof window !== "undefined" ? window.innerWidth * 0.92 : 400, 440);
+      const enterFrom = dir === "next" ? w * 1.08 : -w * 1.08;
+      swipePointerId.current = null;
+      setSwipeDragging(false);
+      setSlideEnterInstant(true);
+      setIsEnteringSlide(true);
+      setSwipeExiting(false);
+      setSwipeOffset(enterFrom);
       requestAnimationFrame(() => {
-        setAnimClass("opacity-0 scale-105");
         requestAnimationFrame(() => {
-          setAnimClass("opacity-100 scale-100");
-          setTimeout(() => setIsTransitioning(false), 300);
+          setSlideEnterInstant(false);
+          setSwipeExiting(true);
+          setSwipeOffset(0);
+          window.setTimeout(() => {
+            setIsTransitioning(false);
+            setSwipeExiting(false);
+            setIsEnteringSlide(false);
+            setStackNavIntent("idle");
+          }, SWIPE_ENTER_SETTLE_MS);
         });
       });
-    }, 200);
-  }, [currentIdx, router, isTransitioning, profiles]);
+      return;
+    }
+    if (enterHandledForProfileRef.current === profile.id) return;
+    enterHandledForProfileRef.current = null;
+    setStackNavIntent("idle");
+    setSwipeOffset(0);
+    setSwipeDragging(false);
+    setSwipeExiting(false);
+    setSlideEnterInstant(false);
+    setIsEnteringSlide(false);
+    swipePointerId.current = null;
+  }, [profile?.id]);
 
-  /* Swipe support for mobile */
-  const touchStart = useCallback((e: React.TouchEvent) => {
-    (e.currentTarget as HTMLElement).dataset.touchX = String(e.touches[0].clientX);
+  const computeSwipeDx = useCallback(
+    (rawDx: number) => {
+      const w = swipeCardRef.current?.offsetWidth ?? 300;
+      const vw = typeof window !== "undefined" ? window.innerWidth : 400;
+      const span = Math.min(vw * 0.52, Math.max(w * 1.05, 320));
+      let x = rawDx;
+      if (currentIdx <= 0 && x > 0) {
+        const cap = 100;
+        x = x <= cap ? x : cap + (x - cap) * 0.2;
+      }
+      if (currentIdx >= profiles.length - 1 && x < 0) {
+        const cap = -100;
+        x = x >= cap ? x : cap + (x - cap) * 0.2;
+      }
+      return Math.max(-span, Math.min(span, x));
+    },
+    [currentIdx, profiles.length]
+  );
+
+  const swipeVelocityPxPerMs = useCallback(() => {
+    const pts = swipeSamplesRef.current;
+    if (pts.length < 2) return 0;
+    const end = pts[pts.length - 1];
+    const start = pts[Math.max(0, pts.length - 4)];
+    const dt = end.t - start.t;
+    if (dt < 16) return 0;
+    return (end.x - start.x) / dt;
   }, []);
-  const touchEnd = useCallback(
-    (e: React.TouchEvent) => {
-      const el = e.currentTarget as HTMLElement;
-      const startX = parseFloat(el.dataset.touchX || "0");
-      const endX = e.changedTouches[0].clientX;
-      const diff = startX - endX;
-      if (Math.abs(diff) > 50) {
-        if (diff > 0) goNext();
-        else goPrev();
+
+  const onSwipePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (profiles.length <= 1 || currentIdx < 0 || isTransitioning || swipeExiting) return;
+      if ((e.target as HTMLElement).closest("button")) return;
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      swipePointerId.current = e.pointerId;
+      swipeStartX.current = e.clientX;
+      const t = typeof performance !== "undefined" ? performance.now() : Date.now();
+      swipeSamplesRef.current = [{ x: e.clientX, t }];
+      setSwipeDragging(true);
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
       }
     },
-    [goNext, goPrev]
+    [profiles.length, currentIdx, isTransitioning, swipeExiting]
+  );
+
+  const onSwipePointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (swipePointerId.current !== e.pointerId) return;
+      const t = typeof performance !== "undefined" ? performance.now() : Date.now();
+      const pts = swipeSamplesRef.current;
+      pts.push({ x: e.clientX, t });
+      if (pts.length > 6) pts.shift();
+      const raw = e.clientX - swipeStartX.current;
+      setSwipeOffset(computeSwipeDx(raw));
+    },
+    [computeSwipeDx]
+  );
+
+  const finishSwipePointer = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (swipePointerId.current !== e.pointerId) return;
+      swipePointerId.current = null;
+      try {
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        }
+      } catch {
+        /* ignore */
+      }
+      setSwipeDragging(false);
+      const tEnd = typeof performance !== "undefined" ? performance.now() : Date.now();
+      swipeSamplesRef.current.push({ x: e.clientX, t: tEnd });
+      const vx = swipeVelocityPxPerMs();
+      swipeSamplesRef.current = [];
+
+      const w = swipeCardRef.current?.offsetWidth ?? 320;
+      const threshold = Math.max(44, w * 0.11);
+      const raw = e.clientX - swipeStartX.current;
+      const FLING = 0.38;
+
+      const commitNext =
+        currentIdx < profiles.length - 1 &&
+        (raw <= -threshold || (raw < -28 && vx < -FLING));
+      const commitPrev =
+        currentIdx > 0 && (raw >= threshold || (raw > 28 && vx > FLING));
+
+      if (!commitNext && !commitPrev) {
+        setSwipeOffset(0);
+        return;
+      }
+
+      const exitDist = Math.min(w * 1.35, typeof window !== "undefined" ? window.innerWidth * 0.95 : 420);
+      if (commitNext) {
+        setStackNavIntent("next");
+        setIsTransitioning(true);
+        setSwipeExiting(true);
+        setSwipeOffset(-exitDist);
+        window.setTimeout(() => {
+          pendingEnterRef.current = "next";
+          const nextProfile = profiles[currentIdx + 1];
+          const nextSlug = getProfileSlug(nextProfile);
+          setDisplayedSlug(nextSlug);
+          startTransition(() => {
+            router.replace(`/profile/${nextSlug}`, { scroll: false });
+          });
+        }, SWIPE_EXIT_ROUTE_MS);
+        return;
+      }
+      if (commitPrev) {
+        setStackNavIntent("prev");
+        setIsTransitioning(true);
+        setSwipeExiting(true);
+        setSwipeOffset(exitDist);
+        window.setTimeout(() => {
+          pendingEnterRef.current = "prev";
+          const prevProfile = profiles[currentIdx - 1];
+          const prevSlug = getProfileSlug(prevProfile);
+          setDisplayedSlug(prevSlug);
+          startTransition(() => {
+            router.replace(`/profile/${prevSlug}`, { scroll: false });
+          });
+        }, SWIPE_EXIT_ROUTE_MS);
+        return;
+      }
+    },
+    [currentIdx, profiles, router, setDisplayedSlug, swipeVelocityPxPerMs]
   );
 
   // Keyboard navigation
@@ -354,6 +555,61 @@ export default function OtherProfilePage() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [goPrev, goNext]);
+
+  useEffect(() => {
+    if (currentIdx < 0 || profiles.length < 2) return;
+    if (currentIdx < profiles.length - 1) {
+      router.prefetch(`/profile/${getProfileSlug(profiles[currentIdx + 1])}`);
+    }
+    if (currentIdx > 0) {
+      router.prefetch(`/profile/${getProfileSlug(profiles[currentIdx - 1])}`);
+    }
+  }, [currentIdx, profiles, router]);
+
+  const swipeMotion = useMemo(() => {
+    const wPx = Math.max(cardWidth, 260);
+    const norm = wPx > 0 ? swipeOffset / wPx : 0;
+    const finger = swipeDragging;
+    const clampRot = (deg: number, lim: number) => Math.max(-lim, Math.min(lim, deg));
+    const rotateDeg = finger
+      ? clampRot((swipeOffset / wPx) * 22, 22)
+      : clampRot((swipeOffset / wPx) * 11, 10);
+    const scale = finger ? 1 + Math.min(0.04, Math.abs(norm) * 0.07) : 1;
+    const drift = Math.abs(swipeOffset);
+    const hint = Math.min(1, Math.max(0, drift / Math.max(wPx * 0.24, 64) - 0.05));
+    const shadowBlur = 16 + drift * 0.1;
+    const shadowY = 5 + drift * 0.045;
+    const shadowAlpha = 0.07 + Math.min(0.2, drift / 560);
+    return { wPx, rotateDeg, scale, hint, shadowBlur, shadowY, shadowAlpha };
+  }, [swipeOffset, cardWidth, swipeDragging]);
+
+  const { underStackProfile, stackLayoutFromPrev } = useMemo(() => {
+    if (profiles.length <= 1 || currentIdx < 0) {
+      return { underStackProfile: null as Profile | null, stackLayoutFromPrev: false };
+    }
+    const dragPick = 6;
+    if (swipeDragging && swipeOffset > dragPick && currentIdx > 0) {
+      return { underStackProfile: profiles[currentIdx - 1], stackLayoutFromPrev: true };
+    }
+    if (swipeDragging && swipeOffset < -dragPick && currentIdx < profiles.length - 1) {
+      return { underStackProfile: profiles[currentIdx + 1], stackLayoutFromPrev: false };
+    }
+    if (stackNavIntent === "prev" && currentIdx > 0) {
+      return { underStackProfile: profiles[currentIdx - 1], stackLayoutFromPrev: true };
+    }
+    if (stackNavIntent === "next" && currentIdx < profiles.length - 1) {
+      return { underStackProfile: profiles[currentIdx + 1], stackLayoutFromPrev: false };
+    }
+    if (currentIdx >= profiles.length - 1 && currentIdx > 0) {
+      return { underStackProfile: profiles[currentIdx - 1], stackLayoutFromPrev: true };
+    }
+    if (currentIdx < profiles.length - 1) {
+      return { underStackProfile: profiles[currentIdx + 1], stackLayoutFromPrev: false };
+    }
+    return { underStackProfile: null, stackLayoutFromPrev: false };
+  }, [profiles, currentIdx, swipeDragging, swipeOffset, stackNavIntent]);
+
+  const stackPeekPx = swipeDragging ? Math.min(20, Math.abs(swipeOffset) * 0.065) : 0;
 
   const whatsappUrl = config.whatsappGroupUrl?.trim() || "";
   const openSupportPopup = () => {
@@ -391,7 +647,8 @@ export default function OtherProfilePage() {
   };
 
   if (!profile) {
-    if (profilesLoading || fallbackLoading) {
+    const blockingInitialList = profilesLoading && profiles.length === 0;
+    if (blockingInitialList || fallbackLoading) {
       return (
         <div className="min-h-screen flex items-center justify-center">
           <div className="flex items-center gap-2 text-gray-500">
@@ -630,55 +887,152 @@ export default function OtherProfilePage() {
       <div className="lg:grid lg:grid-cols-[minmax(340px,40%)_minmax(0,60%)] lg:gap-3 xl:gap-4 lg:items-start">
       <div className="space-y-3 lg:sticky lg:top-[84px]">
       <div
-        key={profile.id}
-        className={`relative transition-all duration-300 ease-in-out ${
-          animClass || "opacity-100 scale-100"
-        }`}
+        className="relative w-full isolate contain-layout"
+        style={{ perspective: 1100, WebkitPerspective: 1100 }}
       >
-        <div
-          className="relative aspect-[4/5] md:aspect-[3/4] md:max-h-[620px] md:mx-auto md:w-[min(100%,560px)] lg:w-full lg:max-h-[760px] max-h-[640px] bg-gray-200 overflow-hidden rounded-[12px] touch-pan-y shadow-sm"
-          onTouchStart={touchStart}
-          onTouchEnd={touchEnd}
-        >
-          <Image
-            src={profile.profilePhoto || "/placeholder.svg"}
-            alt={profile.fullName}
-            fill
-            className="object-cover rounded-[10px]"
-            unoptimized
-            priority
-          />
-          {hasMultiplePhotos && (
-            <button
-              onClick={() => setShowGallery(true)}
-              className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-black/50 hover:bg-black/70 text-white transition z-10 flex items-center gap-1.5 text-sm font-medium"
-              aria-label="View gallery"
-            >
-              <Images size={18} />
-              <span>{allPhotos.length}</span>
-            </button>
-          )}
-          <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-between px-2 pointer-events-none sm:pointer-events-auto">
-            <button
-              onClick={goPrev}
-              disabled={currentIdx <= 0}
-              className="p-2.5 rounded-full bg-black/40 hover:bg-black/60 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg pointer-events-auto"
-              aria-label="Previous profile"
-            >
-              <ChevronLeft size={24} className="text-white" strokeWidth={2.5} />
-            </button>
-            <button
-              onClick={goNext}
-              disabled={currentIdx >= profiles.length - 1}
-              className="p-2.5 rounded-full bg-black/40 hover:bg-black/60 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg pointer-events-auto"
-              aria-label="Next profile"
-            >
-              <ChevronRight size={24} className="text-white" strokeWidth={2.5} />
-            </button>
+        {underStackProfile && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-0 z-0 mx-auto w-full md:w-[min(100%,560px)] lg:w-full"
+            style={{
+              transform: stackLayoutFromPrev
+                ? `translate3d(-7px, ${10 + stackPeekPx}px, 0) scale(0.93) rotate(-2.4deg)`
+                : `translate3d(7px, ${10 + stackPeekPx}px, 0) scale(0.93) rotate(2.4deg)`,
+              transformOrigin: "50% 80%",
+              transition: swipeDragging ? "none" : "transform 0.55s cubic-bezier(0.2, 0.92, 0.28, 1)",
+            }}
+          >
+            <div className="relative aspect-[4/5] md:aspect-[3/4] md:max-h-[620px] lg:max-h-[760px] max-h-[640px] overflow-hidden rounded-[14px] bg-gray-200 shadow-[0_12px_40px_rgba(0,0,0,0.14)] ring-1 ring-black/[0.06]">
+              <Image
+                key={underStackProfile.id}
+                src={underStackProfile.profilePhoto || "/placeholder.svg"}
+                alt=""
+                fill
+                className="object-cover"
+                sizes="(max-width: 1024px) 45vw, 320px"
+                loading="lazy"
+                draggable={false}
+                unoptimized
+              />
+            </div>
           </div>
-        </div>
+        )}
+        <div
+          ref={swipeCardRef}
+          className="relative z-[1] overflow-hidden rounded-[12px] select-none touch-pan-x touch-pan-y"
+          style={{
+            touchAction: "pan-x pan-y",
+            transform: `translate3d(${swipeOffset}px,0,0) rotate(${swipeMotion.rotateDeg}deg) scale(${swipeMotion.scale})`,
+            transformStyle: "preserve-3d",
+            backfaceVisibility: "hidden",
+            WebkitBackfaceVisibility: "hidden",
+            transition:
+              slideEnterInstant || swipeDragging
+                ? "none"
+                : isEnteringSlide
+                  ? "transform 0.72s cubic-bezier(0.14, 0.88, 0.18, 1)"
+                  : swipeExiting && Math.abs(swipeOffset) > 2
+                    ? "transform 0.45s cubic-bezier(0.28, 0.85, 0.36, 1)"
+                    : "transform 0.58s cubic-bezier(0.24, 1, 0.36, 1)",
+            willChange: swipeDragging || swipeExiting || isEnteringSlide ? "transform" : "auto",
+            boxShadow:
+              swipeDragging && Math.abs(swipeOffset) > 4
+                ? `0 ${swipeMotion.shadowY}px ${swipeMotion.shadowBlur}px rgba(0,0,0,${swipeMotion.shadowAlpha})`
+                : "0 4px 24px rgba(0,0,0,0.08)",
+          }}
+          onPointerDown={onSwipePointerDown}
+          onPointerMove={onSwipePointerMove}
+          onPointerUp={finishSwipePointer}
+          onPointerCancel={finishSwipePointer}
+        >
+          {profiles.length > 1 && currentIdx >= 0 && (
+            <>
+              <div
+                className="pointer-events-none absolute inset-0 z-[6] rounded-[12px] bg-gradient-to-l from-[var(--primary)]/45 to-transparent"
+                style={{
+                  opacity: swipeOffset < -8 ? swipeMotion.hint * 0.55 : 0,
+                  transition: "opacity 0.08s ease-out",
+                }}
+                aria-hidden
+              />
+              <div
+                className="pointer-events-none absolute inset-0 z-[6] rounded-[12px] bg-gradient-to-r from-black/35 to-transparent"
+                style={{
+                  opacity: swipeOffset > 8 ? swipeMotion.hint * 0.45 : 0,
+                  transition: "opacity 0.08s ease-out",
+                }}
+                aria-hidden
+              />
+              <div className="pointer-events-none absolute inset-0 z-[7] rounded-[12px]" aria-hidden>
+                <span
+                  className="absolute top-[16%] right-[8%] font-black tracking-[0.2em] text-[clamp(1.65rem,8vw,2.75rem)] uppercase text-white"
+                  style={{
+                    opacity: swipeOffset < -20 ? swipeMotion.hint : 0,
+                    transform: `rotate(-13deg) scale(${0.82 + swipeMotion.hint * 0.22})`,
+                    textShadow:
+                      "0 0 1px rgba(0,0,0,0.5), 0 3px 22px rgba(0,0,0,0.45), 0 0 42px rgba(249,115,22,0.4)",
+                    transition: "opacity 0.08s ease-out",
+                  }}
+                >
+                  Next
+                </span>
+                <span
+                  className="absolute top-[16%] left-[8%] font-black tracking-[0.18em] text-[clamp(1.5rem,7vw,2.35rem)] uppercase text-white"
+                  style={{
+                    opacity: swipeOffset > 20 ? swipeMotion.hint : 0,
+                    transform: `rotate(13deg) scale(${0.82 + swipeMotion.hint * 0.22})`,
+                    textShadow: "0 0 1px rgba(0,0,0,0.45), 0 3px 22px rgba(0,0,0,0.5)",
+                    transition: "opacity 0.08s ease-out",
+                  }}
+                >
+                  Back
+                </span>
+              </div>
+            </>
+          )}
+          <div className="relative aspect-[4/5] md:aspect-[3/4] md:max-h-[620px] md:mx-auto md:w-[min(100%,560px)] lg:w-full lg:max-h-[760px] max-h-[640px] bg-gray-200 overflow-hidden rounded-[12px]">
+            <Image
+              src={profile.profilePhoto || "/placeholder.svg"}
+              alt={profile.fullName}
+              fill
+              className="object-cover rounded-[10px] pointer-events-none"
+              unoptimized
+              priority
+              draggable={false}
+            />
+            {hasMultiplePhotos && (
+              <button
+                onClick={() => setShowGallery(true)}
+                className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-black/50 hover:bg-black/70 text-white transition z-10 flex items-center gap-1.5 text-sm font-medium"
+                aria-label="View gallery"
+              >
+                <Images size={18} />
+                <span>{allPhotos.length}</span>
+              </button>
+            )}
+            <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-between px-2 pointer-events-none sm:pointer-events-auto">
+              <button
+                type="button"
+                onClick={goPrev}
+                disabled={currentIdx <= 0}
+                className="p-2.5 rounded-full bg-black/40 hover:bg-black/60 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg pointer-events-auto"
+                aria-label="Previous profile"
+              >
+                <ChevronLeft size={24} className="text-white" strokeWidth={2.5} />
+              </button>
+              <button
+                type="button"
+                onClick={goNext}
+                disabled={currentIdx >= profiles.length - 1}
+                className="p-2.5 rounded-full bg-black/40 hover:bg-black/60 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg pointer-events-auto"
+                aria-label="Next profile"
+              >
+                <ChevronRight size={24} className="text-white" strokeWidth={2.5} />
+              </button>
+            </div>
+          </div>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent text-white rounded-b-[10px]">
+        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent text-white rounded-b-[10px] pointer-events-none">
           <h1 className="text-xl sm:text-2xl font-bold">{displayName}</h1>
           <p className="text-white/90">
             {getAge(profile.dateOfBirth)} yrs • {profile.height}&quot;
@@ -705,6 +1059,7 @@ export default function OtherProfilePage() {
           <span className="inline-block mt-2 ml-2 px-2.5 py-1 text-xs font-medium text-white bg-white/20 rounded-[8px]">
             {getMemberIdDisplay(profile)}
           </span>
+        </div>
         </div>
       </div>
 
@@ -1079,12 +1434,13 @@ export default function OtherProfilePage() {
               <div className="space-y-3">
                 <div className="p-4 rounded-xl bg-[var(--primary)]/5 border border-[var(--primary)]/20">
                   <p className="text-sm text-gray-600 mb-3">Login to view contact details</p>
-                  <Link
-                    href="/login"
+                  <button
+                    type="button"
+                    onClick={() => openAuthModal("login")}
                     className="inline-flex items-center justify-center w-full px-4 py-2.5 rounded-lg bg-[var(--primary)] text-white font-medium hover:bg-[var(--primary)]/90 transition"
                   >
                     Login to View Contact
-                  </Link>
+                  </button>
                 </div>
                 <div className="p-4 rounded-xl bg-gray-50 border border-gray-200">
                   <p className="text-xs text-gray-500 mb-3">Need help? Contact our support</p>
@@ -1329,12 +1685,13 @@ export default function OtherProfilePage() {
                   ))}
                 </div>
                 <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg backdrop-blur-sm">
-                  <Link
-                    href="/login"
+                  <button
+                    type="button"
+                    onClick={() => openAuthModal("login")}
                     className="px-6 py-3 rounded-xl bg-[var(--primary)] text-white font-semibold hover:bg-[var(--primary-hover)] transition shadow-lg"
                   >
                     Login to View Photos
-                  </Link>
+                  </button>
                 </div>
               </div>
             ) : (
