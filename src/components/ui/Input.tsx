@@ -12,8 +12,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     const labelClass = compact
       ? "block text-xs sm:text-sm font-medium text-gray-700 mb-0.5 sm:mb-1"
       : "block text-sm font-medium text-gray-700 mb-1";
+    const isDate = props.type === "date";
     return (
-      <div className="w-full">
+      <div className={`w-full min-w-0 ${isDate ? "overflow-hidden" : ""}`}>
         {label && (
           <label className={labelClass}>
             {label}
@@ -21,7 +22,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         )}
         <input
           ref={ref}
-          className={`w-full rounded-xl border border-[var(--border)] bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/30 focus:border-[var(--primary)] transition-all ${
+          className={`w-full min-w-0 max-w-full rounded-xl border border-[var(--border)] bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/30 focus:border-[var(--primary)] transition-all box-border ${
+            isDate ? "text-sm [color-scheme:light]" : ""
+          } ${
             compact
               ? "px-3 py-2 text-sm sm:px-4 sm:py-2.5 sm:text-base"
               : "px-4 py-3"

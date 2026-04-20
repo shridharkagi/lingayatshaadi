@@ -201,6 +201,20 @@ export default function AccountPage() {
       dateOfBirth: accountMeta?.dateOfBirth || "",
     });
     setMetaError("");
+    if (authUser) {
+      const pend = pendingAuthEmail(authUser);
+      if (pend) {
+        setContactEmailInput(pend);
+        setContactEmailStep("sent");
+      } else {
+        setContactEmailInput(
+          authUser.email && !isSyntheticAuthEmail(authUser.email) ? authUser.email : ""
+        );
+        setContactEmailStep("idle");
+      }
+      setContactEmailErr("");
+      setContactEmailInfo("");
+    }
     setEditing(true);
   };
 
@@ -469,8 +483,14 @@ export default function AccountPage() {
               )}
             </>
           ) : (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-3 min-w-0">
+              {accountHolderCompletion < 100 && (
+                <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                  Account completeness: {accountHolderCompletion}% — add and verify an email below to reach
+                  100%.
+                </p>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
                 <Input
                   label="First Name"
                   value={metaForm.firstName}
@@ -511,6 +531,78 @@ export default function AccountPage() {
                 onChange={(e) => setMetaForm((m) => ({ ...m, dateOfBirth: e.target.value }))}
                 max={new Date().toISOString().slice(0, 10)}
               />
+
+              {hasRealVerifiedEmail ? (
+                <p className="text-sm text-gray-700">
+                  <span className="text-gray-500">Email (verified):</span>{" "}
+                  <span className="font-medium break-all">{authUser.email}</span>
+                </p>
+              ) : (
+                <div className="space-y-3 pt-2 border-t border-gray-100">
+                  <p className="text-sm font-medium text-gray-900">Email (optional)</p>
+                  <p className="text-xs text-gray-500">
+                    Add a login email and verify it with the code we send you. Same as the section below when
+                    not editing.
+                  </p>
+                  <Input
+                    label="Email address"
+                    type="email"
+                    autoComplete="email"
+                    value={contactEmailInput}
+                    onChange={(e) => setContactEmailInput(e.target.value)}
+                    placeholder="you@example.com"
+                    disabled={contactEmailBusy}
+                  />
+                  {contactEmailStep === "sent" && (
+                    <Input
+                      label="6-digit code from email"
+                      inputMode="numeric"
+                      value={contactEmailOtp}
+                      onChange={(e) => setContactEmailOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      placeholder="Enter code"
+                    />
+                  )}
+                  {contactEmailErr && <p className="text-sm text-red-600">{contactEmailErr}</p>}
+                  {contactEmailInfo && <p className="text-xs text-blue-700">{contactEmailInfo}</p>}
+                  <div className="flex flex-wrap gap-2">
+                    {contactEmailStep !== "sent" ? (
+                      <button
+                        type="button"
+                        disabled={contactEmailBusy || !contactEmailInput.trim()}
+                        onClick={sendContactEmailCode}
+                        className="px-4 py-2 rounded-xl text-sm font-medium bg-[var(--primary)] text-white disabled:opacity-50"
+                      >
+                        {contactEmailBusy ? "Sending…" : "Send verification code"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={contactEmailBusy || contactEmailOtp.length !== 6}
+                        onClick={confirmContactEmail}
+                        className="px-4 py-2 rounded-xl text-sm font-medium bg-[var(--primary)] text-white disabled:opacity-50"
+                      >
+                        {contactEmailBusy ? "Verifying…" : "Verify email"}
+                      </button>
+                    )}
+                    {contactEmailStep === "sent" && (
+                      <button
+                        type="button"
+                        disabled={contactEmailBusy}
+                        onClick={() => {
+                          setContactEmailStep("idle");
+                          setContactEmailOtp("");
+                          setContactEmailErr("");
+                          setContactEmailInfo("");
+                        }}
+                        className="px-4 py-2 rounded-xl text-sm font-medium border border-gray-200 text-gray-700"
+                      >
+                        Edit email
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <p className="text-xs text-gray-500">
                 Phone number can&apos;t be changed here — contact support to update it.
               </p>

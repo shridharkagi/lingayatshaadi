@@ -343,14 +343,16 @@ export function AuthModal({ open, initialMode, onClose }: AuthModalProps) {
             {mode === "login" ? (
               <>
                 {!passwordForgot && (
-                  <div className="inline-flex p-0.5 rounded-lg bg-gray-100">
+                  <div className="inline-flex p-1 rounded-xl bg-gray-100 w-full sm:w-auto">
                     <button
                       type="button"
                       onClick={() => {
                         setLoginMode("otp");
                         setPasswordForgot(false);
                       }}
-                      className={`px-2.5 py-0.5 sm:px-3 sm:py-1 text-[11px] sm:text-xs rounded-md ${loginMode === "otp" ? "bg-white shadow-sm" : "text-gray-500"}`}
+                      className={`flex-1 sm:flex-none px-3 py-2 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition ${
+                        loginMode === "otp" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
+                      }`}
                     >
                       OTP
                     </button>
@@ -361,7 +363,9 @@ export function AuthModal({ open, initialMode, onClose }: AuthModalProps) {
                         setPasswordForgot(false);
                         setLoginPasswordId((prev) => prev || loginMobile);
                       }}
-                      className={`px-2.5 py-0.5 sm:px-3 sm:py-1 text-[11px] sm:text-xs rounded-md ${loginMode === "password" ? "bg-white shadow-sm" : "text-gray-500"}`}
+                      className={`flex-1 sm:flex-none px-3 py-2 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition ${
+                        loginMode === "password" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
+                      }`}
                     >
                       Password
                     </button>
@@ -502,7 +506,7 @@ export function AuthModal({ open, initialMode, onClose }: AuthModalProps) {
               <>
                 {signupStep === 1 ? (
                   <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2 min-w-0">
                       <Input
                         compact
                         label="First Name"

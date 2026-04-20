@@ -19,13 +19,15 @@ export default function LoginPage() {
   const {
     sendPhoneOtp,
     verifyPhoneOtp,
-    signInWithPhonePassword,
+    signInWithPassword,
+    resetPasswordWithPhoneOtp,
     isLoggedIn,
     profileComplete,
     loading: authLoading,
   } = useAuth();
   const [loginMode, setLoginMode] = useState<LoginMode>("otp");
   const [mobile, setMobile] = useState("");
+  const [passwordId, setPasswordId] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
@@ -35,6 +37,13 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [resendIn, setResendIn] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [passwordForgot, setPasswordForgot] = useState(false);
+  const [forgotOtpSent, setForgotOtpSent] = useState(false);
+  const [forgotMobile, setForgotMobile] = useState("");
+  const [forgotOtp, setForgotOtp] = useState("");
+  const [forgotPw1, setForgotPw1] = useState("");
+  const [forgotPw2, setForgotPw2] = useState("");
+  const [forgotResendIn, setForgotResendIn] = useState(0);
 
   useEffect(() => {
     const handleClick = (e: Event) => {
@@ -83,6 +92,16 @@ export default function LoginPage() {
     setOtp("");
     setResendIn(0);
     setPassword("");
+    setPasswordForgot(false);
+    setForgotOtpSent(false);
+    setForgotMobile("");
+    setForgotOtp("");
+    setForgotPw1("");
+    setForgotPw2("");
+    setForgotResendIn(0);
+    if (mode === "password") {
+      setPasswordId((prev) => prev || mobile);
+    }
   };
 
   const sendOtpRequest = async () => {
@@ -139,16 +158,25 @@ export default function LoginPage() {
   const handlePasswordSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!mobile?.trim() || mobile.replace(/\D/g, "").length !== 10) {
-      setError("Please enter a valid 10-digit mobile number");
+    const id = passwordId.trim();
+    if (!id) {
+      setError("Enter mobile number or email");
       return;
+    }
+    if (!id.includes("@")) {
+      const d = id.replace(/\D/g, "");
+      if (d.length !== 10) {
+        setError("Enter a valid 10-digit mobile or email");
+        return;
+      }
     }
     if (!password) {
       setError("Please enter your password");
       return;
     }
     setLoading(true);
-    const result = await signInWithPhonePassword(phoneE164(), password);
+    const identifier = id.includes("@") ? id : `+91${id.replace(/\D/g, "").slice(-10)}`;
+    const result = await signInWithPassword(identifier, password);
     setLoading(false);
 
     if (result.error) {
@@ -156,6 +184,59 @@ export default function LoginPage() {
     } else {
       router.push("/profiles");
     }
+  };
+
+  const sendForgotOtp = async () => {
+    if (loading) return;
+    setError("");
+    setInfo("");
+    if (forgotMobile.replace(/\D/g, "").length !== 10) {
+      setError("Enter the mobile number for your account");
+      return;
+    }
+    setLoading(true);
+    const result = await sendPhoneOtp(`+91${forgotMobile.replace(/\D/g, "").slice(-10)}`, "password_reset");
+    setLoading(false);
+    if (result.error) {
+      setError(result.error);
+      if (result.retryAfter) setForgotResendIn(result.retryAfter);
+      return;
+    }
+    setForgotOtpSent(true);
+    setInfo("OTP sent. It is valid for 10 minutes.");
+    setForgotResendIn(result.cooldownSeconds ?? 30);
+  };
+
+  const submitForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (loading) return;
+    setError("");
+    setInfo("");
+    if (forgotOtp.length !== 6) {
+      setError("Enter the 6-digit OTP");
+      return;
+    }
+    if (!forgotPw1 || forgotPw1.length < 8) {
+      setError("New password must be at least 8 characters");
+      return;
+    }
+    if (forgotPw1 !== forgotPw2) {
+      setError("Passwords do not match");
+      return;
+    }
+    setLoading(true);
+    const result = await resetPasswordWithPhoneOtp(
+      `+91${forgotMobile.replace(/\D/g, "").slice(-10)}`,
+      forgotOtp,
+      forgotPw1
+    );
+    setLoading(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    setSuccess("Password updated. Redirecting...");
+    redirectAfterLogin();
   };
 
   return (
@@ -246,38 +327,40 @@ export default function LoginPage() {
               Sign in with your mobile number — use a one-time code or your password
             </p>
 
-            <div
-              role="tablist"
-              aria-label="Sign in method"
-              className="flex gap-2 mb-6 p-1 bg-[var(--color-border)]/50 rounded-xl"
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={loginMode === "otp"}
-                onClick={() => switchMode("otp")}
-                className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  loginMode === "otp"
-                    ? "bg-[var(--primary)] text-white shadow-md"
-                    : "text-[var(--color-text-muted)]"
-                }`}
+            {!(loginMode === "password" && passwordForgot) && (
+              <div
+                role="tablist"
+                aria-label="Sign in method"
+                className="flex gap-1 mb-6 p-1 bg-[var(--color-border)]/50 rounded-xl"
               >
-                OTP
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={loginMode === "password"}
-                onClick={() => switchMode("password")}
-                className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  loginMode === "password"
-                    ? "bg-[var(--primary)] text-white shadow-md"
-                    : "text-[var(--color-text-muted)]"
-                }`}
-              >
-                Password
-              </button>
-            </div>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={loginMode === "otp"}
+                  onClick={() => switchMode("otp")}
+                  className={`flex-1 py-3 sm:py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                    loginMode === "otp"
+                      ? "bg-[var(--primary)] text-white shadow-md"
+                      : "text-[var(--color-text-muted)]"
+                  }`}
+                >
+                  OTP
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={loginMode === "password"}
+                  onClick={() => switchMode("password")}
+                  className={`flex-1 py-3 sm:py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                    loginMode === "password"
+                      ? "bg-[var(--primary)] text-white shadow-md"
+                      : "text-[var(--color-text-muted)]"
+                  }`}
+                >
+                  Password
+                </button>
+              </div>
+            )}
 
             {loginMode === "otp" ? (
               !otpSent ? (
@@ -348,18 +431,113 @@ export default function LoginPage() {
                   </button>
                 </form>
               )
+            ) : passwordForgot ? (
+              forgotOtpSent ? (
+                <form onSubmit={submitForgotPassword} className="space-y-4" aria-label="Set new password">
+                  <p className="text-sm font-semibold text-[var(--color-text-primary)]">Reset password</p>
+                  <p className="text-xs text-[var(--color-text-muted)]">
+                    Enter the code we sent to +91 {forgotMobile}, then choose a new password.
+                  </p>
+                  <Input
+                    label="OTP"
+                    placeholder="6-digit code"
+                    value={forgotOtp}
+                    onChange={(e) => setForgotOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    maxLength={6}
+                    inputMode="numeric"
+                  />
+                  <Input
+                    label="New password"
+                    type="password"
+                    placeholder="At least 8 characters"
+                    value={forgotPw1}
+                    onChange={(e) => setForgotPw1(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                  <Input
+                    label="Confirm new password"
+                    type="password"
+                    value={forgotPw2}
+                    onChange={(e) => setForgotPw2(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                  {error && <p className="text-red-500 text-sm">{error}</p>}
+                  {info && <p className="text-blue-600 text-sm">{info}</p>}
+                  {success && <p className="text-green-600 text-sm">{success}</p>}
+                  <Button type="submit" fullWidth size="lg" disabled={loading}>
+                    {loading ? "Saving..." : "Save new password"}
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={sendForgotOtp}
+                    disabled={loading || forgotResendIn > 0}
+                    className="w-full text-sm text-[var(--primary)] font-medium py-1 disabled:text-[var(--color-text-muted)]"
+                  >
+                    {forgotResendIn > 0 ? `Resend OTP in ${forgotResendIn}s` : "Resend OTP"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPasswordForgot(false);
+                      setForgotOtpSent(false);
+                      setForgotMobile("");
+                      setForgotOtp("");
+                      setForgotPw1("");
+                      setForgotPw2("");
+                      setForgotResendIn(0);
+                      setError("");
+                      setInfo("");
+                    }}
+                    className="w-full text-sm text-[var(--primary)] font-medium py-2"
+                  >
+                    ← Back to sign in
+                  </button>
+                </form>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm font-semibold text-[var(--color-text-primary)]">Reset password</p>
+                  <p className="text-xs text-[var(--color-text-muted)]">
+                    We&apos;ll send a code to your registered mobile number.
+                  </p>
+                  <Input
+                    label="Mobile Number"
+                    type="tel"
+                    placeholder="10-digit mobile number"
+                    value={forgotMobile}
+                    onChange={(e) =>
+                      setForgotMobile(e.target.value.replace(/\D/g, "").slice(0, 10))
+                    }
+                    maxLength={10}
+                    autoComplete="tel-national"
+                  />
+                  {error && <p className="text-red-500 text-sm">{error}</p>}
+                  {info && <p className="text-blue-600 text-sm">{info}</p>}
+                  <Button type="button" fullWidth size="lg" disabled={loading} onClick={sendForgotOtp}>
+                    {loading ? "Sending..." : "Send reset code"}
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPasswordForgot(false);
+                      setForgotMobile("");
+                      setError("");
+                      setInfo("");
+                    }}
+                    className="w-full text-sm text-[var(--primary)] font-medium py-2"
+                  >
+                    ← Back to sign in
+                  </button>
+                </div>
+              )
             ) : (
               <form onSubmit={handlePasswordSignIn} className="space-y-4" aria-label="Password sign in">
                 <Input
-                  label="Mobile Number"
-                  type="tel"
-                  placeholder="Enter 10-digit mobile number"
-                  value={mobile}
-                  onChange={(e) =>
-                    setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))
-                  }
-                  maxLength={10}
-                  autoComplete="tel-national"
+                  label="Mobile number or email"
+                  type="text"
+                  placeholder="10-digit mobile or your email"
+                  value={passwordId}
+                  onChange={(e) => setPasswordId(e.target.value)}
+                  autoComplete="username"
                 />
                 <Input
                   label="Password"
@@ -369,6 +547,22 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="current-password"
                 />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPasswordForgot(true);
+                    setForgotOtpSent(false);
+                    setForgotMobile(mobile || passwordId.replace(/\D/g, "").slice(-10) || "");
+                    setForgotOtp("");
+                    setForgotPw1("");
+                    setForgotPw2("");
+                    setError("");
+                    setInfo("");
+                  }}
+                  className="text-sm text-[var(--primary)] font-medium -mt-2"
+                >
+                  Forgot password?
+                </button>
                 {error && <p className="text-red-500 text-sm">{error}</p>}
                 <Button type="submit" fullWidth size="lg" disabled={loading}>
                   {loading ? "Signing in..." : "Sign In"}
