@@ -204,12 +204,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     supabase.auth
       .getSession()
-      .then(async ({ data: { session } }) => {
+      .then(({ data: { session } }) => {
         if (session?.user) {
           setAuthUser(session.user);
           setAccountMeta(deriveAccountMeta(session.user));
           setIsLoggedIn(true);
-          await fetchProfile(session.user.id);
+          // Do not await: slow or stuck profile fetch must not block clearing `loading`
+          // (same pattern as onAuthStateChange below).
+          void fetchProfile(session.user.id);
         }
       })
       .catch(() => {
