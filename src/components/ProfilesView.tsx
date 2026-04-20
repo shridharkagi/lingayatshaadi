@@ -15,6 +15,7 @@ import { useProfiles } from "@/contexts/ProfilesContext";
 import { useFilteredProfiles } from "@/hooks/useFilteredProfiles";
 import { useAuth } from "@/contexts/AuthContext";
 import { BottomNav } from "@/components/ui/BottomNav";
+import { useAuthModal } from "@/contexts/AuthModalContext";
 
 const AGE_MIN = 18;
 const AGE_MAX = 60;
@@ -59,6 +60,7 @@ export function ProfilesView({
 }: ProfilesViewProps) {
   const { profiles, profilesLoading } = useProfiles();
   const { isLoggedIn } = useAuth();
+  const { openAuthModal } = useAuthModal();
 
   const lockedProfileType = lockedGender
     ? lockedGender === "female"
@@ -126,13 +128,47 @@ export function ProfilesView({
             {title}
           </h1>
           <p className="text-sm sm:text-base text-white/90 max-w-2xl">{subtitle}</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {isLoggedIn ? (
+              <Link
+                href="/account"
+                className="px-3 py-1.5 rounded-full bg-white/20 hover:bg-white/30 text-xs sm:text-sm font-medium transition"
+              >
+                My Account
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => openAuthModal("signup")}
+                className="px-3 py-1.5 rounded-full bg-white/20 hover:bg-white/30 text-xs sm:text-sm font-medium transition"
+              >
+                Create Profile
+              </button>
+            )}
+            {isLoggedIn ? (
+              <Link
+                href="/search"
+                className="px-3 py-1.5 rounded-full bg-black/20 hover:bg-black/30 text-xs sm:text-sm font-medium transition"
+              >
+                Advanced Search
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => openAuthModal("login")}
+                className="px-3 py-1.5 rounded-full bg-black/20 hover:bg-black/30 text-xs sm:text-sm font-medium transition"
+              >
+                Sign In
+              </button>
+            )}
+          </div>
         </div>
       </section>
 
       {/* Sticky search + filter bar */}
       <div className="sticky top-14 sm:top-16 z-30 -mt-7 sm:-mt-9 px-4">
         <div className="max-w-6xl mx-auto">
-          <div className="bg-white rounded-2xl shadow-lg border border-[var(--color-border)] p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
+          <div className="bg-white/95 backdrop-blur rounded-2xl shadow-lg border border-[var(--color-border)] p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
             <div className="relative flex-1">
               <Search
                 size={18}
@@ -174,6 +210,11 @@ export function ProfilesView({
                 ? `${filteredProfiles.length} of ${totalCount} ${itemNoun}`
                 : `${totalCount} ${itemNoun}`}
             </h2>
+            {!profilesLoading && (
+              <span className="text-xs px-2 py-1 rounded-full bg-[var(--primary)]/10 text-[var(--primary)] font-medium">
+                {showingFiltered ? "Filtered results" : "Latest available"}
+              </span>
+            )}
             {activeCount > 0 && (
               <button
                 onClick={resetFilters}

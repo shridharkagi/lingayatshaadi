@@ -1,0 +1,33 @@
+State: Suggestion of Indian States
+Profile creation:
+Contact details
+Default: Account Contact no (Whom it beongs to dropdown)
+
+Alternate Contact nnumber 1:  (Whom it belongs to) (Optional)
+
+Alternate Contact nnumber 2:  (Whom it belongs to) (Optional)
+
+
+On each contact number, There shoudl be tick mark to choose if we can show this on your profile. User preper message to communicate this)
+
+I tried creating the profile and tried to save it. It keeps saving. It couln't save.
+
+Also please create 10 Brides profiles + 10 Grooms profiles for dummy samples.
+Map them to Super admin number: 9844497002
+Means, these samples profiles must be under Super admin's account.
+
+Check the commit fcad90588616e7c17455930672da6fa3831c8c6a
+The curret live version has some dummy profiles with the photos. Please bring them back.
+Refer screen 2 and 3. These screens are from previous version.
+follow the URL structure and logic similar to what we had earlier.
+
+If you need any clarifications, please ask.
+
+
+********
+
+Partner perferences is missing while creating profiles
+
+
+***********
+

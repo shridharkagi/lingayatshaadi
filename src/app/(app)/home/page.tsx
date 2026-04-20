@@ -43,14 +43,18 @@ export default function HomePage() {
     }
   }, [loading, isLoggedIn, profileComplete, router]);
   const matches = profiles.slice(0, 6);
+  const firstName = user?.fullName?.split(" ")[0] || "User";
 
   return (
-    <div className="w-full pb-6">
-      <header className="bg-[var(--primary)] text-white px-4 py-6 lg:py-8 rounded-b-3xl">
+    <div className="w-full pb-8 space-y-5">
+      <header className="bg-[var(--primary)] text-white px-4 py-6 lg:py-8 rounded-2xl shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-white/80 text-sm sm:text-base">Welcome back,</p>
-            <h1 className="text-lg sm:text-xl lg:text-2xl font-bold">{user?.fullName?.split(" ")[0] || "User"}</h1>
+            <h1 className="text-lg sm:text-xl lg:text-2xl font-bold">{firstName}</h1>
+            <p className="text-white/75 text-xs sm:text-sm mt-1">
+              Explore compatible profiles and keep your account active.
+            </p>
           </div>
           <div className="flex gap-2">
             <Link
@@ -83,7 +87,7 @@ export default function HomePage() {
         </Link>
       </header>
 
-      <div className="px-0 -mt-2 space-y-8">
+      <div className="px-0 space-y-6">
         <div className="bg-white rounded-2xl shadow-sm p-4 lg:p-6">
           <h2 className="font-semibold text-base sm:text-lg text-[var(--foreground)] mb-3">Quick Actions</h2>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -107,7 +111,12 @@ export default function HomePage() {
         </div>
 
         <div>
-          <h2 className="font-semibold text-base sm:text-lg text-[var(--foreground)] mb-3">Suggested Matches</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold text-base sm:text-lg text-[var(--foreground)]">Suggested Matches</h2>
+            <Link href="/profiles" className="text-sm font-medium text-[var(--primary)] hover:underline">
+              View all
+            </Link>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {matches.map((profile) => (
               <ProfileCard key={profile.id} profile={profile} />

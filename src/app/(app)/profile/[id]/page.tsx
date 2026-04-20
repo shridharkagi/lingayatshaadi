@@ -477,7 +477,7 @@ export default function OtherProfilePage() {
   })();
 
   return (
-    <div className="max-w-2xl mx-auto pb-6">
+    <div className="max-w-3xl mx-auto pb-6 px-2 sm:px-3">
       {moderationBanner}
       {showGallery && hasMultiplePhotos && (
         <div
@@ -577,7 +577,7 @@ export default function OtherProfilePage() {
           </div>
         </div>
       )}
-      <header className="sticky top-0 bg-white/95 backdrop-blur border-b border-[var(--border)] px-4 py-3 flex items-center justify-between z-10">
+      <header className="sticky top-0 bg-white/95 backdrop-blur border-b border-[var(--border)] px-4 py-3 flex items-center justify-between z-10 rounded-b-xl">
         <button
           onClick={() => router.back()}
           className="flex items-center gap-2 px-3 py-2 -ml-2 rounded-xl hover:bg-gray-100 transition-colors font-medium text-[var(--foreground)]"
@@ -620,7 +620,7 @@ export default function OtherProfilePage() {
         }`}
       >
         <div
-          className="relative aspect-[4/5] lg:aspect-[16/9] max-h-[500px] bg-gray-200 overflow-hidden rounded-[10px] touch-pan-y"
+          className="relative aspect-[4/5] lg:aspect-[4/5] max-h-[640px] bg-gray-200 overflow-hidden rounded-[12px] touch-pan-y shadow-sm"
           onTouchStart={touchStart}
           onTouchEnd={touchEnd}
         >
@@ -699,7 +699,7 @@ export default function OtherProfilePage() {
       </div>
 
       {/* Action buttons - improved mobile responsiveness */}
-      <div className="px-3 py-2">
+      <div className="px-3 py-2 rounded-2xl bg-gradient-to-b from-white to-gray-50 border border-gray-100">
         <div className="grid grid-cols-4 gap-1 sm:gap-1.5">
           <button
             onClick={async () => {
@@ -857,9 +857,9 @@ export default function OtherProfilePage() {
         )}
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-4 mt-1">
         {profile.aboutMeVisible && profile.aboutMe && (
-          <div className="bg-white rounded-2xl p-4 shadow-sm">
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
             <h3 className="font-semibold text-base sm:text-lg text-[var(--foreground)] mb-2">About Me</h3>
             <p className="text-sm sm:text-base text-gray-600">{aboutMeTruncated}</p>
             {aboutMeWords > 100 && (
@@ -872,7 +872,7 @@ export default function OtherProfilePage() {
 
         {/* Hobbies and Interests - after About Me (Screen 1 design) */}
         {profile.hobbies && profile.hobbies.length > 0 && (
-          <div className="bg-white rounded-2xl p-4 shadow-sm">
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
             <h3 className="font-semibold text-base sm:text-lg text-[var(--foreground)] mb-3 pb-2 border-b border-gray-200">
               Hobbies and Interests
             </h3>
@@ -885,7 +885,7 @@ export default function OtherProfilePage() {
         )}
 
         {/* Profile Details - reference design (Location, Education & Career, Family) */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm">
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
           <h3 className="font-semibold text-base sm:text-lg text-[var(--foreground)] mb-3">Profile Details</h3>
           {!isLoggedIn && (
             <Link

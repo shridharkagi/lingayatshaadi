@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import type { ComponentType, SVGProps } from "react";
 import { Search, MessageCircle, User, Bell, Heart, Users2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { mockNotifications } from "@/data/mock";
 import { FEATURE_MESSAGING_ENABLED } from "@/lib/featureFlags";
 import { BrideIcon, GroomIcon } from "@/components/ui/icons/BrideGroomIcons";
+import { useAuthModal } from "@/contexts/AuthModalContext";
+import { getUnreadNotificationCount } from "@/lib/api/notifications";
 
 type NavIcon = ComponentType<SVGProps<SVGSVGElement> & { size?: number; strokeWidth?: number }>;
 
@@ -42,8 +44,18 @@ const navItems: NavItem[] = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { accountMeta } = useAuth();
-  const unreadCount = mockNotifications.filter((n) => !n.read).length;
+  const { accountMeta, isLoggedIn, user, authUser } = useAuth();
+  const { openAuthModal } = useAuthModal();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setUnreadCount(0);
+      return;
+    }
+    const ids = Array.from(new Set([user?.id, authUser?.id].filter(Boolean) as string[]));
+    getUnreadNotificationCount(ids).then(({ count }) => setUnreadCount(count || 0));
+  }, [isLoggedIn, user?.id, authUser?.id]);
 
   return (
     <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-[var(--border)] min-h-screen fixed left-0 top-0 z-40">
@@ -53,12 +65,39 @@ export function Sidebar() {
       </Link>
       <nav className="flex-1 p-4 space-y-1">
         {navItems.map(({ href, icon: Icon, label }) => {
-          const isActive = pathname === href || pathname.startsWith(href + "/");
-          const showBadge = href === "/activities" && unreadCount > 0;
+          const isProtected = href === "/activities" || href === "/account";
+          const resolvedHref = href === "/activities" && isLoggedIn ? "/notifications" : href;
+          const isActive =
+            pathname === resolvedHref ||
+            pathname.startsWith(resolvedHref + "/") ||
+            (href === "/activities" && pathname.startsWith("/activities"));
+          const showBadge = (href === "/activities" || resolvedHref === "/notifications") && unreadCount > 0;
+
+          if (!isLoggedIn && isProtected) {
+            return (
+              <button
+                key={href}
+                type="button"
+                onClick={() => openAuthModal("login")}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-gray-600 hover:bg-gray-100"
+              >
+                <div className="relative">
+                  <Icon size={22} />
+                  {showBadge && (
+                    <span className="absolute -top-1 -right-1 bg-[var(--accent)] text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </div>
+                <span className="font-medium">{label}</span>
+              </button>
+            );
+          }
+
           return (
             <Link
               key={href}
-              href={href}
+              href={resolvedHref}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
                 isActive ? "bg-[var(--primary)] text-white" : "text-gray-600 hover:bg-gray-100"
               }`}

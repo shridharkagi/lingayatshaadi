@@ -29,21 +29,25 @@ function toNotification(row: NotificationRow): Notification {
   };
 }
 
-/** Get notifications for current user (profile id) */
-export async function getNotifications(myProfileId: string): Promise<{
+/** Get notifications for current user (profile id or auth user id) */
+export async function getNotifications(userIds: string | string[]): Promise<{
   data: Notification[];
   error: string | null;
 }> {
   try {
     const supabase = createSupabaseClientSafe();
     if (!supabase) return { data: [], error: "Supabase not configured" };
+    const ids = Array.isArray(userIds) ? userIds.filter(Boolean) : [userIds].filter(Boolean);
+    if (ids.length === 0) return { data: [], error: null };
 
-    const { data, error } = await supabase
+    const query = supabase
       .from("notifications")
       .select("*")
-      .eq("user_id", myProfileId)
       .order("created_at", { ascending: false })
       .limit(50);
+
+    const { data, error } =
+      ids.length === 1 ? await query.eq("user_id", ids[0]) : await query.in("user_id", ids);
 
     if (error) return { data: [], error: error.message };
     return {
@@ -54,6 +58,34 @@ export async function getNotifications(myProfileId: string): Promise<{
     return {
       data: [],
       error: err instanceof Error ? err.message : "Failed to fetch notifications",
+    };
+  }
+}
+
+export async function getUnreadNotificationCount(userIds: string | string[]): Promise<{
+  count: number;
+  error: string | null;
+}> {
+  try {
+    const supabase = createSupabaseClientSafe();
+    if (!supabase) return { count: 0, error: "Supabase not configured" };
+    const ids = Array.isArray(userIds) ? userIds.filter(Boolean) : [userIds].filter(Boolean);
+    if (ids.length === 0) return { count: 0, error: null };
+
+    const query = supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("read", false);
+
+    const { count, error } =
+      ids.length === 1 ? await query.eq("user_id", ids[0]) : await query.in("user_id", ids);
+
+    if (error) return { count: 0, error: error.message };
+    return { count: count || 0, error: null };
+  } catch (err) {
+    return {
+      count: 0,
+      error: err instanceof Error ? err.message : "Failed to fetch unread count",
     };
   }
 }

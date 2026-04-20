@@ -34,23 +34,8 @@ export function ProfilesProvider({ children }: { children: React.ReactNode }) {
 
   const refreshProfiles = useCallback(async () => {
     setProfilesLoading(true);
-    const { data, error } = await searchProfiles({}, 100);
-    if (!error && data.length > 0) {
-      const filtered = currentUserId
-        ? data.filter((p) => p.id !== currentUserId)
-        : data;
-      setProfiles(filtered);
-    } else {
-      setProfiles([...mockProfiles]);
-    }
-    setProfilesLoading(false);
-  }, [currentUserId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
+    try {
       const { data, error } = await searchProfiles({}, 100);
-      if (cancelled) return;
       if (!error && data.length > 0) {
         const filtered = currentUserId
           ? data.filter((p) => p.id !== currentUserId)
@@ -59,7 +44,32 @@ export function ProfilesProvider({ children }: { children: React.ReactNode }) {
       } else {
         setProfiles([...mockProfiles]);
       }
+    } catch {
+      setProfiles([...mockProfiles]);
+    } finally {
       setProfilesLoading(false);
+    }
+  }, [currentUserId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await searchProfiles({}, 100);
+        if (cancelled) return;
+        if (!error && data.length > 0) {
+          const filtered = currentUserId
+            ? data.filter((p) => p.id !== currentUserId)
+            : data;
+          setProfiles(filtered);
+        } else {
+          setProfiles([...mockProfiles]);
+        }
+      } catch {
+        if (!cancelled) setProfiles([...mockProfiles]);
+      } finally {
+        if (!cancelled) setProfilesLoading(false);
+      }
     })();
     return () => {
       cancelled = true;

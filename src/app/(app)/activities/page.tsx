@@ -507,7 +507,7 @@ export default function ActivitiesPage() {
                   const slug = c.profile ? getProfileSlug(c.profile) : c.profileId;
                   return (
                     <Link
-                      key={c.profileId}
+                      key={`${c.profileId}-${c.viewedAt}`}
                       href={`/profile/${slug}`}
                       className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition"
                     >
@@ -638,7 +638,7 @@ export default function ActivitiesPage() {
             ) : (
               <div className="space-y-3">
                 {notes.map((n) => (
-                  <div key={n.profileId} className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm">
+                  <div key={`${n.profileId}-${n.updatedAt}`} className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm">
                     <Link href={`/profile/${getProfileSlug(n.profile!)}`}>
                       <ProfileAvatar src={n.profile!.profilePhoto} alt={n.profile!.fullName} size={64} />
                     </Link>

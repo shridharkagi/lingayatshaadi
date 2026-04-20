@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export default function SignupPage() {
   const router = useRouter();
-  const { sendPhoneOtp, verifyPhoneOtp } = useAuth();
+  const { sendPhoneOtp, verifyPhoneOtp, isLoggedIn, profileComplete, loading: authLoading } = useAuth();
   const [step, setStep] = useState<1 | 2>(1);
   const [form, setForm] = useState({
     gender: "" as "" | "male" | "female",
@@ -28,6 +28,12 @@ export default function SignupPage() {
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const [resendIn, setResendIn] = useState(0);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!isLoggedIn) return;
+    router.replace(profileComplete ? "/home" : "/profile/complete");
+  }, [authLoading, isLoggedIn, profileComplete, router]);
 
   const updateForm = (key: keyof typeof form, value: string) => {
     setForm((f) => ({ ...f, [key]: value }));

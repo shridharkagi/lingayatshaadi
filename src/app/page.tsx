@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,6 +17,7 @@ import { Button } from "@/components/ui/Button";
 import { searchProfiles } from "@/lib/api/profiles";
 import { calculateAge } from "@/lib/partnerPreferenceDefaults";
 import type { Profile } from "@/types";
+import { useAuthModal } from "@/contexts/AuthModalContext";
 
 // Indian traditional couple and matrimony images
 const HERO_IMAGE =
@@ -133,18 +133,19 @@ const communityLinks = [
 ];
 
 export default function LandingPage() {
-  const router = useRouter();
   const { isLoggedIn, profileComplete, loading } = useAuth();
+  const { openAuthModal } = useAuthModal();
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [livePreviewProfiles, setLivePreviewProfiles] = useState<Profile[] | null>(null);
 
-  useEffect(() => {
-    if (loading) return;
-    if (isLoggedIn && profileComplete) {
-      router.replace("/home");
+  const primaryCta = useMemo(() => {
+    if (!loading && isLoggedIn) {
+      if (profileComplete) return { href: "/profiles", label: "Explore Profiles" };
+      return { href: "/profile/complete", label: "Complete Profile" };
     }
-  }, [loading, isLoggedIn, profileComplete, router]);
+    return { href: "/signup", label: "Create Free Profile" };
+  }, [loading, isLoggedIn, profileComplete]);
 
   // Load a small batch of real, recently-created profiles so the landing
   // page showcases actual members (and cards can deep-link to their
@@ -258,29 +259,37 @@ export default function LandingPage() {
               </>
             ) : (
               <>
-                <Link
-                  href="/login"
+                <button
+                  type="button"
+                  onClick={() => openAuthModal("login")}
                   className="text-[var(--color-text-muted)] hover:text-[var(--primary)] transition"
                 >
                   Sign In
-                </Link>
-                <Link href="/signup">
-                  <Button size="sm">Register</Button>
-                </Link>
+                </button>
+                <Button size="sm" onClick={() => openAuthModal("signup")}>Register</Button>
               </>
             )}
           </nav>
-          {/* Mobile: keep a persistent Register CTA next to the hamburger so
-              visitors don't have to open the menu to find signup. */}
+          {/* Mobile sticky primary CTA near the hamburger. */}
           <div className="md:hidden flex items-center gap-1">
-            <Link href="/signup" aria-label="Register">
+            {!loading && isLoggedIn ? (
+              <Link href={primaryCta.href} aria-label={primaryCta.label}>
+                <Button
+                  size="sm"
+                  className="px-3 py-1.5 text-sm rounded-full shadow-sm"
+                >
+                  Continue
+                </Button>
+              </Link>
+            ) : (
               <Button
                 size="sm"
                 className="px-3 py-1.5 text-sm rounded-full shadow-sm"
+                onClick={() => openAuthModal("signup")}
               >
                 Register
               </Button>
-            </Link>
+            )}
             {/*
               Hamburger toggle.
               NOTE: toggle is handled exclusively by the document-level
@@ -320,12 +329,25 @@ export default function LandingPage() {
               </>
             ) : (
               <>
-                <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    openAuthModal("login");
+                  }}
+                  className="text-left"
+                >
                   Sign In
-                </Link>
-                <Link href="/signup" onClick={() => setMobileMenuOpen(false)}>
-                  <Button fullWidth>Register</Button>
-                </Link>
+                </button>
+                <Button
+                  fullWidth
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    openAuthModal("signup");
+                  }}
+                >
+                  Register
+                </Button>
               </>
             )}
           </div>
@@ -353,15 +375,26 @@ export default function LandingPage() {
           <p className="text-lg sm:text-xl md:text-2xl text-white/95 mb-6 sm:mb-8">
             Connect with compatible life partners rooted in shared faith, tradition, and community
           </p>
-          <Link href="/signup">
+          {!loading && isLoggedIn ? (
+            <Link href={primaryCta.href}>
+              <Button
+                size="lg"
+                className="border-0 text-white text-lg px-10 py-4 rounded-full shadow-lg hover:opacity-95 transition-opacity"
+                style={{ background: "var(--gradient-primary)" }}
+              >
+                {primaryCta.label}
+              </Button>
+            </Link>
+          ) : (
             <Button
               size="lg"
+              onClick={() => openAuthModal("signup")}
               className="border-0 text-white text-lg px-10 py-4 rounded-full shadow-lg hover:opacity-95 transition-opacity"
               style={{ background: "var(--gradient-primary)" }}
             >
-              Create Free Profile
+              {primaryCta.label}
             </Button>
-          </Link>
+          )}
         </div>
         <div className="absolute bottom-4 left-0 right-0 text-center text-white/80 text-xs sm:text-sm px-4">
           Built for Lingayat families • Verified profiles • Community-first matchmaking
@@ -532,11 +565,15 @@ export default function LandingPage() {
               <p className="text-[var(--color-text-muted)] mb-6">
                 Lingayat families across Karnataka and India have found compatible partners through our platform. Here are a few of their journeys.
               </p>
-              <Link href="/login">
-                <Button variant="outline" className="rounded-full">
+              {!loading && isLoggedIn ? (
+                <Link href="/home">
+                  <Button variant="outline" className="rounded-full">Go to Dashboard</Button>
+                </Link>
+              ) : (
+                <Button variant="outline" className="rounded-full" onClick={() => openAuthModal("signup")}>
                   Read More Stories
                 </Button>
-              </Link>
+              )}
             </div>
             <div className="lg:w-2/3 overflow-x-auto pb-4 -mx-4 px-4 sm:overflow-visible sm:mx-0 sm:px-0">
               <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">

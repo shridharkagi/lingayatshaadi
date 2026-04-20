@@ -1,27 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Heart, Menu } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAuthModal } from "@/contexts/AuthModalContext";
 
 export function ProfilesPageHeader() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { isLoggedIn, loading } = useAuth();
+  const { openAuthModal } = useAuthModal();
   const showAuthReady = !loading;
-
-  useEffect(() => {
-    const handleClick = (e: Event) => {
-      const target = (e.target as HTMLElement).closest("#profiles-menu-btn");
-      if (target) {
-        e.preventDefault();
-        setMobileMenuOpen((prev) => !prev);
-      }
-    };
-    document.addEventListener("click", handleClick, true);
-    return () => document.removeEventListener("click", handleClick, true);
-  }, []);
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-[var(--color-border)] shadow-[var(--shadow-soft)]">
@@ -59,15 +49,14 @@ export function ProfilesPageHeader() {
             </>
           ) : (
             <>
-              <Link
-                href="/login"
+              <button
+                type="button"
+                onClick={() => openAuthModal("login")}
                 className="text-[var(--color-text-muted)] hover:text-[var(--primary)] transition"
               >
                 Sign In
-              </Link>
-              <Link href="/signup">
-                <Button size="sm">Register</Button>
-              </Link>
+              </button>
+              <Button size="sm" onClick={() => openAuthModal("signup")}>Register</Button>
             </>
           )}
         </nav>
@@ -101,12 +90,25 @@ export function ProfilesPageHeader() {
             </>
           ) : (
             <>
-              <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  openAuthModal("login");
+                }}
+                className="text-left"
+              >
                 Sign In
-              </Link>
-              <Link href="/signup" onClick={() => setMobileMenuOpen(false)}>
-                <Button fullWidth>Register</Button>
-              </Link>
+              </button>
+              <Button
+                fullWidth
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  openAuthModal("signup");
+                }}
+              >
+                Register
+              </Button>
             </>
           )}
         </div>

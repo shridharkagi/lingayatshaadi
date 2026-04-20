@@ -238,8 +238,8 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto pb-10">
-      <header className="bg-[var(--primary)] text-white px-6 py-4 rounded-b-[10px] shadow-md flex items-center justify-between">
+    <div className="max-w-2xl mx-auto pb-10 space-y-4">
+      <header className="bg-[var(--primary)] text-white px-6 py-4 rounded-2xl shadow-sm flex items-center justify-between">
         <h1 className="text-xl font-bold">My Account</h1>
         <Link
           href="/settings"
@@ -250,7 +250,7 @@ export default function AccountPage() {
         </Link>
       </header>
 
-      <div className="px-4 mt-4 space-y-4">
+      <div className="px-0 space-y-4">
         {/* Account-holder basic details */}
         <section className="bg-white rounded-2xl shadow-sm p-5">
           <div className="flex items-start justify-between mb-4">
@@ -418,13 +418,15 @@ export default function AccountPage() {
           )}
         </section>
 
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 p-4 bg-white rounded-2xl shadow-sm text-red-600 font-medium hover:bg-red-50 transition"
-        >
-          <LogOut size={18} />
-          Logout
-        </button>
+        <div className="bg-white rounded-2xl shadow-sm p-3">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 p-3 rounded-xl text-red-600 font-medium hover:bg-red-50 transition"
+          >
+            <LogOut size={18} />
+            Logout
+          </button>
+        </div>
       </div>
 
       {(showRelPicker || editRelProfile) && (

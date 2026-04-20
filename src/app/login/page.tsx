@@ -16,7 +16,14 @@ type LoginMode = "otp" | "password";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { sendPhoneOtp, verifyPhoneOtp, signInWithPhonePassword } = useAuth();
+  const {
+    sendPhoneOtp,
+    verifyPhoneOtp,
+    signInWithPhonePassword,
+    isLoggedIn,
+    profileComplete,
+    loading: authLoading,
+  } = useAuth();
   const [loginMode, setLoginMode] = useState<LoginMode>("otp");
   const [mobile, setMobile] = useState("");
   const [password, setPassword] = useState("");
@@ -40,6 +47,12 @@ export default function LoginPage() {
     document.addEventListener("click", handleClick, true);
     return () => document.removeEventListener("click", handleClick, true);
   }, []);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!isLoggedIn) return;
+    router.replace(profileComplete ? "/home" : "/profile/complete");
+  }, [authLoading, isLoggedIn, profileComplete, router]);
 
   useEffect(() => {
     if (resendIn <= 0) return;

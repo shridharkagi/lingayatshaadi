@@ -7,6 +7,7 @@ import { AppConfigProvider } from "@/contexts/AppConfigContext";
 import { ProfilesProvider } from "@/contexts/ProfilesContext";
 import { ContactFloat } from "@/components/ui/ContactFloat";
 import { ConfigInjector } from "@/components/ConfigInjector";
+import { AuthModalProvider } from "@/contexts/AuthModalContext";
 function getSeoConfig() {
   try {
     const path = join(process.cwd(), "data", "site-config.json");
@@ -93,10 +94,12 @@ export default function RootLayout({
         <AuthProvider>
           <ProfilesProvider>
             <AppConfigProvider>
-              {children}
-              <ContactFloat />
-              <ConfigInjector />
-              <div id="lingayat-external-scripts" suppressHydrationWarning />
+              <AuthModalProvider>
+                {children}
+                <ContactFloat />
+                <ConfigInjector />
+                <div id="lingayat-external-scripts" suppressHydrationWarning />
+              </AuthModalProvider>
             </AppConfigProvider>
           </ProfilesProvider>
         </AuthProvider>
