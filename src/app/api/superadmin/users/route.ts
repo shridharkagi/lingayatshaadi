@@ -3,14 +3,7 @@ import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
 import { computeAccountCodes } from "@/lib/accountCode";
 import { generatePublicIdFromExistingIds } from "@/lib/memberId";
-
-type AuthUserLite = {
-  id: string;
-  email?: string | null;
-  phone?: string | null;
-  created_at?: string | null;
-  user_metadata?: Record<string, unknown> | null;
-};
+import { listAllAuthUsers, type AuthUserLite } from "@/lib/server/authUsers";
 
 type Range = "all" | "today" | "last7" | "last30" | "this_month";
 
@@ -43,16 +36,23 @@ export async function GET(req: NextRequest) {
   const customTo = url.searchParams.get("customTo");
 
   const admin = createSupabaseAdmin();
-  const { data: listed, error: listErr } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  if (listErr) return NextResponse.json({ error: listErr.message }, { status: 500 });
+  let listedUsers: AuthUserLite[] = [];
+  try {
+    listedUsers = await listAllAuthUsers(admin);
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Database error finding users" },
+      { status: 500 }
+    );
+  }
 
-  const allUsersForCodes = (listed.users || []).map((u) => ({
+  const allUsersForCodes = listedUsers.map((u) => ({
     id: u.id,
     created_at: u.created_at,
   }));
   const codeByUser = computeAccountCodes(allUsersForCodes);
 
-  let users = (listed.users || []) as AuthUserLite[];
+  let users = listedUsers;
   const signupFloor = getFloor(signupRange);
   if (signupFloor) {
     users = users.filter((u) => !!u.created_at && new Date(u.created_at).getTime() >= new Date(signupFloor).getTime());
