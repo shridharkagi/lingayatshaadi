@@ -250,8 +250,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-    // `supabase` client and `fetchProfile` are stable for the provider lifetime.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const sendOtp = async (email: string) => {

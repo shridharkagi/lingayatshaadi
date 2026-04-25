@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Heart, SlidersHorizontal, X, Search } from "lucide-react";
+import { SlidersHorizontal, X, Search } from "lucide-react";
 import { ProfilesPageHeader } from "@/components/ProfilesPageHeader";
 import { ProfileCard } from "@/components/ui/ProfileCard";
 import {
@@ -16,6 +16,8 @@ import { useFilteredProfiles } from "@/hooks/useFilteredProfiles";
 import { useAuth } from "@/contexts/AuthContext";
 import { BottomNav } from "@/components/ui/BottomNav";
 import { useAuthModal } from "@/contexts/AuthModalContext";
+import { ViewerForensicWatermark } from "@/components/ViewerForensicWatermark";
+import { SiteFooter } from "@/components/SiteFooter";
 
 const AGE_MIN = 18;
 const AGE_MAX = 60;
@@ -302,35 +304,10 @@ export function ProfilesView({
         </div>
       )}
 
+      {isLoggedIn && <ViewerForensicWatermark />}
+
       {/* Bottom nav (logged in) or footer */}
-      {isLoggedIn ? (
-        <BottomNav />
-      ) : (
-        <footer className="bg-[var(--color-secondary-dark)] text-white py-10 sm:py-12 px-4">
-          <div className="max-w-6xl mx-auto">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4 sm:gap-6 mb-6 sm:mb-8">
-              <Link href="/" className="flex items-center gap-2">
-                <Heart className="w-6 h-6 text-[var(--primary)] fill-[var(--primary)]" />
-                <span className="font-bold text-lg">LingayatShaadi</span>
-              </Link>
-              <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-sm">
-                <Link href="/contact" className="hover:text-[var(--primary)] transition">
-                  Contact Us
-                </Link>
-                <Link href="/privacy" className="hover:text-[var(--primary)] transition">
-                  Privacy Policy
-                </Link>
-                <Link href="/terms" className="hover:text-[var(--primary)] transition">
-                  Terms of Use
-                </Link>
-              </div>
-            </div>
-            <p className="text-center text-sm text-white/70">
-              © {new Date().getFullYear()} LingayatShaadi. All rights reserved.
-            </p>
-          </div>
-        </footer>
-      )}
+      {isLoggedIn ? <BottomNav /> : <SiteFooter />}
     </div>
   );
 }

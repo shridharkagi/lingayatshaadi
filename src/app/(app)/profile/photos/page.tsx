@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { ChevronLeft } from "lucide-react";
 import { PhotoUpload } from "@/components/PhotoUpload";
+import { KycDocumentsUpload } from "@/components/KycDocumentsUpload";
 
 export default function PhotoGalleryPage() {
   const router = useRouter();
@@ -88,6 +89,18 @@ export default function PhotoGalleryPage() {
           userId={userId}
           profileId={user?.id}
         />
+        <div className="pt-4 border-t border-gray-100">
+          <h2 className="text-base font-semibold text-gray-900">KYC Documents</h2>
+          <p className="text-sm text-gray-600 mt-1">
+            You can upload government ID documents here (Aadhar, PAN, Voter ID, etc). You can delete or replace later.
+          </p>
+          <div className="mt-3">
+            <KycDocumentsUpload
+              profileId={user?.id}
+              userId={userId}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

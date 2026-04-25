@@ -69,8 +69,6 @@ export function ContactsEditor({
     if (!value || value.length === 0) {
       onChange(entries);
     }
-    // We only want to push the seed once when the editor first mounts.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const update = (idx: number, patch: Partial<ProfileContact>) => {

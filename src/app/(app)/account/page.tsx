@@ -21,19 +21,17 @@ import {
   Cake,
   BadgeCheck,
   Users,
+  Clock,
 } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/Input";
 import { isSyntheticAuthEmail } from "@/lib/phoneAuth";
+import { adminFetch } from "@/lib/api/adminClient";
 import type { User } from "@supabase/supabase-js";
-import {
-  listProfilesByUserId,
-  deleteProfileById,
-  updateProfileById,
-} from "@/lib/api/profiles";
+import { listProfilesByUserId, updateProfileById } from "@/lib/api/profiles";
 import { deleteDraft } from "@/lib/api/drafts";
-import { getProfileSlug } from "@/lib/memberId";
+import { getMemberIdDisplay, getProfileSlug } from "@/lib/memberId";
 import type { Profile } from "@/types";
 import {
   computeProfileCompletion,
@@ -76,6 +74,17 @@ function managedByFor(rel: RelationshipValue): NonNullable<Profile["managedBy"]>
   if (rel === "self") return "self";
   if (rel === "other") return "guardian";
   return "parent";
+}
+
+function formatMembershipDate(dateLike?: unknown) {
+  if (!dateLike || typeof dateLike !== "string") return "—";
+  const d = new Date(dateLike);
+  if (Number.isNaN(d.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(d);
 }
 
 function pendingAuthEmail(u: User): string | null {
@@ -122,6 +131,23 @@ export default function AccountPage() {
   const [contactEmailErr, setContactEmailErr] = useState("");
   const [contactEmailInfo, setContactEmailInfo] = useState("");
   const [contactEmailCooldown, setContactEmailCooldown] = useState(0);
+  const [membershipHistory, setMembershipHistory] = useState<{
+    subscriptions: Array<Record<string, unknown>>;
+    transactions: Array<Record<string, unknown>>;
+  }>({ subscriptions: [], transactions: [] });
+  const [accountCode, setAccountCode] = useState<string | null>(null);
+  const [pendingDeletionProfileIds, setPendingDeletionProfileIds] = useState<Set<string>>(() => new Set());
+  const [deletionModalProfile, setDeletionModalProfile] = useState<Profile | null>(null);
+  const [deletionReason, setDeletionReason] = useState("");
+  const [deletionSubmitBusy, setDeletionSubmitBusy] = useState(false);
+  const [deletionSubmitErr, setDeletionSubmitErr] = useState("");
+
+  const loadPendingDeletionRequests = useCallback(async () => {
+    const res = await adminFetch("/api/profile-deletion-request");
+    const json = (await res.json()) as { pending?: Array<{ profile_id: string }> };
+    if (!res.ok) return;
+    setPendingDeletionProfileIds(new Set((json.pending || []).map((p) => p.profile_id)));
+  }, []);
 
   const refreshProfiles = useCallback(async () => {
     if (!authUser) return;
@@ -131,19 +157,34 @@ export default function AccountPage() {
     setLoadingProfiles(false);
   }, [authUser]);
 
-  // Split server-returned profiles into (a) abandoned drafts to resume
-  // and (b) profiles the user has actually submitted. A profile is a
-  // draft iff its moderation_status is exactly "draft"; any other status
-  // (pending_review, approved, rejected) is "real". We memoise so we
-  // don't rebuild these arrays on every render.
-  const { drafts, submittedProfiles } = useMemo(() => {
+  const loadMembershipHistory = useCallback(async () => {
+    if (!authUser) return;
+    const res = await adminFetch("/api/subscriptions/history");
+    const json = (await res.json()) as {
+      subscriptions?: Array<Record<string, unknown>>;
+      transactions?: Array<Record<string, unknown>>;
+    };
+    if (!res.ok) return;
+    setMembershipHistory({
+      subscriptions: json.subscriptions || [],
+      transactions: json.transactions || [],
+    });
+  }, [authUser]);
+
+  // Drafts; submitted (active); soft-deleted (admin trash — read-only for members).
+  const { drafts, submittedProfiles, deletedProfiles } = useMemo(() => {
     const d: Profile[] = [];
-    const s: Profile[] = [];
+    const active: Profile[] = [];
+    const del: Profile[] = [];
     for (const p of profiles) {
+      if (p.deletedAt) {
+        del.push(p);
+        continue;
+      }
       if (p.moderationStatus === "draft") d.push(p);
-      else s.push(p);
+      else active.push(p);
     }
-    return { drafts: d, submittedProfiles: s };
+    return { drafts: d, submittedProfiles: active, deletedProfiles: del };
   }, [profiles]);
 
   const handleResumeDraft = (draft: Profile) => {
@@ -180,10 +221,25 @@ export default function AccountPage() {
 
   useEffect(() => {
     if (authUser) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       refreshProfiles();
+      void loadMembershipHistory();
+      void loadPendingDeletionRequests();
     }
-  }, [authUser, refreshProfiles]);
+  }, [authUser, refreshProfiles, loadMembershipHistory, loadPendingDeletionRequests]);
+
+  useEffect(() => {
+    if (!authUser) return;
+    let cancelled = false;
+    (async () => {
+      const res = await adminFetch("/api/account/account-code");
+      const json = (await res.json()) as { accountCode?: string | null; error?: string };
+      if (cancelled || !res.ok) return;
+      setAccountCode(json.accountCode ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authUser]);
 
   const pendingEmailForEffect = authUser ? pendingAuthEmail(authUser) : null;
   useEffect(() => {
@@ -248,14 +304,40 @@ export default function AccountPage() {
     setEditing(false);
   };
 
-  const handleDelete = async (profile: Profile) => {
-    if (!confirm(`Delete profile "${profile.fullName}"? This cannot be undone.`)) return;
-    const { error } = await deleteProfileById(profile.id);
-    if (error) {
-      alert(`Failed to delete: ${error}`);
+  const openDeletionRequestModal = (profile: Profile) => {
+    setDeletionReason("");
+    setDeletionSubmitErr("");
+    setDeletionModalProfile(profile);
+  };
+
+  const submitDeletionRequest = async () => {
+    if (!deletionModalProfile) return;
+    const reason = deletionReason.trim();
+    if (reason.length < 15) {
+      setDeletionSubmitErr("Please enter at least 15 characters explaining why you want this profile removed.");
       return;
     }
-    refreshProfiles();
+    setDeletionSubmitBusy(true);
+    setDeletionSubmitErr("");
+    const res = await adminFetch("/api/profile-deletion-request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profileId: deletionModalProfile.id, reason }),
+    });
+    const json = (await res.json()) as { error?: string };
+    setDeletionSubmitBusy(false);
+    if (!res.ok) {
+      setDeletionSubmitErr(json.error || "Could not submit request");
+      return;
+    }
+    setPendingDeletionProfileIds((prev) => new Set(prev).add(deletionModalProfile.id));
+    setDeletionModalProfile(null);
+    setDeletionReason("");
+    if (typeof window !== "undefined") {
+      window.alert(
+        "Your removal request was sent to our team. The profile will stay visible until an admin approves it."
+      );
+    }
   };
 
   const handleLogout = async () => {
@@ -343,8 +425,11 @@ export default function AccountPage() {
 
   return (
     <div className="max-w-2xl mx-auto pb-10 space-y-4">
-      <header className="bg-[var(--primary)] text-white px-6 py-4 rounded-2xl shadow-sm flex items-center justify-between">
-        <h1 className="text-xl font-bold">My Account</h1>
+      <header className="bg-[var(--primary)] text-white px-6 py-4 rounded-2xl shadow-sm flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/85">LingayatShaadi</p>
+          <h1 className="text-xl font-bold leading-tight">My Account</h1>
+        </div>
         <Link
           href="/settings"
           className="p-2.5 rounded-full bg-white/20 hover:bg-white/30 transition"
@@ -414,6 +499,11 @@ export default function AccountPage() {
           {!editing ? (
             <>
               <dl className="divide-y divide-gray-100 text-sm">
+                <Row
+                  label="Account ID"
+                  value={accountCode || "—"}
+                  sub="Your account reference. Cannot be changed."
+                />
                 <Row label="Full Name" value={accountMeta?.fullName || "—"} />
                 <Row label="Gender" value={accountMeta?.gender ? capitalize(accountMeta.gender) : "—"} />
                 <Row label="City" value={accountMeta?.city || "—"} />
@@ -512,6 +602,15 @@ export default function AccountPage() {
                   100%.
                 </p>
               )}
+              <div className="rounded-xl border border-gray-100 bg-gray-50/90 px-3 py-2.5">
+                <div className="flex items-start justify-between gap-3 text-sm">
+                  <span className="text-gray-500 shrink-0">Account ID</span>
+                  <span className="font-medium text-[var(--foreground)] text-right break-all">
+                    {accountCode || "—"}
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-500 mt-1 text-right">Cannot be changed</p>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
                 <Input
                   label="First Name"
@@ -648,9 +747,9 @@ export default function AccountPage() {
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-semibold text-[var(--foreground)]">My Profiles</h2>
-                {!loadingProfiles && profiles.length > 0 && (
+                {!loadingProfiles && drafts.length + submittedProfiles.length > 0 && (
                   <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-[var(--primary)]/10 text-[var(--primary)]">
-                    {profiles.length}
+                    {drafts.length + submittedProfiles.length}
                   </span>
                 )}
               </div>
@@ -691,10 +790,26 @@ export default function AccountPage() {
                     <ProfileRow
                       key={p.id}
                       profile={p}
-                      onDelete={() => handleDelete(p)}
+                      deletionPending={pendingDeletionProfileIds.has(p.id)}
+                      onRequestDeletion={() => openDeletionRequestModal(p)}
                       onEditRelationship={setEditRelProfile}
                     />
                   ))}
+                </div>
+              )}
+
+              {deletedProfiles.length > 0 && (
+                <div className="mt-6 pt-6 border-t border-gray-100">
+                  <h3 className="text-sm font-semibold text-[var(--foreground)]">Deleted profiles</h3>
+                  <p className="text-xs text-gray-500 mt-1 mb-3 leading-relaxed">
+                    These profiles are no longer on the site. This is for your records only — you cannot edit or
+                    restore them here. Contact support if you need help.
+                  </p>
+                  <div className="space-y-2.5">
+                    {deletedProfiles.map((p) => (
+                      <DeletedProfileRow key={p.id} profile={p} />
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -711,6 +826,67 @@ export default function AccountPage() {
           )}
         </section>
 
+        <section className="bg-white rounded-2xl shadow-sm p-4 sm:p-5 border border-gray-100/80">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 mb-4">
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold text-[var(--foreground)]">Membership History</h2>
+              <p className="text-sm text-gray-500 mt-0.5 leading-snug">
+                All activations, upgrades, and payment records.
+              </p>
+            </div>
+            <Link
+              href="/account/subscriptions"
+              className="shrink-0 w-full sm:w-auto text-center rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold hover:bg-gray-50"
+            >
+              View Timeline
+            </Link>
+          </div>
+          {membershipHistory.subscriptions.length === 0 ? (
+            <div className="rounded-xl bg-gray-50/80 border border-dashed border-gray-200 px-4 py-6 text-center">
+              <p className="text-sm font-medium text-[var(--foreground)]">No membership records yet</p>
+              <p className="text-xs text-gray-500 mt-1.5 max-w-sm mx-auto">
+                When you subscribe or renew, entries will show here. Open the timeline for the full list.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {membershipHistory.subscriptions.slice(0, 10).map((s) => {
+                const txn = membershipHistory.transactions.find(
+                  (t) => String(t.subscription_id || "") === String(s.id || "")
+                );
+                return (
+                  <div
+                    key={String(s.id)}
+                    className="rounded-xl border border-gray-100 p-3.5 sm:p-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm text-[var(--foreground)]">
+                        {String(s.plan_name_snapshot || "Plan")}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {formatMembershipDate(s.starts_at)} – {formatMembershipDate(s.expires_at)}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600 sm:text-right sm:justify-end">
+                      <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-700">
+                        {String(s.status || "active")}
+                      </span>
+                      <span className="font-semibold text-[var(--foreground)]">
+                        ₹{Number(txn?.amount || s.price_snapshot || 0).toLocaleString("en-IN")}
+                      </span>
+                      {txn && (
+                        <span className="text-gray-500 w-full sm:w-auto sm:max-w-[200px] truncate">
+                          {String(txn.payment_mode || "—")}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
         <div className="bg-white rounded-2xl shadow-sm p-3">
           <button
             onClick={handleLogout}
@@ -721,6 +897,66 @@ export default function AccountPage() {
           </button>
         </div>
       </div>
+
+      {deletionModalProfile && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="deletion-request-title"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-xl p-5 space-y-4">
+            <div>
+              <h2 id="deletion-request-title" className="text-lg font-semibold text-[var(--foreground)]">
+                Request profile removal
+              </h2>
+              {deletionModalProfile.fullName && (
+                <p className="text-xs text-gray-500 mt-0.5">Profile: {deletionModalProfile.fullName}</p>
+              )}
+              <p className="text-sm text-gray-600 mt-1">
+                For member safety and accuracy, profile removal requests are handled by our support team. Please
+                share the reason below.
+              </p>
+            </div>
+            <div>
+              <label htmlFor="deletion-reason" className="block text-sm font-medium text-gray-700 mb-1">
+                Reason (required, min. 15 characters)
+              </label>
+              <textarea
+                id="deletion-reason"
+                rows={4}
+                value={deletionReason}
+                onChange={(e) => setDeletionReason(e.target.value)}
+                placeholder="e.g. Created by mistake, member found a match elsewhere, duplicate profile…"
+                className="w-full rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/30 focus:border-[var(--primary)]"
+              />
+            </div>
+            {deletionSubmitErr && <p className="text-sm text-red-600">{deletionSubmitErr}</p>}
+            <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+              <button
+                type="button"
+                disabled={deletionSubmitBusy}
+                onClick={() => {
+                  setDeletionModalProfile(null);
+                  setDeletionReason("");
+                  setDeletionSubmitErr("");
+                }}
+                className="px-4 py-2.5 rounded-xl text-sm font-medium border border-gray-200 text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deletionSubmitBusy || deletionReason.trim().length < 15}
+                onClick={() => void submitDeletionRequest()}
+                className="px-4 py-2.5 rounded-xl text-sm font-medium bg-[var(--primary)] text-white hover:opacity-95 disabled:opacity-50"
+              >
+                {deletionSubmitBusy ? "Sending…" : "Submit request"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {(showRelPicker || editRelProfile) && (
         <RelationshipPickerModal
@@ -821,13 +1057,71 @@ function calculateAge(dob?: string): number | null {
   return age;
 }
 
+function DeletedProfileRow({ profile: p }: { profile: Profile }) {
+  const age = calculateAge(p.dateOfBirth);
+  const removedLabel = p.deletedAt
+    ? new Date(p.deletedAt).toLocaleString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : "—";
+  const memberId = getMemberIdDisplay(p);
+
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50/90">
+      <div className="flex-shrink-0">
+        {p.profilePhoto ? (
+          <Image
+            src={p.profilePhoto}
+            alt={p.fullName || "Profile"}
+            width={48}
+            height={48}
+            unoptimized
+            className="w-12 h-12 rounded-xl object-cover grayscale opacity-80"
+          />
+        ) : (
+          <div className="w-12 h-12 rounded-xl bg-gray-200 flex items-center justify-center text-gray-400">
+            <UserIcon size={22} />
+          </div>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-semibold text-gray-600 truncate">{p.fullName || "Profile"}</span>
+          {p.relationship && (
+            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded bg-gray-200/80 text-gray-600">
+              <Heart size={9} className="fill-gray-500" />
+              {relationshipLabel(p.relationship)}
+            </span>
+          )}
+          <span className="text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded bg-gray-300/80 text-gray-700">
+            Removed
+          </span>
+        </div>
+        <p className="text-xs text-gray-500 mt-0.5 truncate">
+          {age != null ? `${age} yrs · ` : null}
+          ID {memberId} · Removed {removedLabel}
+        </p>
+        {p.deletedReason ? (
+          <p className="text-[11px] text-gray-500 mt-1 line-clamp-2" title={p.deletedReason}>
+            {p.deletedReason}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function ProfileRow({
   profile: p,
-  onDelete,
+  deletionPending,
+  onRequestDeletion,
   onEditRelationship,
 }: {
   profile: Profile;
-  onDelete: () => void;
+  deletionPending: boolean;
+  onRequestDeletion: () => void;
   onEditRelationship: (profile: Profile) => void;
 }) {
   const router = useRouter();
@@ -966,17 +1260,28 @@ function ProfileRow({
       >
         <Pencil size={16} />
       </Link>
-      <button
-        onClick={(e) => {
-          stop(e);
-          onDelete();
-        }}
-        className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition"
-        aria-label="Delete profile"
-        title="Delete profile"
-      >
-        <Trash2 size={16} />
-      </button>
+      {deletionPending ? (
+        <span
+          className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-100"
+          title="Removal request is with our team"
+        >
+          <Clock size={14} className="shrink-0" />
+          Pending review
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={(e) => {
+            stop(e);
+            onRequestDeletion();
+          }}
+          className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition"
+          aria-label="Request profile removal"
+          title="Request removal (admin must approve)"
+        >
+          <Trash2 size={16} />
+        </button>
+      )}
       <span className="hidden sm:inline-flex p-1 rounded text-gray-300 group-hover:text-gray-500">
         <ChevronRight size={18} />
       </span>

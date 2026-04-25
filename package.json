@@ -10,7 +10,8 @@
     "lint": "eslint",
     "analyze": "ANALYZE=true next build",
     "seed:demo": "tsx --env-file=.env.local scripts/seed-superadmin-profiles.ts",
-    "set-password": "tsx --env-file=.env.local scripts/set-password.ts"
+    "set-password": "tsx --env-file=.env.local scripts/set-password.ts",
+    "verify:schema": "tsx --env-file=.env.local scripts/verify-control-center-schema.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.100.1",
@@ -28,6 +29,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }

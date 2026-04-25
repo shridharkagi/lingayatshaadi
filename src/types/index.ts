@@ -121,6 +121,9 @@ export interface Profile {
   role?: "user" | "superadmin";
   createdAt: string;
   updatedAt: string;
+  /** When set, profile was removed (admin trash). Shown to owner as read-only “deleted” info only. */
+  deletedAt?: string | null;
+  deletedReason?: string | null;
   // Partner preferences (stored with profile)
   partnerPreference?: PartnerPreference;
   /**

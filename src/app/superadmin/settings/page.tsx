@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAppConfig } from "@/contexts/AppConfigContext";
+import { adminFetch } from "@/lib/api/adminClient";
 
 export default function SuperAdminSettingsPage() {
   const { config, updateConfig } = useAppConfig();
@@ -41,7 +42,7 @@ export default function SuperAdminSettingsPage() {
   }, [config.externalScripts]);
 
   useEffect(() => {
-    fetch("/api/site-config")
+    adminFetch("/api/site-config")
       .then((r) => r.json())
       .then((data) => {
         setRobotsTxt(data.robotsTxt || "User-agent: *\nAllow: /");
@@ -66,7 +67,7 @@ export default function SuperAdminSettingsPage() {
   const handleSaveSeo = async () => {
     setSavingSeo(true);
     try {
-      const res = await fetch("/api/site-config", {
+      const res = await adminFetch("/api/site-config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ robotsTxt, seoDescription, seoKeywords }),
@@ -91,7 +92,7 @@ export default function SuperAdminSettingsPage() {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">Support Email</label>
-          <input type="email" defaultValue="support@lingayatshaadi.com" className="mt-1 w-full px-4 py-2 border rounded-lg" />
+          <input type="email" defaultValue="LingayatShaadi@gmail.com" className="mt-1 w-full px-4 py-2 border rounded-lg" />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">Contact – Call Number</label>

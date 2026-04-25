@@ -1,6 +1,15 @@
-import { createSupabaseClient, createSupabaseClientSafe } from "@/lib/supabase";
+import { createSupabaseClientSafe } from "@/lib/supabase";
 import { fromProfileRow, type ProfileRow } from "@/lib/profileMapper";
 import type { Profile, ProfilePhoto } from "@/types";
+async function getAuthHeader(): Promise<Record<string, string>> {
+  const supabase = createSupabaseClientSafe();
+  if (!supabase) return {};
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 /**
  * Admin-only moderation API (Batch 5B).
@@ -172,55 +181,15 @@ export async function approveProfile(
   reviewerId: string
 ): Promise<{ error: string | null }> {
   try {
-    const supabase = createSupabaseClient();
-    const { data: row, error: fetchError } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", profileId)
-      .maybeSingle();
-    if (fetchError) return { error: fetchError.message };
-    if (!row) return { error: "Profile not found" };
-
-    // Strip fields that should NOT live inside the snapshot itself — the
-    // approval-metadata and the snapshot column. Everything else (the
-    // actual profile content) goes in so public reads see the exact
-    // moment-in-time body that was approved.
-    const snapshot = { ...(row as Record<string, unknown>) };
-    delete snapshot.approved_snapshot;
-
-    const { error: updateError } = await supabase
-      .from("profiles")
-      .update({
-        moderation_status: "approved",
-        approved_snapshot: snapshot,
-        approved_at: new Date().toISOString(),
-        rejection_reason: null,
-        reviewed_by: reviewerId,
-      })
-      .eq("id", profileId);
-    if (updateError) return { error: updateError.message };
-
-    // Cascade: any `pending` photos attached to this profile are approved
-    // along with the profile itself — a profile approval implicitly covers
-    // everything it contains. Admins can still review / revoke individual
-    // photos later from the photos tab. Failures here are logged but
-    // non-fatal so the profile approval isn't silently reverted.
-    const { error: photosError } = await supabase
-      .from("profile_photos")
-      .update({
-        status: "approved",
-        reviewed_at: new Date().toISOString(),
-        reviewed_by: reviewerId,
-      })
-      .eq("profile_id", profileId)
-      .eq("status", "pending");
-    if (photosError) {
-      console.warn(
-        "[moderation.approveProfile] profile approved but photo cascade failed:",
-        photosError
-      );
-    }
-    return { error: null };
+    void reviewerId;
+    const headers = await getAuthHeader();
+    const res = await fetch("/api/superadmin/moderation/profile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({ profileId, action: "approve" }),
+    });
+    const json = (await res.json()) as { error?: string };
+    return { error: res.ok ? null : json.error || "Failed to approve profile" };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Failed to approve profile" };
   }
@@ -237,16 +206,15 @@ export async function rejectProfile(
   reason: string
 ): Promise<{ error: string | null }> {
   try {
-    const supabase = createSupabaseClient();
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        moderation_status: "rejected",
-        rejection_reason: reason || null,
-        reviewed_by: reviewerId,
-      })
-      .eq("id", profileId);
-    return { error: error?.message ?? null };
+    void reviewerId;
+    const headers = await getAuthHeader();
+    const res = await fetch("/api/superadmin/moderation/profile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({ profileId, action: "reject", reason }),
+    });
+    const json = (await res.json()) as { error?: string };
+    return { error: res.ok ? null : json.error || "Failed to reject profile" };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Failed to reject profile" };
   }

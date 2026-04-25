@@ -1,22 +1,22 @@
 import { createSupabaseClientSafe } from "@/lib/supabase";
+import { adminFetch } from "@/lib/api/adminClient";
 
 /** Record that viewer viewed contact details of viewedProfile */
 export async function recordContactView(
   viewerProfileId: string,
   viewedProfileId: string
-): Promise<{ error: string | null }> {
+): Promise<{ error: string | null; code?: string }> {
   if (viewerProfileId === viewedProfileId) return { error: null };
 
   try {
-    const supabase = createSupabaseClientSafe();
-    if (!supabase) return { error: "Supabase not configured" };
-
-    await supabase.from("contact_views").upsert(
-      { viewer_id: viewerProfileId, viewed_id: viewedProfileId, viewed_at: new Date().toISOString() },
-      { onConflict: "viewer_id,viewed_id" }
-    );
-
-    return { error: null };
+    const res = await adminFetch("/api/contact-views/record", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ viewerProfileId, viewedProfileId }),
+    });
+    const json = (await res.json()) as { error?: string; code?: string };
+    if (!res.ok) return { error: json.error || "Failed to record contact view", code: json.code };
+    return { error: null, code: json.code };
   } catch (err) {
     return {
       error: err instanceof Error ? err.message : "Failed to record contact view",

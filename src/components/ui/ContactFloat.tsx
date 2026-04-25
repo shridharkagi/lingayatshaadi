@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Phone, MessageCircle, Users2, X } from "lucide-react";
-import { useAppConfig } from "@/contexts/AppConfigContext";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Phone, Users2, X } from "lucide-react";
+import { useAppConfig } from "@/contexts/AppConfigContext";
+import { WhatsAppBrandIcon } from "@/components/icons/WhatsAppBrandIcon";
 
 export function ContactFloat() {
   const { config } = useAppConfig();
@@ -18,9 +19,7 @@ export function ContactFloat() {
 
   // Hide on message/chat pages to avoid overlapping with message input
   const isMessagePage = pathname && pathname.startsWith("/messages/");
-
-  if (!hasCall && !hasWhatsApp && !hasWhatsAppGroup) return null;
-  if (isMessagePage) return null;
+  const shouldHide = (!hasCall && !hasWhatsApp && !hasWhatsAppGroup) || Boolean(isMessagePage);
 
   const whatsappNumber = config.whatsappContactNumber?.replace(/\D/g, "");
 
@@ -60,6 +59,8 @@ export function ContactFloat() {
     return () => document.removeEventListener("click", handleClick, true);
   }, []);
 
+  if (shouldHide) return null;
+
   return (
     <>
       <button
@@ -84,7 +85,7 @@ export function ContactFloat() {
         >
           <div
             data-contact-popup-content
-            className="w-full max-w-sm bg-white rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden"
+            className="w-full max-w-sm bg-white rounded-2xl shadow-xl overflow-hidden mb-[max(1rem,env(safe-area-inset-bottom,0px))] sm:mb-0"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-4 border-b border-[var(--color-border)]">
@@ -101,7 +102,10 @@ export function ContactFloat() {
                 <X size={20} />
               </button>
             </div>
-            <div className="p-4 flex flex-col gap-3">
+            <p className="px-4 pt-3 pb-1 text-sm text-[var(--color-text-muted)] leading-snug">
+              Need help with matches, memberships, or profile support? Contact our team now.
+            </p>
+            <div className="p-4 pt-2 flex flex-col gap-3">
               {hasCall && (
                 <Link
                   href={`tel:${config.callContactNumber}`}
@@ -126,7 +130,7 @@ export function ContactFloat() {
                   className="flex items-center gap-3 p-4 rounded-xl bg-[var(--color-bg)] hover:bg-[var(--color-border)]/50 transition-colors border border-[var(--color-border)]/50"
                 >
                   <div className="flex items-center justify-center w-12 h-12 rounded-full bg-[#25D366] text-white flex-shrink-0">
-                    <MessageCircle size={22} />
+                    <WhatsAppBrandIcon className="w-7 h-7" />
                   </div>
                   <div className="flex-1 text-left">
                     <span className="font-medium text-[var(--color-text-primary)]">WhatsApp Us</span>

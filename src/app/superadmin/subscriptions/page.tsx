@@ -1,107 +1,716 @@
 "use client";
 
-import { useState } from "react";
-import { Pencil } from "lucide-react";
-import { useEffectivePlans } from "@/hooks/useEffectivePlans";
-import { useAppConfig } from "@/contexts/AppConfigContext";
-import { PlanEditModal } from "@/components/PlanEditModal";
-import type { MembershipPlan } from "@/types";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { adminFetch } from "@/lib/api/adminClient";
+
+type Plan = {
+  id: string;
+  code: string;
+  name: string;
+  duration_days: number;
+  price: number;
+  currency: string;
+  total_contact_views: number;
+  daily_contact_view_limit: number;
+  is_active: boolean;
+  activeSubscribers?: number;
+};
+type SubscriptionsByPlanRow = {
+  planId: string;
+  planName: string;
+  activeCount: number;
+  catalogPlanId: string | null;
+};
+type RecentSubscriptionRow = {
+  id: string;
+  planName: string;
+  status: string;
+  startsAt: string | null;
+  expiresAt: string | null;
+  createdAt: string | null;
+  memberLabel: string;
+  userLinkId: string;
+};
+type UpgradeRequest = {
+  id: string;
+  user_id: string;
+  plan_name: string;
+  plan_code?: string;
+  plan_price: number;
+  callback_number: string;
+  note?: string;
+  status: "new" | "contacted" | "closed";
+  email_notification_status?: string;
+  email_notification_error?: string;
+  whatsapp_notification_status?: string;
+  whatsapp_notification_error?: string;
+  created_at: string;
+  member_account_code?: string | null;
+  member_full_name?: string | null;
+};
+type UserLookup = {
+  userId: string | null;
+  profileId: string | null;
+  publicId: string | null;
+  fullName: string;
+  contact: string | null;
+  accountCode?: string | null;
+};
+
+function addDays(yyyyMmDd: string, days: number): string {
+  const base = new Date(`${yyyyMmDd}T00:00:00Z`);
+  if (Number.isNaN(base.getTime())) return "";
+  base.setUTCDate(base.getUTCDate() + days);
+  return base.toISOString().slice(0, 10);
+}
 
 export default function SuperAdminSubscriptionsPage() {
-  const { config, updateConfig } = useAppConfig();
-  const effectivePlans = useEffectivePlans();
-  const enabledPlanIds = config.enabledPlanIds ?? ["p0", "p1", "p2", "p3"];
-  const [editingPlan, setEditingPlan] = useState<MembershipPlan | null>(null);
+  const [overview, setOverview] = useState<Record<string, unknown> | null>(null);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [upgradeRequests, setUpgradeRequests] = useState<UpgradeRequest[]>([]);
+  const [busyPlanCode, setBusyPlanCode] = useState<string | null>(null);
+  const [resolvingUser, setResolvingUser] = useState(false);
+  const [resolvedUser, setResolvedUser] = useState<UserLookup | null>(null);
+  const [userCandidates, setUserCandidates] = useState<UserLookup[]>([]);
+  const [expiresEdited, setExpiresEdited] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+  const [form, setForm] = useState({
+    userQuery: "",
+    userId: "",
+    profileId: "",
+    planId: "",
+    paymentMode: "other",
+    paymentModeDetails: "",
+    payerSource: "",
+    paymentMadeAt: new Date().toISOString().slice(0, 10),
+    startImmediately: true,
+    startsAt: new Date().toISOString().slice(0, 10),
+    expiresAt: "",
+    amount: "",
+    transactionId: "",
+    receiptRef: "",
+    note: "",
+    overrideTotalContactViews: "",
+    overrideDailyContactViewLimit: "",
+  });
 
-  const togglePlan = (planId: string) => {
-    const isEnabled = enabledPlanIds.includes(planId);
-    const next = isEnabled
-      ? enabledPlanIds.filter((id) => id !== planId)
-      : [...enabledPlanIds, planId];
-    updateConfig({ enabledPlanIds: next });
+  const load = async () => {
+    setError(null);
+    const [ovRes, planRes, reqRes] = await Promise.all([
+      adminFetch("/api/superadmin/subscriptions/overview"),
+      adminFetch("/api/superadmin/subscriptions/plans"),
+      adminFetch("/api/superadmin/subscriptions/upgrade-requests"),
+    ]);
+    const ovJson = (await ovRes.json()) as Record<string, unknown>;
+    const planJson = (await planRes.json()) as { plans?: Plan[]; error?: string };
+    const reqJson = (await reqRes.json()) as { requests?: UpgradeRequest[]; error?: string };
+    if (!ovRes.ok) setError(String(ovJson.error || "Failed to load overview"));
+    if (!planRes.ok) setError(planJson.error || "Failed to load plans");
+    if (!reqRes.ok) setError(reqJson.error || "Failed to load upgrade requests");
+    setOverview(ovRes.ok ? ovJson : null);
+    const basePlans = planJson.plans || [];
+    if (ovRes.ok && Array.isArray(ovJson.plans)) {
+      const countById = new Map(
+        (ovJson.plans as Array<{ id?: string; activeSubscribers?: number }>).map((p) => [
+          String(p.id || ""),
+          Number(p.activeSubscribers || 0),
+        ])
+      );
+      setPlans(basePlans.map((p) => ({ ...p, activeSubscribers: countById.get(p.id) ?? 0 })));
+    } else {
+      setPlans(basePlans);
+    }
+    setUpgradeRequests(reqJson?.requests || []);
   };
 
-  const handleSaveOverride = (planId: string, override: Partial<MembershipPlan> | null) => {
-    const overrides = { ...(config.planOverrides ?? {}) };
-    if (override === null) {
-      delete overrides[planId];
-    } else {
-      overrides[planId] = override;
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const selectedPlan = useMemo(
+    () => plans.find((p) => p.id === form.planId),
+    [plans, form.planId]
+  );
+
+  useEffect(() => {
+    if (!selectedPlan) return;
+    const startDate = form.startImmediately ? new Date().toISOString().slice(0, 10) : form.startsAt;
+    const amount = Number(selectedPlan.price || 0);
+    const isFree = amount <= 0;
+    setForm((prev) => ({
+      ...prev,
+      amount: String(amount),
+      startsAt: prev.startsAt || startDate,
+      expiresAt: expiresEdited ? prev.expiresAt : addDays(prev.startsAt || startDate, Number(selectedPlan.duration_days || 0)),
+      paymentMode: isFree ? "free_auto" : prev.paymentMode === "free_auto" ? "other" : prev.paymentMode,
+      transactionId:
+        isFree && !prev.transactionId
+          ? `FREE-${prev.userId || "user"}-${Date.now().toString(36).toUpperCase()}`
+          : prev.transactionId,
+      overrideTotalContactViews: prev.overrideTotalContactViews || String(selectedPlan.total_contact_views || 0),
+      overrideDailyContactViewLimit:
+        prev.overrideDailyContactViewLimit || String(selectedPlan.daily_contact_view_limit || 0),
+    }));
+  }, [selectedPlan, form.startImmediately, expiresEdited]);
+
+  useEffect(() => {
+    if (!selectedPlan) return;
+    if (expiresEdited) return;
+    setForm((prev) => ({
+      ...prev,
+      expiresAt: addDays(prev.startsAt, Number(selectedPlan.duration_days || 0)),
+    }));
+  }, [form.startsAt, selectedPlan, expiresEdited]);
+
+  /** Returns the chosen profile row, or null. Updates UI state like before. */
+  const resolveUser = async (queryRaw: string): Promise<UserLookup | null> => {
+    const query = queryRaw.trim();
+    if (!query) {
+      setResolvedUser(null);
+      setUserCandidates([]);
+      return null;
     }
-    updateConfig({ planOverrides: overrides });
+    setResolvingUser(true);
+    try {
+      const res = await adminFetch(`/api/superadmin/subscriptions/user-lookup?q=${encodeURIComponent(query)}`);
+      let json: { users?: UserLookup[]; error?: string };
+      try {
+        json = (await res.json()) as { users?: UserLookup[]; error?: string };
+      } catch {
+        setError("Invalid response from user lookup.");
+        setResolvedUser(null);
+        setUserCandidates([]);
+        return null;
+      }
+      if (!res.ok) {
+        setError(json.error || "Failed to resolve user");
+        setResolvedUser(null);
+        setUserCandidates([]);
+        return null;
+      }
+      const users = json.users || [];
+      setUserCandidates(users);
+      const exact = users.find(
+        (u) =>
+          (u.publicId || "").toLowerCase() === query.toLowerCase() ||
+          (u.userId || "").toLowerCase() === query.toLowerCase()
+      );
+      const chosen = exact || users[0] || null;
+      setResolvedUser(chosen);
+      setForm((prev) => ({
+        ...prev,
+        userId: chosen?.userId || "",
+        profileId: chosen?.profileId || prev.profileId,
+        payerSource: prev.payerSource || chosen?.contact || "",
+      }));
+      return chosen;
+    } finally {
+      setResolvingUser(false);
+    }
+  };
+
+  const assignManual = async () => {
+    setError(null);
+    setAssigning(true);
+    try {
+      let userId = form.userId.trim();
+      let profileId = form.profileId.trim();
+      if (!userId && form.userQuery.trim()) {
+        const chosen = await resolveUser(form.userQuery);
+        userId = (chosen?.userId || "").trim();
+        profileId = (chosen?.profileId || profileId).trim();
+      }
+      if (!userId) {
+        setError("Please enter a valid Member/User ID. Tab out of the field or wait for the name to appear, then try again.");
+        return;
+      }
+      if (!form.planId) {
+        setError("Please select a plan.");
+        return;
+      }
+      const res = await adminFetch("/api/superadmin/subscriptions/assign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          profileId: profileId || undefined,
+          planId: form.planId,
+          paymentMode: form.paymentMode || undefined,
+          paymentModeDetails: form.paymentModeDetails || undefined,
+          payerSource: form.payerSource || undefined,
+          paymentMadeAt: form.paymentMadeAt ? `${form.paymentMadeAt}T00:00:00.000Z` : undefined,
+          startsAt: form.startsAt ? `${form.startsAt}T00:00:00.000Z` : undefined,
+          expiresAt: form.expiresAt ? `${form.expiresAt}T00:00:00.000Z` : undefined,
+          startImmediately: form.startImmediately,
+          amount: Number(form.amount || 0),
+          transactionId: form.transactionId || undefined,
+          receiptRef: form.receiptRef || undefined,
+          note: form.note || undefined,
+          overrideTotalContactViews: Number(form.overrideTotalContactViews || 0),
+          overrideDailyContactViewLimit: Number(form.overrideDailyContactViewLimit || 0),
+        }),
+      });
+      let json: { error?: string };
+      try {
+        json = (await res.json()) as { error?: string };
+      } catch {
+        setError(`Assignment failed (${res.status}). The server did not return JSON.`);
+        return;
+      }
+      if (!res.ok) {
+        setError(json.error || "Failed to assign subscription");
+        return;
+      }
+      setForm({
+        userQuery: "",
+        userId: "",
+        profileId: "",
+        planId: "",
+        paymentMode: "other",
+        paymentModeDetails: "",
+        payerSource: "",
+        paymentMadeAt: new Date().toISOString().slice(0, 10),
+        startImmediately: true,
+        startsAt: new Date().toISOString().slice(0, 10),
+        expiresAt: "",
+        amount: "",
+        transactionId: "",
+        receiptRef: "",
+        note: "",
+        overrideTotalContactViews: "",
+        overrideDailyContactViewLimit: "",
+      });
+      setResolvedUser(null);
+      setUserCandidates([]);
+      setExpiresEdited(false);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Assignment request failed");
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  const savePlan = async (plan: Plan) => {
+    setBusyPlanCode(plan.code);
+    const res = await adminFetch("/api/superadmin/subscriptions/plans", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: plan.id,
+        code: plan.code,
+        name: plan.name,
+        durationDays: Number(plan.duration_days || 0),
+        price: Number(plan.price || 0),
+        currency: plan.currency || "INR",
+        totalContactViews: Number(plan.total_contact_views || 0),
+        dailyContactViewLimit: Number(plan.daily_contact_view_limit || 0),
+        isActive: plan.is_active,
+        features: [],
+      }),
+    });
+    const json = (await res.json()) as { error?: string };
+    if (!res.ok) setError(json.error || `Failed to update ${plan.name}`);
+    await load();
+    setBusyPlanCode(null);
+  };
+
+  const totals = useMemo(
+    () =>
+      (overview?.totals as { activeSubscriptions?: number; expiringIn7Days?: number; totalCollected?: number } | undefined) ||
+      {},
+    [overview]
+  );
+  const subscriptionsByPlan = useMemo(
+    () => (overview?.subscriptionsByPlan as SubscriptionsByPlanRow[] | undefined) || [],
+    [overview]
+  );
+  const recentSubscriptions = useMemo(
+    () => (overview?.recentSubscriptions as RecentSubscriptionRow[] | undefined) || [],
+    [overview]
+  );
+  const fmtIn = (iso?: string | null) =>
+    iso ? new Date(iso).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "—";
+
+  const updateUpgradeStatus = async (id: string, status: UpgradeRequest["status"]) => {
+    const res = await adminFetch("/api/superadmin/subscriptions/upgrade-requests", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, status }),
+    });
+    const json = (await res.json()) as { error?: string };
+    if (!res.ok) setError(json.error || "Failed to update request");
+    else await load();
   };
 
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900">Subscriptions</h1>
-      <p className="text-gray-500 mt-1">Manage membership plans and control which plans are live</p>
+      <p className="text-gray-500 mt-1">Manual subscription assignment and plan controls</p>
+      <p className="text-sm text-gray-600 mt-2">
+        To see which accounts have a plan and how much they have paid in total, open{" "}
+        <Link href="/superadmin/users" className="text-[var(--primary)] font-medium underline">
+          Users (Account Owners)
+        </Link>
+        — columns <span className="font-medium">Current plan</span> and <span className="font-medium">Total paid</span>.
+      </p>
+      {error && <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+      <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="rounded-xl border bg-white p-4">
+          <p className="text-xs text-gray-500">Active subscriptions</p>
+          <p className="text-2xl font-bold">{totals.activeSubscriptions || 0}</p>
+        </div>
+        <div className="rounded-xl border bg-white p-4">
+          <p className="text-xs text-gray-500">Expiring in 7 days</p>
+          <p className="text-2xl font-bold">{totals.expiringIn7Days || 0}</p>
+        </div>
+        <div className="rounded-xl border bg-white p-4">
+          <p className="text-xs text-gray-500">Collected payments</p>
+          <p className="text-2xl font-bold">Rs {Number(totals.totalCollected || 0).toLocaleString()}</p>
+        </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="rounded-xl border bg-white p-5">
+          <h2 className="text-lg font-semibold text-gray-900">Active members by plan</h2>
+          <p className="text-xs text-gray-500 mt-1">
+            Counts from <code className="text-[11px]">user_subscriptions</code> (raw plan ids). Legacy membership plan ids are
+            shown separately when they differ from catalog UUIDs.
+          </p>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b text-left text-gray-500">
+                  <th className="py-2 pr-2">Plan</th>
+                  <th className="py-2 pr-2">Active</th>
+                  <th className="py-2">Catalog link</th>
+                </tr>
+              </thead>
+              <tbody>
+                {subscriptionsByPlan.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="py-4 text-gray-500">
+                      No active subscriptions.
+                    </td>
+                  </tr>
+                ) : (
+                  subscriptionsByPlan.map((row) => (
+                    <tr key={row.planId} className="border-b border-gray-100">
+                      <td className="py-2 pr-2 font-medium text-gray-900">{row.planName}</td>
+                      <td className="py-2 pr-2">{row.activeCount}</td>
+                      <td className="py-2 text-gray-500">
+                        {row.catalogPlanId ? (
+                          <span className="text-emerald-700">Maps to catalog</span>
+                        ) : (
+                          <span>Legacy / other id</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="rounded-xl border bg-white p-5">
+          <h2 className="text-lg font-semibold text-gray-900">Recent subscriptions</h2>
+          <p className="text-xs text-gray-500 mt-1">Latest rows by created time (up to 25).</p>
+          <div className="mt-3 overflow-x-auto max-h-[320px] overflow-y-auto">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-white border-b text-left text-gray-500">
+                <tr>
+                  <th className="py-2 pr-2">Member</th>
+                  <th className="py-2 pr-2">Plan</th>
+                  <th className="py-2 pr-2">Status</th>
+                  <th className="py-2">Ends</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentSubscriptions.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-4 text-gray-500">
+                      No subscription rows yet.
+                    </td>
+                  </tr>
+                ) : (
+                  recentSubscriptions.map((r) => (
+                    <tr key={r.id} className="border-b border-gray-100 align-top">
+                      <td className="py-2 pr-2">
+                        <span className="text-gray-900">{r.memberLabel}</span>
+                      </td>
+                      <td className="py-2 pr-2">{r.planName}</td>
+                      <td className="py-2 pr-2 capitalize">{r.status}</td>
+                      <td className="py-2 whitespace-nowrap">{fmtIn(r.expiresAt)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {effectivePlans.map((plan) => {
-          const isEnabled = enabledPlanIds.includes(plan.id);
+        {plans.map((plan) => {
           return (
-            <div
-              key={plan.id}
-              className={`bg-white rounded-xl shadow-sm p-6 border-2 transition ${
-                isEnabled ? "border-[var(--primary)]" : "border-gray-200 opacity-75"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h3 className="font-semibold text-gray-900">{plan.name}</h3>
-                  {plan.isFree && (
-                    <span className="inline-block mt-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded">
-                      Free
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEditingPlan(plan)}
-                    className="p-2 rounded-lg hover:bg-gray-100 text-gray-600"
-                    title="Edit plan"
-                  >
-                    <Pencil size={18} />
-                  </button>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={isEnabled}
-                    onClick={() => togglePlan(plan.id)}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2 ${
-                      isEnabled ? "bg-[var(--primary)]" : "bg-gray-200"
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
-                        isEnabled ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
+            <div key={String(plan.id)} className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+              <input
+                value={plan.name}
+                onChange={(e) =>
+                  setPlans((prev) =>
+                    prev.map((p) => (p.id === plan.id ? { ...p, name: e.target.value } : p))
+                  )
+                }
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 font-semibold text-gray-900"
+              />
+              <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                <label className="text-gray-600">
+                  Price
+                  <input
+                    type="number"
+                    value={plan.price}
+                    onChange={(e) =>
+                      setPlans((prev) =>
+                        prev.map((p) => (p.id === plan.id ? { ...p, price: Number(e.target.value || 0) } : p))
+                      )
+                    }
+                    className="mt-1 w-full rounded-lg border border-gray-200 px-2 py-1.5"
+                  />
+                </label>
+                <label className="text-gray-600">
+                  Days
+                  <input
+                    type="number"
+                    value={plan.duration_days}
+                    onChange={(e) =>
+                      setPlans((prev) =>
+                        prev.map((p) =>
+                          p.id === plan.id ? { ...p, duration_days: Number(e.target.value || 0) } : p
+                        )
+                      )
+                    }
+                    className="mt-1 w-full rounded-lg border border-gray-200 px-2 py-1.5"
+                  />
+                </label>
+                <label className="text-gray-600">
+                  Total views
+                  <input
+                    type="number"
+                    value={plan.total_contact_views}
+                    onChange={(e) =>
+                      setPlans((prev) =>
+                        prev.map((p) =>
+                          p.id === plan.id ? { ...p, total_contact_views: Number(e.target.value || 0) } : p
+                        )
+                      )
+                    }
+                    className="mt-1 w-full rounded-lg border border-gray-200 px-2 py-1.5"
+                  />
+                </label>
+                <label className="text-gray-600">
+                  Daily limit
+                  <input
+                    type="number"
+                    value={plan.daily_contact_view_limit}
+                    onChange={(e) =>
+                      setPlans((prev) =>
+                        prev.map((p) =>
+                          p.id === plan.id
+                            ? { ...p, daily_contact_view_limit: Number(e.target.value || 0) }
+                            : p
+                        )
+                      )
+                    }
+                    className="mt-1 w-full rounded-lg border border-gray-200 px-2 py-1.5"
+                  />
+                </label>
               </div>
-              <p className="text-2xl font-bold text-[var(--primary)] mt-2">
-                {plan.price === 0 ? "Free" : `₹${plan.price}`}
+              <label className="mt-3 flex items-center gap-2 text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={plan.is_active}
+                  onChange={(e) =>
+                    setPlans((prev) =>
+                      prev.map((p) => (p.id === plan.id ? { ...p, is_active: e.target.checked } : p))
+                    )
+                  }
+                />
+                Visible for new users
+              </label>
+              <p className="mt-2 text-xs text-gray-600">
+                <span className="font-semibold text-gray-800">Active members (catalog):</span>{" "}
+                {Number(plan.activeSubscribers ?? 0)}
               </p>
-              <p className="text-sm text-gray-500">/{plan.duration} month(s)</p>
-              <p className="text-sm text-gray-500 mt-4">~45 active subscribers</p>
-              <p className={`text-xs font-medium mt-2 ${isEnabled ? "text-green-600" : "text-gray-400"}`}>
-                {isEnabled ? "Live" : "Hidden"}
-              </p>
+              <button
+                onClick={() => savePlan(plan)}
+                className="mt-4 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-50"
+              >
+                {busyPlanCode === plan.code ? "Saving..." : "Save Plan"}
+              </button>
             </div>
           );
         })}
       </div>
-
-      {editingPlan && (
-        <PlanEditModal
-          plan={editingPlan}
-          onSave={(override) => {
-            handleSaveOverride(editingPlan.id, override);
-          }}
-          onClose={() => setEditingPlan(null)}
-        />
-      )}
+      <div className="mt-8 rounded-xl border bg-white p-6">
+        <h2 className="text-lg font-semibold">Manual assignment (offline payments)</h2>
+        <p className="text-sm text-gray-500 mt-1">Collect payment offline and activate plan with transaction details.</p>
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <input
+              value={form.userQuery}
+              placeholder="Member/User ID (ex: U26045 / LS...)"
+              onChange={(e) => setForm((s) => ({ ...s, userQuery: e.target.value }))}
+              onBlur={() => {
+                void resolveUser(form.userQuery);
+              }}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            />
+            <input
+              value={resolvedUser ? `${resolvedUser.fullName}${resolvedUser.publicId ? ` (${resolvedUser.publicId})` : ""}` : resolvingUser ? "Resolving..." : ""}
+              placeholder="Name auto-populates"
+              readOnly
+              className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
+            />
+            {resolvedUser && (
+              <p className="text-xs text-gray-500 md:col-span-2">
+                Resolved user: {resolvedUser.fullName}
+                {resolvedUser.accountCode ? ` | ${resolvedUser.accountCode}` : ""}
+                {resolvedUser.publicId ? ` | ${resolvedUser.publicId}` : ""}
+              </p>
+            )}
+            {userCandidates.length > 1 && (
+              <select
+                value={resolvedUser?.profileId || ""}
+                onChange={(e) => {
+                  const chosen = userCandidates.find((u) => u.profileId === e.target.value) || null;
+                  setResolvedUser(chosen);
+                  setForm((s) => ({
+                    ...s,
+                    userId: chosen?.userId || "",
+                    profileId: chosen?.profileId || "",
+                  }));
+                }}
+                className="rounded-lg border border-gray-200 px-3 py-2 text-sm md:col-span-2"
+              >
+                {userCandidates.map((u) => (
+                  <option key={String(u.profileId)} value={String(u.profileId || "")}>
+                    {u.fullName} {u.publicId ? `(${u.publicId})` : ""}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+          <select value={form.planId} onChange={(e) => setForm((s) => ({ ...s, planId: e.target.value }))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm">
+            <option value="">Select plan</option>
+            {plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <select value={form.paymentMode} onChange={(e) => setForm((s) => ({ ...s, paymentMode: e.target.value }))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm">
+            <option value="phonepe">PhonePe</option>
+            <option value="gpay">G-Pay</option>
+            <option value="bank_transfer">Bank transfer</option>
+            <option value="check">Check</option>
+            <option value="cash">Cash</option>
+            <option value="other">Other</option>
+            <option value="free_auto">Free Auto</option>
+          </select>
+          <input value={form.paymentModeDetails} placeholder="other payment details" onChange={(e) => setForm((s) => ({ ...s, paymentModeDetails: e.target.value }))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          <input value={form.payerSource} placeholder="payment made from number/account" onChange={(e) => setForm((s) => ({ ...s, payerSource: e.target.value }))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          <input type="date" value={form.paymentMadeAt} onChange={(e) => setForm((s) => ({ ...s, paymentMadeAt: e.target.value }))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <input type="checkbox" checked={form.startImmediately} onChange={(e) => setForm((s) => ({ ...s, startImmediately: e.target.checked }))} />
+            Start immediately
+          </label>
+          <input
+            type="date"
+            value={form.startsAt}
+            onChange={(e) => setForm((s) => ({ ...s, startsAt: e.target.value }))}
+            className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          />
+          <input
+            type="date"
+            value={form.expiresAt}
+            onChange={(e) => {
+              setExpiresEdited(true);
+              setForm((s) => ({ ...s, expiresAt: e.target.value }));
+            }}
+            className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          />
+          <input value={form.amount} placeholder="amount" onChange={(e) => setForm((s) => ({ ...s, amount: e.target.value }))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          <input value={form.transactionId} placeholder="transactionId" onChange={(e) => setForm((s) => ({ ...s, transactionId: e.target.value }))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          <input value={form.receiptRef} placeholder="receiptRef" onChange={(e) => setForm((s) => ({ ...s, receiptRef: e.target.value }))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          <input value={form.overrideTotalContactViews} placeholder="allowed total contacts" onChange={(e) => setForm((s) => ({ ...s, overrideTotalContactViews: e.target.value }))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          <input value={form.overrideDailyContactViewLimit} placeholder="allowed daily contacts" onChange={(e) => setForm((s) => ({ ...s, overrideDailyContactViewLimit: e.target.value }))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          <input value={form.note} placeholder="note" onChange={(e) => setForm((s) => ({ ...s, note: e.target.value }))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm md:col-span-2" />
+        </div>
+        <button
+          type="button"
+          onClick={() => void assignManual()}
+          disabled={assigning || resolvingUser}
+          className="mt-4 rounded-lg bg-[var(--primary)] px-4 py-2 text-white text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {assigning ? "Assigning…" : "Assign subscription"}
+        </button>
+      </div>
+      <div className="mt-8 rounded-xl border bg-white p-6">
+        <h2 className="text-lg font-semibold">Upgrade Requests</h2>
+        <p className="text-sm text-gray-500 mt-1">Requests submitted from membership page.</p>
+        <div className="mt-4 space-y-3">
+          {upgradeRequests.length === 0 ? (
+            <p className="text-sm text-gray-500">No upgrade requests yet.</p>
+          ) : (
+            upgradeRequests.map((r) => (
+              <div key={r.id} className="rounded-lg border border-gray-200 p-3">
+                <p className="text-sm font-semibold text-gray-900">
+                  {r.plan_name} (₹{Number(r.plan_price || 0)})
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  User: {r.member_account_code || r.user_id.slice(0, 8) + "…"} | {r.member_full_name || "—"} |
+                  Callback: {r.callback_number}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Requested: {new Date(r.created_at).toLocaleString("en-IN")}
+                </p>
+                {r.note && <p className="text-xs text-gray-600 mt-1">Note: {r.note}</p>}
+                <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+                  <span className={`rounded-full px-2 py-0.5 ${
+                    r.email_notification_status === "sent" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+                  }`}>
+                    Email: {r.email_notification_status || "pending"}
+                  </span>
+                  <span className={`rounded-full px-2 py-0.5 ${
+                    r.whatsapp_notification_status === "sent" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+                  }`}>
+                    WhatsApp: {r.whatsapp_notification_status || "pending"}
+                  </span>
+                </div>
+                {r.email_notification_error && (
+                  <p className="text-[11px] text-amber-700 mt-1">Email error: {r.email_notification_error}</p>
+                )}
+                {r.whatsapp_notification_error && (
+                  <p className="text-[11px] text-amber-700 mt-1">WhatsApp error: {r.whatsapp_notification_error}</p>
+                )}
+                <div className="mt-2 flex gap-2">
+                  {(["new", "contacted", "closed"] as const).map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => updateUpgradeStatus(r.id, s)}
+                      className={`rounded-md px-2.5 py-1 text-xs font-medium border ${
+                        r.status === s
+                          ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                          : "bg-white text-gray-600 border-gray-200"
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -3,6 +3,14 @@
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, Mail, Phone } from "lucide-react";
+import { WhatsAppBrandIcon } from "@/components/icons/WhatsAppBrandIcon";
+import {
+  SUPPORT_EMAIL,
+  SUPPORT_PHONE_DISPLAY,
+  SUPPORT_WHATSAPP_DISPLAY,
+  supportTelHref,
+  supportWhatsAppHref,
+} from "@/lib/support";
 
 export default function HelpPage() {
   const router = useRouter();
@@ -20,18 +28,32 @@ export default function HelpPage() {
         <div className="bg-white rounded-2xl p-4 shadow-sm">
           <h3 className="font-semibold text-[var(--foreground)] mb-2">Contact Us</h3>
           <div className="space-y-3">
-            <a href="mailto:support@lingayatshaadi.com" className="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
               <Mail size={20} className="text-[var(--primary)]" />
               <div>
                 <p className="font-medium">Email</p>
-                <p className="text-sm text-gray-500">support@lingayatshaadi.com</p>
+                <p className="text-sm text-gray-500">{SUPPORT_EMAIL}</p>
               </div>
             </a>
-            <a href="tel:+919876543210" className="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
+            <a href={supportTelHref()} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
               <Phone size={20} className="text-[var(--primary)]" />
               <div>
                 <p className="font-medium">Phone</p>
-                <p className="text-sm text-gray-500">+91 98765 43210</p>
+                <p className="text-sm text-gray-500">{SUPPORT_PHONE_DISPLAY}</p>
+              </div>
+            </a>
+            <a
+              href={supportWhatsAppHref()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 p-3 rounded-xl bg-gray-50"
+            >
+              <span className="text-[#25D366] flex items-center justify-center">
+                <WhatsAppBrandIcon className="w-6 h-6" />
+              </span>
+              <div>
+                <p className="font-medium">WhatsApp</p>
+                <p className="text-sm text-gray-500">{SUPPORT_WHATSAPP_DISPLAY}</p>
               </div>
             </a>
           </div>

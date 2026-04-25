@@ -1,5 +1,14 @@
 import { createSupabaseClient, createSupabaseClientSafe } from "@/lib/supabase";
 import type { ProfilePhoto } from "@/types";
+async function getAuthHeader(): Promise<Record<string, string>> {
+  const supabase = createSupabaseClientSafe();
+  if (!supabase) return {};
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 /**
  * Per-photo moderation API (Batch 5).
@@ -247,16 +256,15 @@ export async function approvePhoto(
   reviewerId: string
 ): Promise<{ error: string | null }> {
   try {
-    const supabase = createSupabaseClient();
-    const { error } = await supabase
-      .from("profile_photos")
-      .update({
-        status: "approved",
-        reviewed_at: new Date().toISOString(),
-        reviewed_by: reviewerId,
-      })
-      .eq("id", photoId);
-    return { error: error?.message ?? null };
+    void reviewerId;
+    const headers = await getAuthHeader();
+    const res = await fetch("/api/superadmin/moderation/photo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({ photoId, action: "approve" }),
+    });
+    const json = (await res.json()) as { error?: string };
+    return { error: res.ok ? null : json.error || "Failed to approve" };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Failed to approve" };
   }
@@ -273,17 +281,15 @@ export async function rejectPhoto(
   reason?: string
 ): Promise<{ error: string | null }> {
   try {
-    const supabase = createSupabaseClient();
-    const { error } = await supabase
-      .from("profile_photos")
-      .update({
-        status: "rejected",
-        rejection_reason: reason ?? null,
-        reviewed_at: new Date().toISOString(),
-        reviewed_by: reviewerId,
-      })
-      .eq("id", photoId);
-    return { error: error?.message ?? null };
+    void reviewerId;
+    const headers = await getAuthHeader();
+    const res = await fetch("/api/superadmin/moderation/photo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({ photoId, action: "reject", reason }),
+    });
+    const json = (await res.json()) as { error?: string };
+    return { error: res.ok ? null : json.error || "Failed to reject" };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Failed to reject" };
   }

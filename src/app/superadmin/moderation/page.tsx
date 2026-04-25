@@ -7,7 +7,6 @@ import {
   Check,
   X as XIcon,
   Clock,
-  AlertTriangle,
   RefreshCw,
   ExternalLink,
   Star,
@@ -95,7 +94,7 @@ function computeProfileDiff(current: Profile, prev: Profile | null): FieldDiff[]
 type Tab = "profiles" | "photos";
 
 export default function ModerationQueuePage() {
-  const { authUser, user } = useAuth();
+  const { authUser } = useAuth();
   const [tab, setTab] = useState<Tab>("profiles");
   const [pendingProfiles, setPendingProfiles] = useState<Profile[]>([]);
   const [pendingPhotos, setPendingPhotos] = useState<ProfilePhoto[]>([]);
@@ -109,7 +108,6 @@ export default function ModerationQueuePage() {
   const [error, setError] = useState<string | null>(null);
 
   const reviewerId = authUser?.id ?? "";
-  const isAdmin = user?.role === "superadmin";
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -129,22 +127,6 @@ export default function ModerationQueuePage() {
   useEffect(() => {
     refresh();
   }, [refresh]);
-
-  // Role check fallback. The superadmin layout should already gate access
-  // but we render a sane "not authorised" UI if something slips through.
-  if (!isAdmin) {
-    return (
-      <div className="bg-white rounded-xl shadow-sm p-8 text-center">
-        <AlertTriangle size={40} className="mx-auto text-amber-500" />
-        <h2 className="mt-3 text-xl font-semibold text-gray-900">
-          Admin access required
-        </h2>
-        <p className="mt-1 text-sm text-gray-500">
-          You need super-admin role to view the moderation queue.
-        </p>
-      </div>
-    );
-  }
 
   return (
     <div>

@@ -2,9 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 import "./globals.css";
+import { getPublicSiteUrl } from "@/lib/siteUrl";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AppConfigProvider } from "@/contexts/AppConfigContext";
-import { ProfilesProvider } from "@/contexts/ProfilesContext";
 import { ContactFloat } from "@/components/ui/ContactFloat";
 import { ConfigInjector } from "@/components/ConfigInjector";
 import { AuthModalProvider } from "@/contexts/AuthModalContext";
@@ -28,9 +28,10 @@ function getSeoConfig() {
 }
 
 const seo = getSeoConfig();
+const siteUrl = getPublicSiteUrl();
 
 export const metadata: Metadata = {
-  title: "LingayatShaadi - Find Your Perfect Match",
+  title: "LingayatShaadi.in — Find your Lingayat match",
   description: seo.description,
   keywords: seo.keywords,
   authors: [{ name: "LingayatShaadi" }],
@@ -43,27 +44,27 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: "website",
-    locale: "en_US",
-    url: "https://test.ligayatshaadi.in",
-    siteName: "LingayatShaadi",
-    title: "LingayatShaadi - Find Your Perfect Match",
+    locale: "en_IN",
+    url: siteUrl,
+    siteName: "LingayatShaadi.in",
+    title: "LingayatShaadi.in — Find your Lingayat match",
     description: seo.description,
     images: [
       {
-        url: "/og-image.jpg",
+        url: "/opengraph-image",
         width: 1200,
         height: 630,
-        alt: "LingayatShaadi - Premium Matrimonial Platform",
+        alt: "LingayatShaadi — Lingayat matrimony",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "LingayatShaadi - Find Your Perfect Match",
+    title: "LingayatShaadi.in — Find your Lingayat match",
     description: seo.description,
-    images: ["/og-image.jpg"],
+    images: ["/opengraph-image"],
   },
-  metadataBase: new URL("https://test.ligayatshaadi.in"),
+  metadataBase: new URL(siteUrl),
   robots: {
     index: true,
     follow: true,
@@ -92,16 +93,14 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased min-h-screen">
         <AuthProvider>
-          <ProfilesProvider>
-            <AppConfigProvider>
-              <AuthModalProvider>
-                {children}
-                <ContactFloat />
-                <ConfigInjector />
-                <div id="lingayat-external-scripts" suppressHydrationWarning />
-              </AuthModalProvider>
-            </AppConfigProvider>
-          </ProfilesProvider>
+          <AppConfigProvider>
+            <AuthModalProvider>
+              {children}
+              <ContactFloat />
+              <ConfigInjector />
+              <div id="lingayat-external-scripts" suppressHydrationWarning />
+            </AuthModalProvider>
+          </AppConfigProvider>
         </AuthProvider>
       </body>
     </html>

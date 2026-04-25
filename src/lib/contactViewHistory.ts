@@ -31,23 +31,24 @@ export function loadContactViewHistory(): ContactView[] {
 export async function trackContactViewToDb(
   viewerProfileId: string,
   profile: Profile
-): Promise<void> {
+): Promise<{ error: string | null; code?: string }> {
   try {
     const { recordContactView } = await import("@/lib/api/contactViews");
-    await recordContactView(viewerProfileId, profile.id);
+    return await recordContactView(viewerProfileId, profile.id);
   } catch {
-    // ignore
+    return { error: "Failed to record contact view" };
   }
 }
 
 /**
  * Track a contact view (localStorage + optional DB)
  */
-export function trackContactView(profile: Profile, viewerProfileId?: string): void {
-  if (typeof window === 'undefined') return;
+export async function trackContactView(profile: Profile, viewerProfileId?: string): Promise<{ error: string | null; code?: string }> {
+  if (typeof window === 'undefined') return { error: null };
 
   if (viewerProfileId) {
-    trackContactViewToDb(viewerProfileId, profile);
+    const dbRes = await trackContactViewToDb(viewerProfileId, profile);
+    if (dbRes.error) return dbRes;
   }
   
   const contactView: ContactView = {
@@ -88,6 +89,7 @@ export function trackContactView(profile: Profile, viewerProfileId?: string): vo
     const trimmedViews = existingViews.slice(0, MAX_HISTORY_ITEMS);
     saveContactViewHistory(trimmedViews);
   }
+  return { error: null };
 }
 
 /**

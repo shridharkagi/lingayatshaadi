@@ -28,7 +28,7 @@ export default function SettingsPage() {
             <span className="flex-1 font-medium">View my profile</span>
             <ChevronRight size={20} className="text-gray-400" />
           </Link>
-          <Link href="/profile/edit" className="flex items-center gap-3 p-4 border-b border-[var(--border)]">
+          <Link href="/account" className="flex items-center gap-3 p-4 border-b border-[var(--border)]">
             <User size={20} className="text-gray-500" />
             <span className="flex-1 font-medium">Account Settings</span>
             <ChevronRight size={20} className="text-gray-400" />

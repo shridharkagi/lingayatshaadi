@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
+import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
 
 const CONFIG_PATH = join(process.cwd(), "data", "site-config.json");
 
@@ -15,12 +16,20 @@ function readConfig() {
   return { robotsTxt: "User-agent: *\nAllow: /", seoDescription: "", seoKeywords: "" };
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await requireSuperAdmin(request);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
   const config = readConfig();
   return NextResponse.json(config);
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireSuperAdmin(request);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
   try {
     const body = await request.json();
     const dir = join(process.cwd(), "data");

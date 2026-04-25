@@ -353,7 +353,8 @@ export async function getProfileByPublicId(publicId: string): Promise<{ data: Pr
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
-      .eq("public_id", publicId)
+      .or(`public_id.eq.${publicId},member_id.eq.${publicId}`)
+      .is("deleted_at", null)
       .maybeSingle();
 
     if (error) return { data: null, error: error.message };
@@ -382,6 +383,7 @@ export async function searchProfiles(
     const supabase = createSupabaseClientSafe();
     if (!supabase) return { data: [], error: "Supabase not configured" };
     let query = supabase.from("profiles").select("*");
+    query = query.is("deleted_at", null);
 
     if (filters.gender) query = query.eq("gender", filters.gender);
     if (filters.city) query = query.ilike("city", `%${filters.city}%`);

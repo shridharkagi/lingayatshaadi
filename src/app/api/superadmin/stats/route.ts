@@ -27,13 +27,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { createSupabaseAdmin } from "@/lib/supabase";
-
-const SUPER_ADMIN_PHONE = (process.env.SUPER_ADMIN_PHONE || "9844497002").replace(
-  /\D/g,
-  ""
-);
+import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
 
 interface RangeFilter {
   from?: string; // inclusive ISO date YYYY-MM-DD
@@ -95,62 +90,6 @@ function toTimestampBounds(range: RangeFilter): { fromTs?: string; toTs?: string
   return { fromTs, toTs };
 }
 
-async function authenticate(req: NextRequest): Promise<{ ok: true; userId: string } | { ok: false; status: number; error: string }> {
-  const authHeader = req.headers.get("authorization") || "";
-  const match = authHeader.match(/^Bearer\s+(.+)$/i);
-  if (!match) {
-    return { ok: false, status: 401, error: "Missing Authorization: Bearer <token>" };
-  }
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anon) {
-    return { ok: false, status: 500, error: "Supabase env not configured" };
-  }
-  const anonClient = createClient(url, anon, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const { data: userData, error: userErr } = await anonClient.auth.getUser(match[1]);
-  if (userErr || !userData.user) {
-    return { ok: false, status: 401, error: userErr?.message || "Invalid token" };
-  }
-  const user = userData.user;
-
-  // Allow super-admins via any of:
-  //   1. auth.users.phone matches SUPER_ADMIN_PHONE
-  //   2. auth.users.email matches the synthetic email for SUPER_ADMIN_PHONE
-  //      (phone-OTP signup uses `phone_<digits>@phone.otp.lingayatshaadi`).
-  //      Needed because some legacy rows have phone=NULL even though they were
-  //      registered with the super-admin number.
-  //   3. profiles.role = 'superadmin' for this user.
-  const phoneDigits = (user.phone || "").replace(/\D/g, "");
-  const isPhoneAdmin = !!phoneDigits && phoneDigits.endsWith(SUPER_ADMIN_PHONE);
-  const email = (user.email || "").toLowerCase();
-  const isEmailAdmin =
-    email === `phone_${SUPER_ADMIN_PHONE}@phone.otp.lingayatshaadi` ||
-    email.includes(SUPER_ADMIN_PHONE);
-
-  if (isPhoneAdmin || isEmailAdmin) return { ok: true, userId: user.id };
-
-  try {
-    const admin = createSupabaseAdmin();
-    const { data: prof, error: pErr } = await admin
-      .from("profiles")
-      .select("id, role")
-      .eq("user_id", user.id)
-      .eq("role", "superadmin")
-      .limit(1)
-      .maybeSingle();
-    if (pErr) {
-      // RLS shouldn't apply to admin client. If it errored, treat as forbidden.
-      console.warn("[stats] role lookup error:", pErr.message);
-    }
-    if (prof) return { ok: true, userId: user.id };
-  } catch (e) {
-    console.warn("[stats] role lookup threw:", e);
-  }
-  return { ok: false, status: 403, error: "Forbidden: super admin only" };
-}
-
 async function countAuthSignups(fromTs?: string, toTs?: string): Promise<number> {
   // auth.admin.listUsers doesn't accept a date filter, so we paginate and
   // filter in memory. Up to 20k users (20 pages × 1000) — fine for now.
@@ -177,7 +116,7 @@ async function countAuthSignups(fromTs?: string, toTs?: string): Promise<number>
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = await authenticate(req);
+    const auth = await requireSuperAdmin(req);
     if (!auth.ok) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
@@ -187,18 +126,28 @@ export async function GET(req: NextRequest) {
 
     const admin = createSupabaseAdmin();
 
-    // Fetch only the columns we need for in-memory aggregation. PostgREST
-    // doesn't support multi-group counts in one round trip, so we pull a
-    // narrow projection and aggregate here. At ~10k profiles this is well
-    // under 1MB on the wire.
-    let q = admin
+    // Aggregate scan: narrow columns, no ORDER BY (avoids full-table sort).
+    // Recent registrations: small ordered slice in parallel with signups + aggregate.
+    let aggQ = admin
       .from("profiles")
-      .select(
-        "id, public_id, full_name, gender, profile_status, verified, profile_type, relationship, created_at, profile_photo"
-      );
-    if (fromTs) q = q.gte("created_at", fromTs);
-    if (toTs) q = q.lt("created_at", toTs);
-    const { data: rows, error } = await q.order("created_at", { ascending: false });
+      .select("id, gender, profile_status, verified, profile_type, relationship");
+    if (fromTs) aggQ = aggQ.gte("created_at", fromTs);
+    if (toTs) aggQ = aggQ.lt("created_at", toTs);
+
+    let recentQ = admin
+      .from("profiles")
+      .select("id, public_id, full_name, gender, profile_photo, created_at");
+    if (fromTs) recentQ = recentQ.gte("created_at", fromTs);
+    if (toTs) recentQ = recentQ.lt("created_at", toTs);
+    recentQ = recentQ.order("created_at", { ascending: false }).limit(6);
+
+    const [signups, aggRes, recentRes] = await Promise.all([
+      countAuthSignups(fromTs, toTs),
+      aggQ,
+      recentQ,
+    ]);
+
+    const { data: rows, error } = aggRes;
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -245,7 +194,8 @@ export async function GET(req: NextRequest) {
       result.relationship[rel] = (result.relationship[rel] || 0) + 1;
     }
 
-    result.recent = (rows || []).slice(0, 6).map((r) => {
+    const recentSource = !recentRes.error && recentRes.data ? recentRes.data : [];
+    result.recent = recentSource.slice(0, 6).map((r) => {
       const row = r as Record<string, unknown>;
       return {
         id: String(row.id),
@@ -257,7 +207,7 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    result.signups = await countAuthSignups(fromTs, toTs);
+    result.signups = signups;
 
     return NextResponse.json(result);
   } catch (err) {

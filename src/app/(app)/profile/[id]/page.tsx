@@ -55,7 +55,12 @@ import {
   wordCount,
   formatDateDDMMYYYY,
 } from "@/lib/profileUtils";
-import { getProfileSlug, parseProfileSlug, getMemberIdDisplay } from "@/lib/memberId";
+import {
+  getProfileSlug,
+  parseProfileSlug,
+  getMemberIdDisplay,
+  profileMatchesCanonicalPublicId,
+} from "@/lib/memberId";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAppConfig } from "@/contexts/AppConfigContext";
 import { useAuthModal } from "@/contexts/AuthModalContext";
@@ -64,16 +69,24 @@ import { HobbyTag } from "@/components/ui/HobbyTag";
 import { LanguageTag } from "@/components/ui/LanguageTag";
 import { ProfileCard } from "@/components/ui/ProfileCard";
 import { ContactsList } from "@/components/ui/ContactsList";
+import { ViewerForensicWatermark } from "@/components/ViewerForensicWatermark";
 import { Profile } from "@/types";
 import { trackContactView } from "@/lib/contactViewHistory";
 import { hasMeaningfulPreferences } from "@/lib/partnerPreferenceDefaults";
 import { computeProfileCompletion } from "@/lib/profileCompletion";
+import { buildProfileSeoTitle } from "@/lib/profileSeo";
+
+/** Session-only: user dismissed the confidential-use strip for this browser session. */
+const CONFIDENTIAL_STRIP_SESSION_KEY = "profile_confidential_notice_dismiss";
 
 function ShareProfileButton({ profile }: { profile: Profile }) {
   const handleShare = async () => {
-    const url = typeof window !== "undefined" ? `${window.location.origin}/profile/${getProfileSlug(profile)}` : "";
-    const title = `${profile.fullName} - LingayatShaadi Profile`;
-    const text = `Check out ${profile.fullName}'s profile on LingayatShaadi`;
+    const url =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/profile/${getProfileSlug(profile)}`
+        : "";
+    const title = buildProfileSeoTitle(profile);
+    const text = url ? `${title}\n${url}` : title;
 
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
@@ -198,6 +211,9 @@ export default function OtherProfilePage() {
   const [reporting, setReporting] = useState(false);
   const [copiedMemberId, setCopiedMemberId] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+  const [stripNoticeDismissed, setStripNoticeDismissed] = useState(false);
+  const [stripNoticeAutoHidden, setStripNoticeAutoHidden] = useState(false);
+  const [contactHintVisible, setContactHintVisible] = useState(true);
 
   const showToast = useCallback((msg: string, type: "success" | "error" = "success") => {
     setToast({ msg, type });
@@ -216,10 +232,7 @@ export default function OtherProfilePage() {
 
   const profileFromContext = useMemo(() => {
     if (lookupPublicId) {
-      return profiles.find(
-        (p) =>
-          (p.publicId || p.memberId || "").toUpperCase().replace(/-/g, "") === lookupPublicId.replace(/-/g, "")
-      );
+      return profiles.find((p) => profileMatchesCanonicalPublicId(p, lookupPublicId));
     }
     return profiles.find((p) => p.id === displayedSlug);
   }, [profiles, displayedSlug, lookupPublicId]);
@@ -232,9 +245,7 @@ export default function OtherProfilePage() {
   // unchanged.
   const rawProfile =
     profileFromContext ||
-    (fallbackProfile &&
-    lookupPublicId &&
-    (fallbackProfile.publicId || "").toUpperCase() === lookupPublicId
+    (fallbackProfile && lookupPublicId && profileMatchesCanonicalPublicId(fallbackProfile, lookupPublicId)
       ? fallbackProfile
       : undefined);
 
@@ -264,17 +275,24 @@ export default function OtherProfilePage() {
     return snapshot ?? undefined;
   })();
 
+  const profileHiddenPendingPublic =
+    !!rawProfile &&
+    !profile &&
+    !isOwnerViewer &&
+    !viewerIsAdmin;
+
   // If the profile isn't in the in-memory context (e.g. visitor or RLS / pagination
   // hides it), fetch it directly by public id so the page never falsely shows
   // "Profile not found" on the first navigation.
   useEffect(() => {
+    setFallbackProfile(null);
+  }, [lookupPublicId]);
+
+  useEffect(() => {
     if (profileFromContext) return;
     if (profilesLoading && profiles.length === 0) return;
     if (!lookupPublicId) return;
-    if (
-      fallbackProfile &&
-      (fallbackProfile.publicId || "").toUpperCase() === lookupPublicId
-    ) {
+    if (fallbackProfile && profileMatchesCanonicalPublicId(fallbackProfile, lookupPublicId)) {
       return;
     }
     let cancelled = false;
@@ -312,12 +330,90 @@ export default function OtherProfilePage() {
     setShowContact(false);
   }, [profile?.id]);
 
+  useEffect(() => {
+    const lock = showContact && isLoggedIn;
+    if (!lock) return;
+    const scrollY = window.scrollY;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevBodyPosition = document.body.style.position;
+    const prevBodyTop = document.body.style.top;
+    const prevBodyWidth = document.body.style.width;
+    const prevOverscroll = document.body.style.overscrollBehavior;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    document.body.style.overscrollBehavior = "none";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+    return () => {
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.overflow = prevBodyOverflow;
+      document.body.style.overscrollBehavior = prevOverscroll;
+      document.body.style.position = prevBodyPosition;
+      document.body.style.top = prevBodyTop;
+      document.body.style.width = prevBodyWidth;
+      window.scrollTo(0, scrollY);
+    };
+  }, [showContact, isLoggedIn]);
+
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(CONFIDENTIAL_STRIP_SESSION_KEY) === "1") {
+        setStripNoticeDismissed(true);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn || !actorId || !profile?.id || actorId === profile.id) return;
+    setStripNoticeAutoHidden(false);
+  }, [profile?.id, isLoggedIn, actorId]);
+
+  useEffect(() => {
+    if (!isLoggedIn || !actorId || !profile?.id || actorId === profile.id) return;
+    if (stripNoticeDismissed || stripNoticeAutoHidden) return;
+    const t = window.setTimeout(() => setStripNoticeAutoHidden(true), 10000);
+    return () => clearTimeout(t);
+  }, [profile?.id, isLoggedIn, actorId, stripNoticeDismissed, stripNoticeAutoHidden]);
+
+  useEffect(() => {
+    if (showContact && isLoggedIn) setContactHintVisible(true);
+  }, [showContact, isLoggedIn]);
+
+  const dismissConfidentialStrip = useCallback(() => {
+    try {
+      sessionStorage.setItem(CONFIDENTIAL_STRIP_SESSION_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+    setStripNoticeDismissed(true);
+  }, []);
+
   // Record profile view when logged-in user views another profile
   useEffect(() => {
     if (actorId && profile?.id && actorId !== profile.id) {
       recordProfileView(actorId, profile.id);
     }
   }, [actorId, profile?.id]);
+
+  const toggleContactDetails = useCallback(() => {
+    if (!profile) return;
+    if (showContact) {
+      setShowContact(false);
+      return;
+    }
+    setShowContact(true);
+    void (async () => {
+      const res = await trackContactView(profile, actorId || undefined);
+      if (res.error) {
+        setShowContact(false);
+        showToast(res.error, "error");
+      }
+    })();
+  }, [showContact, profile, actorId, showToast]);
 
   // Fetch interest status and shortlist when profile or user changes
   useEffect(() => {
@@ -681,6 +777,20 @@ export default function OtherProfilePage() {
         </div>
       );
     }
+    if (profileHiddenPendingPublic) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center max-w-md mx-auto">
+          <p className="text-[var(--foreground)] font-medium text-lg mb-2">Profile not available yet</p>
+          <p className="text-sm text-gray-600 mb-6">
+            This member profile is still under admin review or has no published version. Check back later, or browse
+            other profiles from Search or Brides / Grooms.
+          </p>
+          <Link href="/home" className="text-[var(--primary)] font-medium underline">
+            Go home
+          </Link>
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p>Profile not found</p>
@@ -708,6 +818,10 @@ export default function OtherProfilePage() {
     ...(profile.photos || []).filter((p) => p !== profile.profilePhoto),
   ];
   const hasMultiplePhotos = allPhotos.length > 1;
+  const contactSheetOpen = showContact && isLoggedIn;
+  const showForensicOverlay = !!(isLoggedIn && actorId && profile.id && actorId !== profile.id);
+  const showConfidentialBanner =
+    showForensicOverlay && !stripNoticeDismissed && !stripNoticeAutoHidden;
 
   // Owner/admin-only banner that surfaces the moderation status. Public
   // viewers never see these since they're rendering from the approved
@@ -771,8 +885,42 @@ export default function OtherProfilePage() {
   })();
 
   return (
-    <div className="w-full max-w-[1800px] mx-auto pb-6 px-1 sm:px-2 lg:px-2 xl:px-3">
+    <div
+      className={`w-full max-w-[1800px] mx-auto px-3 sm:px-2 lg:px-2 xl:px-3${showForensicOverlay ? " pb-20" : " pb-6"}`}
+    >
       {moderationBanner}
+      {showForensicOverlay && <ViewerForensicWatermark />}
+      {showConfidentialBanner && (
+        <div className="mx-0 sm:mx-2 mt-1 flex gap-2 items-start rounded-2xl bg-amber-50/90 border border-amber-100 px-3 py-2.5 text-[11px] sm:text-xs text-amber-950 leading-snug">
+          <div className="flex-1 min-w-0">
+            <span>Member details are confidential — for your matrimonial search only. Misuse may lead to suspension. </span>
+            <Link href="/terms" className="underline font-medium text-[var(--primary)]">
+              Terms
+            </Link>
+            <span> · </span>
+            <Link href="/privacy" className="underline font-medium text-[var(--primary)]">
+              Privacy
+            </Link>
+            <span> · </span>
+            <button
+              type="button"
+              className="underline font-medium text-[var(--primary)]"
+              onClick={() => setShowReportModal(true)}
+            >
+              Report misuse
+            </button>
+            <span> · Profile views may be logged for safety.</span>
+          </div>
+          <button
+            type="button"
+            onClick={dismissConfidentialStrip}
+            className="flex-shrink-0 p-1 rounded-lg hover:bg-amber-200/60 text-amber-900/80"
+            aria-label="Hide notice for this session"
+          >
+            <X size={18} strokeWidth={2} />
+          </button>
+        </div>
+      )}
       {showGallery && hasMultiplePhotos && (
         <div
           className="fixed inset-0 z-50 bg-black flex flex-col"
@@ -881,7 +1029,7 @@ export default function OtherProfilePage() {
           </div>
         </div>
       )}
-      <header className="sticky top-0 bg-white/95 backdrop-blur border-b border-[var(--border)] px-3 sm:px-4 py-3 flex items-center justify-between z-10 rounded-b-xl">
+      <header className="sticky top-0 bg-white/95 backdrop-blur border-b border-[var(--border)] px-3 sm:px-4 py-3 flex items-center justify-between z-10 rounded-b-2xl">
         <button
           onClick={() => router.back()}
           className="flex items-center gap-2 px-3 py-2 -ml-2 rounded-xl hover:bg-gray-100 transition-colors font-medium text-[var(--foreground)]"
@@ -892,9 +1040,9 @@ export default function OtherProfilePage() {
         
         {/* Profile navigation indicator */}
         {currentIdx >= 0 && profiles.length > 1 && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500">
-              {currentIdx + 1} of {profiles.length}
+          <div className="flex flex-col items-center gap-1 min-w-0 flex-1 px-2">
+            <span className="text-xs sm:text-sm font-semibold text-[var(--primary)] tracking-tight truncate max-w-[11rem] sm:max-w-none">
+              LingayatShaadi
             </span>
             <div className="flex gap-1">
               {profiles.slice(Math.max(0, currentIdx - 2), Math.min(profiles.length, currentIdx + 3)).map((_, i) => {
@@ -920,12 +1068,12 @@ export default function OtherProfilePage() {
       <div className="lg:grid lg:grid-cols-[minmax(340px,40%)_minmax(0,60%)] lg:gap-3 xl:gap-4 lg:items-start">
       <div className="space-y-3 lg:sticky lg:top-[84px]">
       <div
-        className="relative w-full isolate contain-layout overflow-hidden rounded-[14px]"
+        className="relative w-full isolate contain-layout overflow-hidden rounded-2xl"
         style={{ perspective: 1100, WebkitPerspective: 1100 }}
       >
         <div
           ref={swipeCardRef}
-          className="relative z-[1] overflow-hidden rounded-[12px] select-none touch-pan-y"
+          className="relative z-[1] overflow-hidden rounded-t-2xl rounded-b-none select-none touch-pan-y"
           style={{
             // Prefer native vertical scroll; horizontal profile swipe is handled in JS after axis lock.
             touchAction: "pan-y",
@@ -955,7 +1103,7 @@ export default function OtherProfilePage() {
           {profiles.length > 1 && currentIdx >= 0 && (
             <>
               <div
-                className="pointer-events-none absolute inset-0 z-[6] rounded-[12px] bg-gradient-to-l from-[var(--primary)]/45 to-transparent"
+                className="pointer-events-none absolute inset-0 z-[6] rounded-t-2xl rounded-b-none bg-gradient-to-l from-[var(--primary)]/45 to-transparent"
                 style={{
                   opacity: swipeOffset < -8 ? swipeMotion.hint * 0.55 : 0,
                   transition: "opacity 0.08s ease-out",
@@ -963,14 +1111,14 @@ export default function OtherProfilePage() {
                 aria-hidden
               />
               <div
-                className="pointer-events-none absolute inset-0 z-[6] rounded-[12px] bg-gradient-to-r from-black/35 to-transparent"
+                className="pointer-events-none absolute inset-0 z-[6] rounded-t-2xl rounded-b-none bg-gradient-to-r from-black/35 to-transparent"
                 style={{
                   opacity: swipeOffset > 8 ? swipeMotion.hint * 0.45 : 0,
                   transition: "opacity 0.08s ease-out",
                 }}
                 aria-hidden
               />
-              <div className="pointer-events-none absolute inset-0 z-[7] rounded-[12px]" aria-hidden>
+              <div className="pointer-events-none absolute inset-0 z-[7] rounded-t-2xl rounded-b-none" aria-hidden>
                 <span
                   className="absolute top-[16%] right-[8%] font-black tracking-[0.2em] text-[clamp(1.65rem,8vw,2.75rem)] uppercase text-white"
                   style={{
@@ -997,12 +1145,12 @@ export default function OtherProfilePage() {
               </div>
             </>
           )}
-          <div className="relative aspect-[4/5] md:aspect-[3/4] md:max-h-[620px] md:mx-auto md:w-[min(100%,560px)] lg:w-full lg:max-h-[760px] max-h-[640px] bg-gray-200 overflow-hidden rounded-[12px]">
+          <div className="relative aspect-[4/5] md:aspect-[3/4] md:max-h-[620px] md:mx-auto md:w-[min(100%,560px)] lg:w-full lg:max-h-[760px] max-h-[640px] bg-gray-200 overflow-hidden rounded-t-2xl rounded-b-none">
             <Image
               src={profile.profilePhoto || "/placeholder.svg"}
               alt={profile.fullName}
               fill
-              className="object-cover rounded-[10px] pointer-events-none"
+              className="object-cover rounded-t-2xl rounded-b-none pointer-events-none"
               unoptimized
               priority
               draggable={false}
@@ -1039,7 +1187,7 @@ export default function OtherProfilePage() {
             </div>
           </div>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent text-white rounded-b-[10px] pointer-events-none">
+        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent text-white rounded-b-none pointer-events-none">
           <h1 className="text-xl sm:text-2xl font-bold">{displayName}</h1>
           <p className="text-white/90">
             {getAge(profile.dateOfBirth)} yrs • {profile.height}&quot;
@@ -1071,7 +1219,7 @@ export default function OtherProfilePage() {
       </div>
 
       {/* Action buttons - improved mobile responsiveness */}
-      <div className="px-3 py-2 rounded-2xl bg-gradient-to-b from-white to-gray-50 border border-gray-100">
+      <div className="px-3 py-2 rounded-b-2xl rounded-t-none bg-gradient-to-b from-white to-gray-50 border border-gray-100 border-t-gray-200/70">
         <div className={`grid ${FEATURE_MESSAGING_ENABLED ? "grid-cols-5" : "grid-cols-4"} gap-1 sm:gap-1.5`}>
           <button
             onClick={async () => {
@@ -1139,13 +1287,7 @@ export default function OtherProfilePage() {
             </a>
           ) : (
             <button
-              onClick={() => {
-                const newShowContact = !showContact;
-                setShowContact(newShowContact);
-                if (newShowContact && profile) {
-                  trackContactView(profile, actorId || undefined);
-                }
-              }}
+              onClick={toggleContactDetails}
               className={`flex flex-col items-center justify-center gap-0.5 px-1.5 py-2 sm:py-1.5 rounded-xl transition min-h-[40px] border ${
                 showContact 
                   ? 'bg-blue-50 border-blue-200 text-blue-600' 
@@ -1219,27 +1361,11 @@ export default function OtherProfilePage() {
             </a>
           </div>
         )}
-
-        {showContact && (
-          <div className="mt-4 p-4 rounded-2xl bg-[var(--primary)]/5 border border-[var(--primary)]/20">
-            <h4 className="font-semibold text-[var(--foreground)] mb-3">Contact Details</h4>
-            <ContactsList
-              contacts={profile.contacts}
-              fallbackNumber={profile.contact}
-              fallbackBelongsTo={profile.contactType}
-            />
-            {profile.address && (
-              <p className="mt-3 flex items-center gap-3 p-3 rounded-xl bg-white/60 text-sm">
-                <MapPin size={18} className="text-gray-500" />
-                <span>{profile.address}, {profile.city}, {profile.state}</span>
-              </p>
-            )}
-          </div>
-        )}
       </div>
       </div>
 
       <div className="space-y-4 mt-1 lg:max-h-[calc(100vh-104px)] lg:overflow-y-auto lg:pr-0.5">
+        <div className="space-y-4">
         {profile.aboutMeVisible && profile.aboutMe && (
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
             <h3 className="font-semibold text-base sm:text-lg text-[var(--foreground)] mb-2">About Me</h3>
@@ -1427,6 +1553,7 @@ export default function OtherProfilePage() {
             </div>
           </div>
         )}
+        </div>
 
         <div className="bg-white rounded-2xl p-4 shadow-sm">
           <h3 className="font-semibold text-[var(--foreground)] mb-3">Contact Information</h3>
@@ -1478,38 +1605,19 @@ export default function OtherProfilePage() {
             ) : (
               <>
                 <button
-                  onClick={() => {
-                    const newShowContact = !showContact;
-                    setShowContact(newShowContact);
-                    if (newShowContact && profile) {
-                      trackContactView(profile, actorId || undefined);
-                    }
-                  }}
+                  type="button"
+                  onClick={toggleContactDetails}
                   className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors text-[var(--primary)] font-medium"
                 >
                   <Phone size={18} />
                   {showContact ? "Hide Contact" : "View Contact"}
                 </button>
-                {showContact && (
-                  <div className="mt-3 p-4 rounded-xl bg-[var(--primary)]/5 border border-[var(--primary)]/20 space-y-2">
-                    <ContactsList
-                      contacts={profile.contacts}
-                      fallbackNumber={profile.contact}
-                      fallbackBelongsTo={profile.contactType}
-                    />
-                    {profile.address && (
-                      <p className="flex items-center gap-3 p-3 rounded-xl bg-white/60">
-                        <MapPin size={18} className="text-gray-500" />
-                        <span>{profile.address}, {profile.city}, {profile.state}</span>
-                      </p>
-                    )}
-                  </div>
-                )}
               </>
             )}
           </DetailSection>
         </div>
 
+        <div className="space-y-4">
         {(() => {
           const isOwnProfile = !!actorId && actorId === profile.id;
           const hasPrefs = hasMeaningfulPreferences({
@@ -1664,7 +1772,6 @@ export default function OtherProfilePage() {
             </div>
           );
         })()}
-      </div>
       </div>
 
       <div className="space-y-4 mt-4">
@@ -1841,35 +1948,101 @@ export default function OtherProfilePage() {
           how users typically browse (a matchmaker viewing female profiles
           continues to compare females; same for males).
         */}
-        <div className="pt-6">
-          <h3 className="font-semibold text-[var(--foreground)] mb-3 text-lg sm:text-xl text-center">
-            {profile.gender === "female"
-              ? "More Brides You May Like"
-              : profile.gender === "male"
-              ? "More Grooms You May Like"
-              : "Results"}
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            {profiles
-              .filter(
-                (p) =>
-                  p.id !== profile.id &&
-                  // Match source context: if the current profile has a
-                  // gender, only suggest same-gender profiles. Fall back
-                  // to showing all if gender is missing (defensive).
-                  (!profile.gender || p.gender === profile.gender)
-              )
-              .slice(0, 6)
-              .map((similar) => (
-                <ProfileCard
-                  key={similar.id}
-                  profile={similar}
-                  displayName={isLoggedIn ? similar.fullName : maskString(similar.fullName, 5)}
-                />
-              ))}
+        <div className="pt-8">
+          <div className="rounded-xl border border-gray-200/90 bg-gradient-to-br from-white via-orange-50/30 to-slate-50/80 p-5 sm:p-6 lg:p-8 shadow-sm">
+            <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3 mb-5 lg:mb-6">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--primary)] mb-1">
+                  Similar profiles
+                </p>
+                <h3 className="text-xl sm:text-2xl font-bold text-[var(--foreground)] tracking-tight">
+                  {profile.gender === "female"
+                    ? "More brides you may like"
+                    : profile.gender === "male"
+                      ? "More grooms you may like"
+                      : "More results for you"}
+                </h3>
+                <p className="text-sm text-gray-600 mt-1.5 max-w-xl">
+                  Same section as this profile — open any card to compare details side by side.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-5">
+              {profiles
+                .filter(
+                  (p) =>
+                    p.id !== profile.id &&
+                    (!profile.gender || p.gender === profile.gender)
+                )
+                .slice(0, 6)
+                .map((similar) => (
+                  <ProfileCard
+                    key={similar.id}
+                    profile={similar}
+                    displayName={isLoggedIn ? similar.fullName : maskString(similar.fullName, 5)}
+                  />
+                ))}
+            </div>
           </div>
         </div>
+        </div>
       </div>
+      </div>
+
+      {contactSheetOpen && profile && (
+        <div
+          className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center sm:p-4 px-0 pt-4 pb-0"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="profile-contact-sheet-title"
+        >
+          <div
+            className="absolute inset-0 bg-black/45 backdrop-blur-md supports-[backdrop-filter]:bg-black/35"
+            aria-hidden
+            onClick={() => setShowContact(false)}
+          />
+          <div
+            className="relative z-[71] mx-3 w-[calc(100%-1.5rem)] max-w-lg sm:mx-auto sm:w-full rounded-2xl bg-white shadow-2xl border border-gray-100 max-h-[min(82vh,680px)] flex flex-col sm:max-h-[85vh] mb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] sm:mb-0"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-2 px-4 pt-4 pb-2 border-b border-gray-100 shrink-0">
+              <h2 id="profile-contact-sheet-title" className="text-lg font-semibold text-[var(--foreground)]">
+                Contact details
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowContact(false)}
+                className="p-2 rounded-full hover:bg-gray-100 text-gray-600"
+                aria-label="Close contact details"
+              >
+                <X size={22} />
+              </button>
+            </div>
+            <div className="px-4 py-3 overflow-y-auto">
+              {contactHintVisible && (
+                <div className="flex gap-2 items-start mb-3 rounded-xl bg-gray-50/90 border border-gray-100 px-2.5 py-2">
+                  <p className="flex-1 min-w-0 text-[11px] sm:text-xs text-gray-600 leading-snug">
+                    Tap outside or Close to hide. Numbers look masked; Call and WhatsApp still work.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setContactHintVisible(false)}
+                    className="flex-shrink-0 p-1 rounded-md hover:bg-gray-200/80 text-gray-500"
+                    aria-label="Dismiss hint"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
+              <ContactsList
+                contacts={profile.contacts}
+                fallbackNumber={profile.contact}
+                fallbackBelongsTo={profile.contactType}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <div className="fixed left-1/2 -translate-x-1/2 bottom-24 sm:bottom-8 z-[60] px-4 max-w-[90vw]">

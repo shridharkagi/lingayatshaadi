@@ -33,6 +33,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { HobbiesSelector } from "@/components/ui/HobbiesSelector";
 import { PhotoUpload } from "@/components/PhotoUpload";
+import { KycDocumentsUpload } from "@/components/KycDocumentsUpload";
 import { useAuth } from "@/contexts/AuthContext";
 import { Profile, ProfileContact } from "@/types";
 import {
@@ -1389,6 +1390,19 @@ function ProfileCompleteInner() {
                 userId={authUser?.id || profileIdParam || "new-user"}
                 profileId={draftId ?? undefined}
               />
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <h4 className="text-sm font-semibold text-gray-900">KYC Documents</h4>
+                <p className="text-xs text-gray-600 mt-1">
+                  Upload Aadhar, Voter ID, PAN, or other government ID. You can delete or replace anytime.
+                  Admin will decide verification based on these documents.
+                </p>
+                <div className="mt-3">
+                  <KycDocumentsUpload
+                    profileId={draftId ?? undefined}
+                    userId={authUser?.id || profileIdParam || "new-user"}
+                  />
+                </div>
+              </div>
             </SectionCard>
           )}
         </div>

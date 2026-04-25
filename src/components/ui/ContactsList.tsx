@@ -2,6 +2,7 @@
 
 import { Phone, MessageCircle, Smartphone, type LucideIcon } from "lucide-react";
 import type { ProfileContact } from "@/types";
+import { maskPhoneForDisplay } from "@/lib/profileUtils";
 
 const METHOD_META: Record<string, { Icon: LucideIcon; color: string }> = {
   Call: { Icon: Phone, color: "bg-[var(--primary)]/10 text-[var(--primary)]" },
@@ -46,6 +47,7 @@ export function ContactsList({ contacts, fallbackNumber, fallbackBelongsTo }: Co
         const isPrimary = idx === 0;
         const owner = ownerLabel(c);
         const sanitized = c.number.replace(/\D/g, "");
+        const displayDigits = maskPhoneForDisplay(c.number, 5);
         return (
           <div
             key={`${c.number}-${idx}`}
@@ -60,7 +62,7 @@ export function ContactsList({ contacts, fallbackNumber, fallbackBelongsTo }: Co
                     href={`tel:${sanitized}`}
                     className="text-[var(--primary)] font-semibold text-sm hover:underline"
                   >
-                    {c.number}
+                    {displayDigits}
                   </a>
                   {isPrimary && (
                     <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--primary)]/10 text-[var(--primary)]">
@@ -90,7 +92,7 @@ export function ContactsList({ contacts, fallbackNumber, fallbackBelongsTo }: Co
                       target={m === "WhatsApp" ? "_blank" : undefined}
                       rel={m === "WhatsApp" ? "noopener noreferrer" : undefined}
                       className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium ${color} hover:opacity-90 transition`}
-                      title={`${m} ${c.number}`}
+                      title={m}
                     >
                       <Icon size={11} />
                       <span>{m}</span>

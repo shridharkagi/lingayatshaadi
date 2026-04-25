@@ -18,6 +18,7 @@ import { searchProfiles } from "@/lib/api/profiles";
 import { calculateAge } from "@/lib/partnerPreferenceDefaults";
 import type { Profile } from "@/types";
 import { useAuthModal } from "@/contexts/AuthModalContext";
+import { SiteFooter } from "@/components/SiteFooter";
 
 // Indian traditional couple and matrimony images
 const HERO_IMAGE =
@@ -273,12 +274,12 @@ export default function LandingPage() {
           {/* Mobile sticky primary CTA near the hamburger. */}
           <div className="md:hidden flex items-center gap-1">
             {!loading && isLoggedIn ? (
-              <Link href={primaryCta.href} aria-label={primaryCta.label}>
+              <Link href="/account" aria-label="My account">
                 <Button
                   size="sm"
                   className="px-3 py-1.5 text-sm rounded-full shadow-sm"
                 >
-                  Continue
+                  My account
                 </Button>
               </Link>
             ) : (
@@ -699,31 +700,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-[var(--color-secondary-dark)] text-white py-10 sm:py-12 px-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 sm:gap-6 mb-6 sm:mb-8">
-            <Link href="/" className="flex items-center gap-2">
-              <Heart className="w-6 h-6 text-[var(--primary)] fill-[var(--primary)]" />
-              <span className="font-bold text-lg">LingayatShaadi</span>
-            </Link>
-            <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-sm">
-              <Link href="/contact" className="hover:text-[var(--primary)] transition">
-                Contact Us
-              </Link>
-              <Link href="/privacy" className="hover:text-[var(--primary)] transition">
-                Privacy Policy
-              </Link>
-              <Link href="/terms" className="hover:text-[var(--primary)] transition">
-                Terms of Use
-              </Link>
-            </div>
-          </div>
-          <p className="text-center text-sm text-white/70">
-            © {new Date().getFullYear()} LingayatShaadi. All rights reserved.
-          </p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

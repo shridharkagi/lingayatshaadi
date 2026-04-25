@@ -7,6 +7,17 @@ export function maskString(value: string | undefined, visibleChars = 1): string 
   return value.slice(0, visibleChars) + "*".repeat(Math.min(value.length - visibleChars, 6));
 }
 
+/** Digits-only phone: show first `visibleDigitCount` digits, mask the rest with X (e.g. 98444XXXXX). */
+export function maskPhoneForDisplay(raw: string | undefined, visibleDigitCount = 5): string {
+  if (!raw?.trim()) return "—";
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 0) return "—";
+  const n = Math.min(visibleDigitCount, digits.length);
+  const prefix = digits.slice(0, n);
+  const restLen = Math.max(digits.length - n, 4);
+  return `${prefix}${"X".repeat(Math.min(restLen, 12))}`;
+}
+
 /**
  * Truncate text to max words (for About Me 100 word limit)
  */

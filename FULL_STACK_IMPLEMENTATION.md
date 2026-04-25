@@ -3,6 +3,14 @@
 
 ---
 
+## Status Note (April 2026)
+
+This document is now partially historical. Large portions of auth, profile APIs,
+moderation, subscriptions, and superadmin flows are already implemented in the app.
+Use this guide as background context, and prefer current source/API routes for truth.
+
+---
+
 ## 📊 Current Status
 
 ### ✅ What's Already Built

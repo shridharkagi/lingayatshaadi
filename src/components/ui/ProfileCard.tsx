@@ -20,7 +20,7 @@ function ProfileCardComponent({ profile, displayName, variant = "card" }: Profil
   const name = displayName ?? profile.fullName;
 
   return (
-    <div className="bg-white rounded-[10px] overflow-hidden shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-card)] transition-shadow border border-[var(--color-border)]">
+    <div className="bg-white rounded-lg overflow-hidden shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-card)] transition-shadow border border-[var(--color-border)]">
       {/* Mobile / List: horizontal layout - image left, details right */}
       <div className={`flex flex-row ${variant === "list" ? "" : "lg:hidden"}`}>
         <div className="relative w-28 min-w-[9rem] aspect-[3/4] bg-gray-200 flex-shrink-0 overflow-hidden">
@@ -34,7 +34,7 @@ function ProfileCardComponent({ profile, displayName, variant = "card" }: Profil
             unoptimized
           />
           {profile.verified && (
-            <div className="absolute bottom-2 left-2 w-7 h-7 flex items-center justify-center bg-[var(--color-accent-gold)] rounded-[8px] shadow-[var(--shadow-soft)]" title="Verified profile" aria-label="Verified profile">
+            <div className="absolute bottom-2 left-2 w-7 h-7 flex items-center justify-center bg-[var(--color-accent-gold)] rounded-md shadow-[var(--shadow-soft)]" title="Verified profile" aria-label="Verified profile">
               <BadgeCheck size={16} className="text-[var(--color-secondary-dark)]" strokeWidth={2.5} />
             </div>
           )}
@@ -65,7 +65,7 @@ function ProfileCardComponent({ profile, displayName, variant = "card" }: Profil
           </div>
           <Link
             href={`/profile/${getProfileSlug(profile)}`}
-            className="mt-3 inline-flex w-fit py-2 px-4 rounded-[10px] font-medium text-xs sm:text-sm bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] transition-colors"
+            className="mt-3 inline-flex w-fit py-2 px-4 rounded-md font-medium text-xs sm:text-sm bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] transition-colors"
           >
             View Profile
           </Link>
@@ -85,7 +85,7 @@ function ProfileCardComponent({ profile, displayName, variant = "card" }: Profil
             unoptimized
           />
           {profile.verified && (
-            <div className="absolute bottom-2 left-2 w-7 h-7 flex items-center justify-center bg-[var(--color-accent-gold)] rounded-[8px] shadow-[var(--shadow-soft)]" title="Verified profile" aria-label="Verified profile">
+            <div className="absolute bottom-2 left-2 w-7 h-7 flex items-center justify-center bg-[var(--color-accent-gold)] rounded-md shadow-[var(--shadow-soft)]" title="Verified profile" aria-label="Verified profile">
               <BadgeCheck size={16} className="text-[var(--color-secondary-dark)]" strokeWidth={2.5} />
             </div>
           )}
@@ -114,7 +114,7 @@ function ProfileCardComponent({ profile, displayName, variant = "card" }: Profil
           )}
           <Link
             href={`/profile/${getProfileSlug(profile)}`}
-            className="mt-4 inline-flex w-fit py-2.5 px-4 rounded-[10px] font-medium text-sm bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] transition-colors"
+            className="mt-4 inline-flex w-fit py-2.5 px-4 rounded-md font-medium text-sm bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] transition-colors"
           >
             View Profile
           </Link>

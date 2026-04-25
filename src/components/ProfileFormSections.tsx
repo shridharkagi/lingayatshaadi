@@ -3,6 +3,7 @@
 import { Input } from "@/components/ui/Input";
 import { HobbiesSelector } from "@/components/ui/HobbiesSelector";
 import { PhotoUpload } from "@/components/PhotoUpload";
+import { KycDocumentsUpload } from "@/components/KycDocumentsUpload";
 import { SubCasteSelector } from "@/components/ui/SubCasteSelector";
 import { Profile } from "@/types";
 import { PROFESSION_TYPES } from "@/data/constants";
@@ -262,6 +263,24 @@ export function ProfileFormSections({
               />
             </div>
           </>
+        )}
+      </Section>
+
+      <Section title="KYC Documents">
+        <p className="text-sm text-gray-600">
+          Upload Aadhar, Voter ID, PAN, or any government-issued ID for verification.
+          Admins may use these documents while deciding approval.
+        </p>
+        {userId ? (
+          <KycDocumentsUpload
+            profileId={profile.id}
+            userId={userId}
+            adminMode={adminMode}
+          />
+        ) : (
+          <p className="text-sm text-gray-500">
+            Save the profile first to enable document upload.
+          </p>
         )}
       </Section>
     </div>

@@ -8,7 +8,7 @@ import { searchProfiles } from "@/lib/api/profiles";
 import { withTimeout } from "@/lib/withTimeout";
 import { useAuth } from "@/contexts/AuthContext";
 
-const PROFILE_LIST_TIMEOUT_MS = 22_000;
+const PROFILE_LIST_TIMEOUT_MS = 14_000;
 
 interface ProfilesContextType {
   profiles: Profile[];
@@ -39,7 +39,7 @@ export function ProfilesProvider({ children }: { children: React.ReactNode }) {
     setProfilesLoading(true);
     try {
       const { data, error } = await withTimeout(
-        searchProfiles({}, 100),
+        searchProfiles({}, 48),
         PROFILE_LIST_TIMEOUT_MS,
         "Profile list"
       );
@@ -63,7 +63,7 @@ export function ProfilesProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         const { data, error } = await withTimeout(
-          searchProfiles({}, 100),
+          searchProfiles({}, 48),
           PROFILE_LIST_TIMEOUT_MS,
           "Profile list"
         );

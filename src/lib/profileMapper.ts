@@ -175,6 +175,10 @@ export function fromProfileRow(row: ProfileRow): Profile {
       typeof row.draft_current_step === "number"
         ? (row.draft_current_step as number)
         : undefined,
+    deletedAt: row.deleted_at
+      ? new Date(row.deleted_at as string).toISOString()
+      : null,
+    deletedReason: (row.deleted_reason as string | undefined) ?? null,
     createdAt: row.created_at ? new Date(row.created_at as string).toISOString().slice(0, 10) : "",
     updatedAt: row.updated_at ? new Date(row.updated_at as string).toISOString().slice(0, 10) : "",
   };

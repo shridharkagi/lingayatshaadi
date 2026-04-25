@@ -56,9 +56,10 @@ npm run dev  # Opens on http://localhost:3000
 
 ⚠️ **Note:** Clicks won't work in dev mode due to a Turbopack bug. Use production mode instead.
 
-## Demo Login
+## Authentication
 
-Use any email and password to login (mock auth). Example: `test@example.com` / `password123`
+Authentication is Supabase-backed (email OTP, phone OTP, and password login/reset flows).
+Use a real account created through the app; there is no mock-auth bypass.
 
 ## Project Structure
 
@@ -103,6 +104,7 @@ See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for deployment instructions and [
 - **[SOCIAL_MEDIA_PREVIEW_FIX.md](SOCIAL_MEDIA_PREVIEW_FIX.md)** - Summary of social media preview implementation
 - **[OG_IMAGES_SETUP.md](OG_IMAGES_SETUP.md)** - Open Graph images setup and configuration
 - **[WHATSAPP_PROFILE_LINK.md](WHATSAPP_PROFILE_LINK.md)** - WhatsApp integration details
+- **[SUBSCRIPTION_POLICY_REFERENCE.md](SUBSCRIPTION_POLICY_REFERENCE.md)** - Account-level subscription and quota policy
 
 ## Supabase Integration
 
@@ -112,4 +114,28 @@ The application uses Supabase for backend services:
 - `interests` - Sent/received interests
 - `messages` - Chat messages
 - `notifications` - User notifications
-- `membership_plans` - Subscription plans
+- `subscription_plans` - Active subscription catalog for member/admin flows
+- `user_subscriptions` - Account-level entitlements
+- `payment_transactions` - Payment ledger and refund tracking
+- `profile_deletion_requests` - Member initiated deletion workflow
+
+## Operational Commands
+
+```bash
+# Lint checks
+npm run lint
+
+# Production build validation
+npm run build
+
+# Verify control-center Supabase schema (tables + required columns)
+npm run verify:schema
+```
+
+## Webhook Hardening Notes
+
+- `/api/payments/webhook/[provider]` now enforces signature validation and duplicate-event protection.
+- Configure the matching secret per provider:
+  - `RAZORPAY_WEBHOOK_SECRET`
+  - `CASHFREE_WEBHOOK_SECRET`
+  - `STRIPE_WEBHOOK_SECRET`

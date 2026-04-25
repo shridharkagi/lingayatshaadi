@@ -1,7 +1,8 @@
-import { Metadata } from "next";
-import { createSupabaseClientSafe } from "@/lib/supabase";
-import { parseProfileSlug } from "@/lib/memberId";
-import { getAge } from "@/lib/utils";
+import type { Metadata } from "next";
+import { fetchProfileForSeo } from "@/lib/server/fetchProfileForSeo";
+import { getPublicSiteUrl, absolutePublicAssetUrl } from "@/lib/siteUrl";
+import { buildProfileSeoDescription, buildProfileSeoTitle } from "@/lib/profileSeo";
+import { getProfileSlug } from "@/lib/memberId";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -10,74 +11,67 @@ type Props = {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  
-  let profile = null;
-  
-  // Try to fetch profile data from Supabase if configured
-  try {
-    const supabase = createSupabaseClientSafe();
-    
-    if (supabase) {
-      const publicId = parseProfileSlug(id);
-      
-      if (publicId) {
-        const { data } = await supabase
-          .from("profiles")
-          .select("*")
-          .or(`public_id.eq.${publicId},member_id.eq.${publicId}`)
-          .single();
-        profile = data;
-      }
-    }
-  } catch (error) {
-    console.log("Error fetching profile metadata, using defaults:", error);
-  }
+  const siteUrl = getPublicSiteUrl();
+  const defaultOg = `${siteUrl}/opengraph-image`;
+  const profilePath = `/profile/${id}`;
 
-  // Return default metadata when Supabase isn't connected or profile not found
+  const profile = await fetchProfileForSeo(id);
+
   if (!profile) {
     return {
-      title: `Profile ${id} - LingayatShaadi`,
-      description: "Find your perfect life partner in the Lingayat community. View detailed profiles with verified information.",
+      metadataBase: new URL(siteUrl),
+      title: `Profile — LingayatShaadi.in`,
+      description: "Find your life partner in the Lingayat community on LingayatShaadi.in.",
       openGraph: {
-        type: "profile",
-        url: `https://test.ligayatshaadi.in/profile/${id}`,
-        title: "Profile - LingayatShaadi",
-        description: "Find your perfect life partner in the Lingayat community.",
-        siteName: "LingayatShaadi",
+        type: "website",
+        url: `${siteUrl}${profilePath}`,
+        title: "Profile — LingayatShaadi.in",
+        description: "Lingayat matrimony profiles with privacy-first discovery.",
+        siteName: "LingayatShaadi.in",
+        images: [{ url: defaultOg, width: 1200, height: 630, alt: "LingayatShaadi" }],
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: "Profile — LingayatShaadi.in",
+        description: "Lingayat matrimony on LingayatShaadi.in",
+        images: [defaultOg],
       },
     };
   }
 
-  // If we have profile data from Supabase, generate rich metadata
-  const age = profile.date_of_birth ? getAge(profile.date_of_birth) : "N/A";
-  const title = `${profile.full_name || "Profile"} - ${age} yrs, ${profile.profession || "Profession"} | LingayatShaadi`;
-  const description = `${profile.full_name || "Profile"} - ${age} years old, ${profile.height || "N/A"}" tall, ${profile.profession || "Profession"} from ${profile.city || "City"}, ${profile.state || "State"}. ${profile.qualification || "Education"}. Find your perfect match on LingayatShaadi.`;
-
-  const profileUrl = `https://test.ligayatshaadi.in/profile/${id}`;
+  const title = buildProfileSeoTitle(profile);
+  const description = buildProfileSeoDescription(profile);
+  const canonicalPath = `/profile/${getProfileSlug(profile)}`;
+  const profileUrl = `${siteUrl}${canonicalPath}`;
+  const imageUrl = profile.profilePhoto
+    ? absolutePublicAssetUrl(siteUrl, profile.profilePhoto)
+    : defaultOg;
 
   return {
+    metadataBase: new URL(siteUrl),
     title,
     description,
+    alternates: { canonical: profileUrl },
     openGraph: {
       type: "profile",
       url: profileUrl,
       title,
       description,
+      siteName: "LingayatShaadi.in",
       images: [
         {
-          url: profile.profile_photo || "/og-image.jpg",
+          url: imageUrl,
           width: 1200,
           height: 630,
-          alt: `${profile.full_name || "Profile"} - LingayatShaadi`,
+          alt: title,
         },
       ],
-      siteName: "LingayatShaadi",
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: [profile.profile_photo || "/og-image.jpg"],
+      images: [imageUrl],
     },
   };
 }

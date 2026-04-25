@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
+import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
 
 /** Create a notification for a user (uses service role, bypasses RLS) */
 export async function POST(request: NextRequest) {
+  const auth = await requireSuperAdmin(request);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
   try {
     const body = await request.json();
     const { userId, type, title, message } = body as {

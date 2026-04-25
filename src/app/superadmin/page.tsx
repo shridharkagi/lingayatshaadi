@@ -41,6 +41,29 @@ interface StatsResponse {
   }>;
 }
 
+interface SubscriptionOverviewResponse {
+  totals?: {
+    activeSubscriptions?: number;
+    expiringIn7Days?: number;
+    totalCollected?: number;
+  };
+  subscriptionsByPlan?: Array<{
+    planId: string;
+    planName: string;
+    activeCount: number;
+    catalogPlanId: string | null;
+  }>;
+  recentSubscriptions?: Array<{
+    id: string;
+    planName: string;
+    status: string;
+    expiresAt: string | null;
+    createdAt: string | null;
+    memberLabel: string;
+  }>;
+  setupWarning?: string | null;
+}
+
 const RELATIONSHIP_LABELS: Record<string, string> = {
   self: "Self",
   son: "Son",
@@ -107,10 +130,42 @@ function ProgressBar({ value, total, color }: { value: number; total: number; co
   );
 }
 
+function DashboardSkeleton() {
+  const bar = "h-8 rounded-lg bg-gray-200/80 animate-pulse";
+  return (
+    <div className="space-y-6" aria-hidden>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="bg-white rounded-xl shadow-sm p-5 space-y-3">
+            <div className="h-3 w-24 rounded bg-gray-200/80 animate-pulse" />
+            <div className={bar} />
+          </div>
+        ))}
+      </div>
+      <div className="h-40 rounded-xl bg-white shadow-sm border border-gray-100 overflow-hidden">
+        <div className="h-full bg-gradient-to-r from-gray-100/0 via-gray-100/80 to-gray-100/0 animate-pulse" />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="h-64 rounded-xl bg-white shadow-sm p-5 space-y-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className={bar} />
+          ))}
+        </div>
+        <div className="h-64 rounded-xl bg-white shadow-sm p-5 space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className={bar} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SuperAdminDashboard() {
   const [range, setRange] = useState<DateRange>(() => rangeFromPreset("all"));
   const [stats, setStats] = useState<StatsResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [subscriptionOverview, setSubscriptionOverview] = useState<SubscriptionOverviewResponse | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchStats = useMemo(
@@ -130,18 +185,33 @@ export default function SuperAdminDashboard() {
         const params = new URLSearchParams();
         if (r.from) params.set("from", r.from);
         if (r.to) params.set("to", r.to);
-        const res = await fetch(`/api/superadmin/stats?${params.toString()}`, {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store",
-        });
-        const json = await res.json();
-        if (!res.ok) {
-          throw new Error(json?.error || `Request failed (${res.status})`);
+        const [statsRes, subRes] = await Promise.all([
+          fetch(`/api/superadmin/stats?${params.toString()}`, {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: "no-store",
+          }),
+          fetch("/api/superadmin/subscriptions/overview", {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: "no-store",
+          }),
+        ]);
+        const [json, subJson] = await Promise.all([
+          statsRes.json() as Promise<StatsResponse & { error?: string }>,
+          subRes.json() as Promise<SubscriptionOverviewResponse & { error?: string }>,
+        ]);
+        if (!statsRes.ok) {
+          throw new Error((json as { error?: string })?.error || `Request failed (${statsRes.status})`);
         }
         setStats(json as StatsResponse);
+        if (subRes.ok) {
+          setSubscriptionOverview(subJson);
+        } else {
+          setSubscriptionOverview(null);
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load stats");
         setStats(null);
+        setSubscriptionOverview(null);
       } finally {
         setLoading(false);
       }
@@ -183,8 +253,14 @@ export default function SuperAdminDashboard() {
         </div>
       )}
 
+      {loading && !stats ? (
+        <DashboardSkeleton />
+      ) : (
+        <>
       {/* KPI cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div
+        className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 ${loading && stats ? "opacity-60 transition-opacity" : ""}`}
+      >
         <KpiCard
           label="Total Signups"
           value={stats?.signups ?? "—"}
@@ -219,23 +295,145 @@ export default function SuperAdminDashboard() {
         />
       </div>
 
+      {/* Subscription snapshot (global, not date-filtered) */}
+      {subscriptionOverview && (
+        <div className="bg-white rounded-xl shadow-sm p-5 border border-amber-100">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+            <div>
+              <h2 className="font-semibold text-gray-900">Subscriptions snapshot</h2>
+              <p className="text-xs text-gray-500 mt-1">
+                Live counts from the database (not tied to the date range above). Per-account spend is on{" "}
+                <Link href="/superadmin/users" className="text-[var(--primary)] font-medium underline">
+                  Users
+                </Link>
+                .
+              </p>
+            </div>
+            <Link
+              href="/superadmin/subscriptions"
+              className="text-sm text-[var(--primary)] font-medium hover:underline shrink-0"
+            >
+              Manage plans & assignments →
+            </Link>
+          </div>
+          {subscriptionOverview.setupWarning && (
+            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 mb-3">
+              {subscriptionOverview.setupWarning}
+            </p>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+            <KpiCard
+              label="Active subscriptions"
+              value={subscriptionOverview.totals?.activeSubscriptions ?? "—"}
+              icon={Crown}
+              tone="amber"
+            />
+            <KpiCard
+              label="Expiring in 7 days"
+              value={subscriptionOverview.totals?.expiringIn7Days ?? "—"}
+              icon={Clock}
+              tone="amber"
+              hint="Active rows ending this week"
+            />
+            <KpiCard
+              label="Collected (sample)"
+              value={
+                subscriptionOverview.totals?.totalCollected != null
+                  ? `₹${Number(subscriptionOverview.totals.totalCollected).toLocaleString("en-IN")}`
+                  : "—"
+              }
+              icon={Sparkles}
+              tone="green"
+              hint="Sum of up to 2,000 most recent paid transactions"
+            />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800 mb-2">Active members by plan</h3>
+              <div className="border border-gray-100 rounded-lg overflow-hidden max-h-56 overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 text-gray-500 sticky top-0">
+                    <tr>
+                      <th className="text-left px-2 py-2">Plan</th>
+                      <th className="text-right px-2 py-2 w-16">Count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(subscriptionOverview.subscriptionsByPlan || []).length === 0 ? (
+                      <tr>
+                        <td colSpan={2} className="px-2 py-3 text-gray-500">
+                          No active subscriptions.
+                        </td>
+                      </tr>
+                    ) : (
+                      (subscriptionOverview.subscriptionsByPlan || []).map((row) => (
+                        <tr key={row.planId} className="border-t border-gray-100">
+                          <td className="px-2 py-1.5 text-gray-900">{row.planName}</td>
+                          <td className="px-2 py-1.5 text-right font-medium">{row.activeCount}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800 mb-2">Recent subscriptions</h3>
+              <div className="border border-gray-100 rounded-lg overflow-hidden max-h-56 overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 text-gray-500 sticky top-0">
+                    <tr>
+                      <th className="text-left px-2 py-2">Member</th>
+                      <th className="text-left px-2 py-2">Plan</th>
+                      <th className="text-left px-2 py-2">Ends</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(subscriptionOverview.recentSubscriptions || []).slice(0, 10).length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="px-2 py-3 text-gray-500">
+                          No rows.
+                        </td>
+                      </tr>
+                    ) : (
+                      (subscriptionOverview.recentSubscriptions || []).slice(0, 10).map((r) => (
+                        <tr key={r.id} className="border-t border-gray-100">
+                          <td className="px-2 py-1.5 text-gray-900 max-w-[140px] truncate" title={r.memberLabel}>
+                            {r.memberLabel}
+                          </td>
+                          <td className="px-2 py-1.5">{r.planName}</td>
+                          <td className="px-2 py-1.5 whitespace-nowrap text-gray-600">
+                            {r.expiresAt ? formatDate(r.expiresAt) : "—"}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Status + Subscription */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className={`grid grid-cols-1 lg:grid-cols-2 gap-4 ${loading && stats ? "opacity-60 transition-opacity" : ""}`}>
         <div className="bg-white rounded-xl shadow-sm p-5">
           <h2 className="font-semibold text-gray-900 mb-4">Profile Status</h2>
           <div className="grid grid-cols-2 gap-3">
-            <KpiCard label="Verified" value={stats?.status.verified ?? "—"} icon={ShieldCheck} tone="green" />
-            <KpiCard label="Pending" value={stats?.status.pending ?? "—"} icon={Clock} tone="amber" />
-            <KpiCard label="Rejected" value={stats?.status.rejected ?? "—"} icon={XCircle} tone="red" />
-            <KpiCard label="Suspended" value={stats?.status.suspended ?? "—"} icon={Ban} tone="gray" />
+            <KpiCard label="Verified" value={stats?.status?.verified ?? "—"} icon={ShieldCheck} tone="green" />
+            <KpiCard label="Pending" value={stats?.status?.pending ?? "—"} icon={Clock} tone="amber" />
+            <KpiCard label="Rejected" value={stats?.status?.rejected ?? "—"} icon={XCircle} tone="red" />
+            <KpiCard label="Suspended" value={stats?.status?.suspended ?? "—"} icon={Ban} tone="gray" />
           </div>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm p-5">
-          <h2 className="font-semibold text-gray-900 mb-4">Subscription Mix</h2>
+          <h2 className="font-semibold text-gray-900 mb-1">Profile type (premium / free)</h2>
+          <p className="text-xs text-gray-500 mb-4">Based on profile records, not payment subscriptions.</p>
           <div className="grid grid-cols-2 gap-3 mb-5">
-            <KpiCard label="Premium" value={stats?.type.premium ?? "—"} icon={Crown} tone="amber" />
-            <KpiCard label="Free" value={stats?.type.free ?? "—"} icon={Sparkles} tone="gray" />
+            <KpiCard label="Premium" value={stats?.type?.premium ?? "—"} icon={Crown} tone="amber" />
+            <KpiCard label="Free" value={stats?.type?.free ?? "—"} icon={Sparkles} tone="gray" />
           </div>
           <div className="space-y-3">
             <div>
@@ -288,7 +486,7 @@ export default function SuperAdminDashboard() {
       </div>
 
       {/* Relationship breakdown + recent registrations */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className={`grid grid-cols-1 lg:grid-cols-2 gap-4 ${loading && stats ? "opacity-60 transition-opacity" : ""}`}>
         <div className="bg-white rounded-xl shadow-sm p-5">
           <h2 className="font-semibold text-gray-900 mb-4">Profiles by Relationship</h2>
           {stats && Object.keys(stats.relationship).length === 0 && (
@@ -322,11 +520,11 @@ export default function SuperAdminDashboard() {
               View all
             </Link>
           </div>
-          {stats?.recent.length === 0 && (
+          {stats?.recent?.length === 0 && (
             <p className="text-sm text-gray-500">No profiles in selected range.</p>
           )}
           <div className="space-y-2">
-            {stats?.recent.map((p) => (
+            {(stats?.recent ?? []).map((p) => (
               <div key={p.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50">
                 <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
                   {p.profilePhoto ? (
@@ -357,6 +555,8 @@ export default function SuperAdminDashboard() {
           </div>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }

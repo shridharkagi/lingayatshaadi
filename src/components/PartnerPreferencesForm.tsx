@@ -577,7 +577,6 @@ export function PartnerPreferencesForm({
     } else {
       seededRef.current = true;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
   /* derived slider values */

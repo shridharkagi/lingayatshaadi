@@ -123,6 +123,25 @@ export function getProfileSlug(profile: Profile): string {
   return `${publicId}-${nameSlug}`;
 }
 
+/**
+ * Same URL segment as {@link getProfileSlug} for surfaces that only have DB fields.
+ * Uses `publicId` + first-name slug when `publicId` parses as a member id; otherwise raw `profileId` (UUID).
+ */
+export function profilePathSegmentFromPublicInfo(params: {
+  profileId: string;
+  publicId: string | null;
+  fullName: string;
+}): string {
+  const raw = (params.publicId || "").trim();
+  const canonical = raw ? parseProfileSlug(raw) : null;
+  if (canonical) {
+    const base = raw.toLowerCase();
+    const nameSlug = slugifyFirstName(params.fullName || "profile");
+    return `${base}-${nameSlug}`;
+  }
+  return params.profileId;
+}
+
 /** Get the display Member ID (publicId preferred over memberId). */
 export function getMemberIdDisplay(profile: Profile | Partial<Profile>): string {
   return profile.publicId || profile.memberId || profile.id || "—";
@@ -145,6 +164,18 @@ export function parseProfileSlug(slug: string): string | null {
   if (NEW_PUBLIC_ID_RE.test(upper)) return upper;
   if (LEGACY_PUBLIC_ID_RE.test(upper)) return upper;
   return null;
+}
+
+/** True if `publicId` or `memberId` matches the canonical id from {@link parseProfileSlug} (ignores hyphens / case). */
+export function profileMatchesCanonicalPublicId(
+  profile: Pick<Profile, "publicId" | "memberId">,
+  canonicalPublicId: string | null
+): boolean {
+  if (!canonicalPublicId) return false;
+  const needle = canonicalPublicId.replace(/-/g, "").toUpperCase();
+  const a = (profile.publicId || "").toUpperCase().replace(/-/g, "");
+  const b = (profile.memberId || "").toUpperCase().replace(/-/g, "");
+  return a === needle || b === needle;
 }
 
 /** Public regex predicates, exposed for tests / mappers. */

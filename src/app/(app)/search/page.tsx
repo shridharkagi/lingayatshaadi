@@ -8,9 +8,12 @@ import { ProfileCard } from "@/components/ui/ProfileCard";
 import { SearchFilters, defaultFilters, type SearchFiltersState } from "@/components/SearchFilters";
 import { useFilteredProfiles } from "@/hooks/useFilteredProfiles";
 import { debounce } from "@/lib/security";
+import { useAuth } from "@/contexts/AuthContext";
+import { ViewerForensicWatermark } from "@/components/ViewerForensicWatermark";
 
 export default function SearchPage() {
   const { profiles } = useProfiles();
+  const { isLoggedIn } = useAuth();
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [view, setView] = useState<"list" | "grid">("grid");
@@ -60,7 +63,7 @@ export default function SearchPage() {
   }, []);
 
   return (
-    <div className="max-w-6xl mx-auto w-full pb-6">
+    <div className={`max-w-6xl mx-auto w-full ${isLoggedIn ? "pb-20" : "pb-6"}`}>
       <header className="bg-white border-b border-[var(--border)] px-4 py-4 sticky top-0 z-10">
         <h1 className="text-lg sm:text-xl font-bold text-[var(--foreground)] mb-4">Search</h1>
         <div className="flex gap-2">
@@ -142,6 +145,8 @@ export default function SearchPage() {
           </div>
         )}
       </div>
+
+      {isLoggedIn && <ViewerForensicWatermark />}
     </div>
   );
 }
