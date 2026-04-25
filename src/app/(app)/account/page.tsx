@@ -22,6 +22,7 @@ import {
   BadgeCheck,
   Users,
   Clock,
+  Bell,
 } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -841,6 +842,13 @@ export default function AccountPage() {
               View Timeline
             </Link>
           </div>
+          <Link
+            href="/membership"
+            className="mb-4 inline-flex items-center gap-2 rounded-xl bg-[var(--primary)]/10 px-3 py-2 text-sm font-semibold text-[var(--primary)] hover:bg-[var(--primary)]/15"
+          >
+            <Bell size={14} />
+            Upgrade or manage membership
+          </Link>
           {membershipHistory.subscriptions.length === 0 ? (
             <div className="rounded-xl bg-gray-50/80 border border-dashed border-gray-200 px-4 py-6 text-center">
               <p className="text-sm font-medium text-[var(--foreground)]">No membership records yet</p>
@@ -1135,6 +1143,7 @@ function ProfileRow({
   ].filter(Boolean) as string[];
   const { percent: completionPct, isComplete } = computeProfileCompletion(p);
   const tone = completionTone(completionPct);
+  const moderationStatus = p.moderationStatus || "approved";
 
   // The whole card is clickable and routes to the public profile page.
   // Internal action buttons stop the click and route to their own destinations.
@@ -1206,6 +1215,17 @@ function ProfileRow({
             >
               <BadgeCheck size={10} />
               Complete
+            </span>
+          )}
+          {moderationStatus === "pending_review" && (
+            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+              <Clock size={10} />
+              Review pending
+            </span>
+          )}
+          {moderationStatus === "rejected" && (
+            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded bg-red-100 text-red-700">
+              Needs changes
             </span>
           )}
         </div>

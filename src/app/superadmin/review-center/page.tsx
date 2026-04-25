@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { adminFetch } from "@/lib/api/adminClient";
+import { ProfileTransferModal } from "@/components/admin/ProfileTransferModal";
 
 type Tab = "published" | "pending" | "draft" | "rejected" | "suspended" | "trash" | "plan_over";
 type DateFilter = "all" | "today" | "last7" | "last30" | "this_month";
@@ -27,6 +28,7 @@ export default function SuperAdminReviewCenterPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [transferProfileId, setTransferProfileId] = useState<string | null>(null);
 
   const load = async (nextTab: Tab) => {
     setLoading(true);
@@ -382,12 +384,20 @@ export default function SuperAdminReviewCenterPage() {
                     <td className="px-5 py-3 text-sm">
                       {id ? (
                         <div className="flex flex-wrap gap-2">
-                          <Link href={`/profile/${viewHref}`} className="text-[var(--primary)] hover:underline">
+                          <Link href={`/profile/${viewHref}?preview=admin`} className="text-[var(--primary)] hover:underline">
                             View
                           </Link>
                           <Link href={`/superadmin/users/${id}/edit`} className="text-[var(--primary)] hover:underline">
                             Edit
                           </Link>
+                          <button
+                            type="button"
+                            onClick={() => setTransferProfileId(id)}
+                            disabled={busy}
+                            className="text-indigo-700 hover:underline disabled:opacity-50"
+                          >
+                            Transfer
+                          </button>
                           {(tab === "rejected" || tab === "draft" || tab === "pending") && (
                             <button
                               type="button"
@@ -447,6 +457,16 @@ export default function SuperAdminReviewCenterPage() {
           </tbody>
         </table>
       </div>
+      <ProfileTransferModal
+        open={!!transferProfileId}
+        profileId={transferProfileId || ""}
+        note="Transferred from review center"
+        onClose={() => setTransferProfileId(null)}
+        onTransferred={() => {
+          setSuccess("Profile transferred.");
+          void load(tab);
+        }}
+      />
     </div>
   );
 }

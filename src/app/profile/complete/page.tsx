@@ -1355,7 +1355,7 @@ function ProfileCompleteInner() {
             <SectionCard
               icon={Camera}
               title="Profile Photos"
-              description="Add up to 5 photos. The first photo is your primary."
+              description="Add up to 5 photos. You can choose which one is primary."
             >
               <div className="rounded-xl bg-[var(--primary)]/5 border border-[var(--primary)]/20 p-3 text-xs text-gray-700 mb-3 flex gap-2">
                 <Camera size={16} className="text-[var(--primary)] shrink-0 mt-0.5" />
@@ -1386,6 +1386,18 @@ function ProfileCompleteInner() {
                   } else {
                     setProfile((prev) => ({ ...prev, photos: (prev.photos || []).filter((p) => p !== url) }));
                   }
+                }}
+                primaryUrl={profile.profilePhoto}
+                onSetPrimary={(url) => {
+                  if (url === profile.profilePhoto) return;
+                  setProfile((prev) => ({
+                    ...prev,
+                    profilePhoto: url,
+                    photos: [
+                      ...(prev.profilePhoto ? [prev.profilePhoto] : []),
+                      ...(prev.photos || []).filter((p) => p !== url && p !== prev.profilePhoto),
+                    ],
+                  }));
                 }}
                 userId={authUser?.id || profileIdParam || "new-user"}
                 profileId={draftId ?? undefined}

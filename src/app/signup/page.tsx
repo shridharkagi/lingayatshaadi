@@ -51,11 +51,11 @@ export default function SignupPage() {
   const phoneE164 = () => `+91${form.mobile.replace(/\D/g, "")}`;
 
   const redirectAfterSignup = () => {
-    router.replace("/profile/complete");
+    router.replace("/account");
     // Fallback for dev-mode HMR compile stalls during navigation.
     window.setTimeout(() => {
       if (window.location.pathname === "/signup") {
-        window.location.assign("/profile/complete");
+        window.location.assign("/account");
       }
     }, 1200);
   };

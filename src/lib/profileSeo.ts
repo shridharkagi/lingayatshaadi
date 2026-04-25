@@ -3,13 +3,13 @@ import { getAge } from "@/lib/utils";
 
 /**
  * SEO / share title pattern:
- * `[First Name], [Age] - Lingayat Profile in [City] | LingayatShaadi.in`
+ * `[First Name], [Age] - [City] | LingayatShaadi.in`
  */
 export function buildProfileSeoTitle(profile: Pick<Profile, "fullName" | "dateOfBirth" | "city">): string {
   const first = (profile.fullName || "").trim().split(/\s+/)[0] || "Member";
   const age = profile.dateOfBirth ? getAge(profile.dateOfBirth) : "—";
   const city = (profile.city || "").trim() || "India";
-  return `${first}, ${age} - Lingayat Profile in ${city} | LingayatShaadi.in`;
+  return `${first}, ${age} - ${city} | LingayatShaadi.in`;
 }
 
 export function buildProfileSeoDescription(

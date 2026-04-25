@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -42,11 +42,10 @@ import {
 } from "lucide-react";
 import { useProfiles } from "@/contexts/ProfilesContext";
 import { hasAcceptedInterest, hasSentInterest, sendInterest } from "@/lib/api/interests";
-import { getProfileByPublicId, profileFromSnapshot } from "@/lib/api/profiles";
+import { getProfileById, getProfileByPublicId, profileFromSnapshot } from "@/lib/api/profiles";
 import { recordProfileView } from "@/lib/api/profileViews";
 import { addToShortlist, removeFromShortlist, isShortlisted } from "@/lib/api/shortlist";
 import { blockUser } from "@/lib/api/blocked";
-import { getNote, saveNote } from "@/lib/api/notes";
 import { reportProfile } from "@/lib/api/reports";
 import { getAge } from "@/lib/utils";
 import {
@@ -164,6 +163,14 @@ const GALLERY_IMG_TRANSITION_MS = 340;
 const CARD_SWIPE_SLOP_PX = 12;
 const CARD_SWIPE_HORIZONTAL_DOMINANCE = 1.25;
 
+const UUID_PREFIX_RE =
+  /^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:-.+)?$/i;
+
+function parseUuidPrefix(slug: string): string | null {
+  const m = (slug || "").match(UUID_PREFIX_RE);
+  return m?.[1] || null;
+}
+
 function swipeVelocityFromSamples(pts: Array<{ x: number; t: number }>): number {
   if (pts.length < 2) return 0;
   const end = pts[pts.length - 1];
@@ -176,6 +183,7 @@ function swipeVelocityFromSamples(pts: Array<{ x: number; t: number }>): number 
 export default function OtherProfilePage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, authUser, isLoggedIn } = useAuth();
   const { openAuthModal } = useAuthModal();
   // Actor id (profiles.id) used for relational interactions like Interest,
@@ -203,12 +211,11 @@ export default function OtherProfilePage() {
   const [sendingInterest, setSendingInterest] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [savingShortlist, setSavingShortlist] = useState(false);
-  const [myNote, setMyNote] = useState("");
-  const [savingNote, setSavingNote] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [reportMessage, setReportMessage] = useState("");
   const [reporting, setReporting] = useState(false);
+  const [showCreateProfileModal, setShowCreateProfileModal] = useState(false);
   const [copiedMemberId, setCopiedMemberId] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
   const [stripNoticeDismissed, setStripNoticeDismissed] = useState(false);
@@ -229,13 +236,17 @@ export default function OtherProfilePage() {
 
   /** Resolve profile from local slug first so stack navigation updates before the URL catches up (avoids flash / loading). */
   const lookupPublicId = useMemo(() => parseProfileSlug(displayedSlug), [displayedSlug]);
+  const lookupUuidPrefix = useMemo(() => parseUuidPrefix(displayedSlug), [displayedSlug]);
 
   const profileFromContext = useMemo(() => {
     if (lookupPublicId) {
       return profiles.find((p) => profileMatchesCanonicalPublicId(p, lookupPublicId));
     }
+    if (lookupUuidPrefix) {
+      return profiles.find((p) => p.id === lookupUuidPrefix);
+    }
     return profiles.find((p) => p.id === displayedSlug);
-  }, [profiles, displayedSlug, lookupPublicId]);
+  }, [profiles, displayedSlug, lookupPublicId, lookupUuidPrefix]);
 
   // `rawProfile` holds whatever the DB / context gave us — which for the
   // owner is always their live, possibly-pending-edits data. Public
@@ -256,6 +267,7 @@ export default function OtherProfilePage() {
   // comparison used further down the page.
   const isOwnerViewer = !!authUser?.id && !!rawProfile?.userId && rawProfile.userId === authUser.id;
   const viewerIsAdmin = (user?.role ?? "user") === "superadmin";
+  const adminPreviewByQuery = searchParams.get("preview") === "admin";
 
   // Decide which view of the profile to render.
   //   * Owner or admin → always the live row (so they see their own
@@ -268,7 +280,7 @@ export default function OtherProfilePage() {
   //     "Profile not found" block, effectively hiding it.
   const profile = (() => {
     if (!rawProfile) return undefined;
-    if (isOwnerViewer || viewerIsAdmin) return rawProfile;
+    if (isOwnerViewer || viewerIsAdmin || adminPreviewByQuery) return rawProfile;
     const status = rawProfile.moderationStatus ?? "approved";
     if (status === "approved") return rawProfile;
     const snapshot = profileFromSnapshot(rawProfile.approvedSnapshot);
@@ -279,25 +291,43 @@ export default function OtherProfilePage() {
     !!rawProfile &&
     !profile &&
     !isOwnerViewer &&
-    !viewerIsAdmin;
+    !viewerIsAdmin &&
+    !adminPreviewByQuery;
+
+  // Canonicalize URL to member-id slug whenever possible so shared/admin links
+  // converge to `/profile/lb...-name` even if an older UUID-style link is opened.
+  useEffect(() => {
+    if (!profile) return;
+    const canonical = getProfileSlug(profile);
+    if (canonical && slugFromParams && canonical !== slugFromParams) {
+      router.replace(`/profile/${canonical}`, { scroll: false });
+    }
+  }, [profile, slugFromParams, router]);
 
   // If the profile isn't in the in-memory context (e.g. visitor or RLS / pagination
   // hides it), fetch it directly by public id so the page never falsely shows
   // "Profile not found" on the first navigation.
   useEffect(() => {
     setFallbackProfile(null);
-  }, [lookupPublicId]);
+  }, [lookupPublicId, lookupUuidPrefix]);
 
   useEffect(() => {
     if (profileFromContext) return;
     if (profilesLoading && profiles.length === 0) return;
-    if (!lookupPublicId) return;
-    if (fallbackProfile && profileMatchesCanonicalPublicId(fallbackProfile, lookupPublicId)) {
+    if (!lookupPublicId && !lookupUuidPrefix) return;
+    if (
+      fallbackProfile &&
+      ((lookupPublicId && profileMatchesCanonicalPublicId(fallbackProfile, lookupPublicId)) ||
+        (lookupUuidPrefix && fallbackProfile.id === lookupUuidPrefix))
+    ) {
       return;
     }
     let cancelled = false;
     setFallbackLoading(true);
-    getProfileByPublicId(lookupPublicId).then(({ data }) => {
+    const fetchProfile = lookupPublicId
+      ? getProfileByPublicId(lookupPublicId)
+      : getProfileById(lookupUuidPrefix || "");
+    fetchProfile.then(({ data }) => {
       if (cancelled) return;
       setFallbackProfile(data);
       setFallbackLoading(false);
@@ -305,7 +335,7 @@ export default function OtherProfilePage() {
     return () => {
       cancelled = true;
     };
-  }, [profileFromContext, profilesLoading, profiles.length, lookupPublicId, fallbackProfile]);
+  }, [profileFromContext, profilesLoading, profiles.length, lookupPublicId, lookupUuidPrefix, fallbackProfile]);
 
   const currentIdx = profile ? profiles.findIndex((p) => p.id === profile.id) : -1;
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -426,7 +456,6 @@ export default function OtherProfilePage() {
     hasAcceptedInterest(actorId, profile.id).then(({ data }) => setInterestAccepted(!!data));
     hasSentInterest(actorId, profile.id).then(({ data }) => setHasShownInterest(!!data));
     isShortlisted(actorId, profile.id).then(({ data }) => setIsSaved(!!data));
-    getNote(actorId, profile.id).then(({ data }) => setMyNote(data || ""));
   }, [profile?.id, actorId]);
 
   /** Slide direction after route change (enter-from side). Consumed in useLayoutEffect. */
@@ -1228,8 +1257,7 @@ export default function OtherProfilePage() {
                 return;
               }
               if (needsOwnProfile) {
-                showToast("Create your profile first to send interest", "error");
-                router.push("/profile/complete");
+                setShowCreateProfileModal(true);
                 return;
               }
               if (!actorId || !profile || hasShownInterest || sendingInterest) return;
@@ -1305,8 +1333,7 @@ export default function OtherProfilePage() {
                 return;
               }
               if (needsOwnProfile) {
-                showToast("Create your profile first to shortlist", "error");
-                router.push("/profile/complete");
+                setShowCreateProfileModal(true);
                 return;
               }
               if (!actorId || !profile || savingShortlist) return;
@@ -1834,30 +1861,6 @@ export default function OtherProfilePage() {
           </div>
         )}
 
-        {isLoggedIn && actorId && profile && actorId !== profile.id && (
-          <div className="mt-4 p-4 rounded-2xl bg-gray-50 border border-gray-100">
-            <h4 className="font-semibold text-[var(--foreground)] mb-2">My note</h4>
-            <textarea
-              value={myNote}
-              onChange={(e) => setMyNote(e.target.value)}
-              placeholder="Add a private note about this profile..."
-              className="w-full px-3 py-2 text-sm rounded-xl border border-[var(--border)] min-h-[80px] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-            />
-            <button
-              onClick={async () => {
-                if (!actorId || !profile || savingNote) return;
-                setSavingNote(true);
-                await saveNote(actorId, profile.id, myNote);
-                setSavingNote(false);
-              }}
-              disabled={savingNote}
-              className="mt-2 px-4 py-1.5 rounded-lg bg-[var(--primary)] text-white text-sm font-medium"
-            >
-              {savingNote ? "Saving..." : "Save note"}
-            </button>
-          </div>
-        )}
-
         <div className="flex gap-2 pt-4">
           <button
             onClick={() => setShowReportModal(true)}
@@ -2053,6 +2056,33 @@ export default function OtherProfilePage() {
             }`}
           >
             {toast.msg}
+          </div>
+        </div>
+      )}
+
+      {showCreateProfileModal && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+            <h3 className="text-lg font-semibold text-[var(--foreground)]">Create profile to continue</h3>
+            <p className="mt-2 text-sm text-gray-600">
+              You can browse profiles, but features like Interest and Save are available after creating at least one
+              profile in your account.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowCreateProfileModal(false)}
+                className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700"
+              >
+                Later
+              </button>
+              <Link
+                href="/profile/complete"
+                className="flex-1 rounded-xl bg-[var(--primary)] px-3 py-2 text-center text-sm font-semibold text-white"
+              >
+                Create profile
+              </Link>
+            </div>
           </div>
         </div>
       )}

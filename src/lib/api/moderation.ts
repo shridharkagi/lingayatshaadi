@@ -1,5 +1,6 @@
 import { createSupabaseClientSafe } from "@/lib/supabase";
 import { fromProfileRow, type ProfileRow } from "@/lib/profileMapper";
+import { generatePublicIdFromExistingIds } from "@/lib/memberId";
 import type { Profile, ProfilePhoto } from "@/types";
 async function getAuthHeader(): Promise<Record<string, string>> {
   const supabase = createSupabaseClientSafe();
@@ -82,8 +83,28 @@ export async function listPendingProfiles(): Promise<{
       .eq("moderation_status", "pending_review")
       .order("last_submitted_at", { ascending: false });
     if (error) return { data: [], error: error.message };
+    const rows = (data || []) as ProfileRow[];
+    const missing = rows.filter((r) => !(r.public_id as string | undefined));
+    if (missing.length > 0) {
+      const { data: existingIds } = await supabase
+        .from("profiles")
+        .select("public_id")
+        .like("public_id", "L%");
+      const seed = (existingIds || [])
+        .map((r) => (r as { public_id?: string | null }).public_id || "")
+        .filter(Boolean);
+      for (const m of missing) {
+        const id = String(m.id || "");
+        if (!id) continue;
+        const g = (m.gender as Profile["gender"] | undefined) || "male";
+        const next = generatePublicIdFromExistingIds(seed, g);
+        seed.push(next);
+        await supabase.from("profiles").update({ public_id: next }).eq("id", id);
+        m.public_id = next;
+      }
+    }
     return {
-      data: (data || []).map((r) => fromProfileRow(r as ProfileRow)),
+      data: rows.map((r) => fromProfileRow(r)),
       error: null,
     };
   } catch (err) {

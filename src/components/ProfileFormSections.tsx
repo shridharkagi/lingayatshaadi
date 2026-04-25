@@ -5,6 +5,7 @@ import { HobbiesSelector } from "@/components/ui/HobbiesSelector";
 import { PhotoUpload } from "@/components/PhotoUpload";
 import { KycDocumentsUpload } from "@/components/KycDocumentsUpload";
 import { SubCasteSelector } from "@/components/ui/SubCasteSelector";
+import { ContactsEditor } from "@/components/ui/ContactsEditor";
 import { Profile } from "@/types";
 import { PROFESSION_TYPES } from "@/data/constants";
 
@@ -32,6 +33,15 @@ export function ProfileFormSections({
 }: ProfileFormSectionsProps) {
   const update = (key: keyof Profile, value: string | boolean | string[] | number | undefined) => {
     onChange({ [key]: value } as Partial<Profile>);
+  };
+
+  const updateContacts = (contacts: NonNullable<Profile["contacts"]>) => {
+    const primary = contacts[0];
+    onChange({
+      contacts,
+      contact: primary?.number || "",
+      contactType: primary?.belongsTo || "",
+    });
   };
 
   return (
@@ -198,8 +208,14 @@ export function ProfileFormSections({
         <Input label="District" value={profile.district || ""} onChange={(e) => update("district", e.target.value)} />
         <Input label="State" value={profile.state || ""} onChange={(e) => update("state", e.target.value)} />
         <Input label="Country" value={profile.country || ""} onChange={(e) => update("country", e.target.value)} />
-        <Input label="Contact" value={profile.contact || ""} onChange={(e) => update("contact", e.target.value)} />
-        <Input label="Contact Type" placeholder="e.g. Office, Personal" value={profile.contactType || ""} onChange={(e) => update("contactType", e.target.value)} />
+        <div className="pt-1">
+          <ContactsEditor
+            accountPhone={profile.contact || ""}
+            value={profile.contacts}
+            onChange={updateContacts}
+            max={3}
+          />
+        </div>
       </Section>
 
       <Section title="Profile Photo">
@@ -228,6 +244,17 @@ export function ProfileFormSections({
                 } else {
                   onChange({ photos: (profile.photos || []).filter((p) => p !== url) });
                 }
+              }}
+              primaryUrl={profile.profilePhoto}
+              onSetPrimary={(url) => {
+                if (url === profile.profilePhoto) return;
+                onChange({
+                  profilePhoto: url,
+                  photos: [
+                    ...(profile.profilePhoto ? [profile.profilePhoto] : []),
+                    ...(profile.photos || []).filter((p) => p !== url && p !== profile.profilePhoto),
+                  ],
+                });
               }}
               userId={userId}
               profileId={profile.id}

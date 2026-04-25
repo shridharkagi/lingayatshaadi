@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
 import { adminFetch } from "@/lib/api/adminClient";
+import { ProfileTransferModal } from "@/components/admin/ProfileTransferModal";
 
 type Range = "all" | "today" | "last7" | "last30" | "this_month";
 type AccountRow = {
@@ -46,6 +47,7 @@ export default function SuperAdminUsersPage() {
   const [activityLoading, setActivityLoading] = useState(false);
   const [activityData, setActivityData] = useState<AccountRow | null>(null);
   const [activitySection, setActivitySection] = useState<"all" | "contact" | "saved" | "sent">("all");
+  const [transferProfileId, setTransferProfileId] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -268,7 +270,7 @@ export default function SuperAdminUsersPage() {
                               </div>
                               <div className="flex gap-3">
                                 <Link
-                                  href={`/profile/${toSlug(String(p.public_id || ""), String(p.full_name || ""), String(p.id || ""))}`}
+                                  href={`/profile/${toSlug(String(p.public_id || ""), String(p.full_name || ""), String(p.id || ""))}?preview=admin`}
                                   className="text-[var(--primary)] text-sm font-medium hover:underline"
                                 >
                                   View
@@ -279,6 +281,13 @@ export default function SuperAdminUsersPage() {
                                 <Link href="/superadmin/review-center" className="text-[var(--primary)] text-sm font-medium hover:underline">
                                   Review Center
                                 </Link>
+                                <button
+                                  type="button"
+                                  onClick={() => setTransferProfileId(String(p.id || ""))}
+                                  className="text-indigo-700 text-sm font-medium hover:underline"
+                                >
+                                  Transfer
+                                </button>
                               </div>
                             </div>
                           ))
@@ -377,6 +386,15 @@ export default function SuperAdminUsersPage() {
           </div>
         </div>
       )}
+      <ProfileTransferModal
+        open={!!transferProfileId}
+        profileId={transferProfileId || ""}
+        note="Transferred from users screen"
+        onClose={() => setTransferProfileId(null)}
+        onTransferred={() => {
+          void load();
+        }}
+      />
     </div>
   );
 }

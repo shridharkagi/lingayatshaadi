@@ -10,7 +10,11 @@ import type { Profile } from "@/types";
  */
 export async function fetchProfileForSeo(routeSlug: string): Promise<Profile | null> {
   const publicId = parseProfileSlug(routeSlug);
-  if (!publicId) return null;
+  const uuidPrefix =
+    routeSlug.match(
+      /^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:-.+)?$/i
+    )?.[1] || null;
+  if (!publicId && !uuidPrefix) return null;
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -22,7 +26,11 @@ export async function fetchProfileForSeo(routeSlug: string): Promise<Profile | n
     const { data, error } = await client
       .from("profiles")
       .select("*")
-      .or(`public_id.eq.${publicId},member_id.eq.${publicId}`)
+      .or(
+        publicId
+          ? `public_id.eq.${publicId}`
+          : `id.eq.${uuidPrefix}`
+      )
       .is("deleted_at", null)
       .maybeSingle();
 

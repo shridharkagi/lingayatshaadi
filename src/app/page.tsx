@@ -19,6 +19,7 @@ import { calculateAge } from "@/lib/partnerPreferenceDefaults";
 import type { Profile } from "@/types";
 import { useAuthModal } from "@/contexts/AuthModalContext";
 import { SiteFooter } from "@/components/SiteFooter";
+import { getProfileSlug } from "@/lib/memberId";
 
 // Indian traditional couple and matrimony images
 const HERO_IMAGE =
@@ -182,7 +183,7 @@ export default function LandingPage() {
       return livePreviewProfiles!.slice(0, 5).map((p, i) => {
         const age = calculateAge(p.dateOfBirth);
         const image = p.profilePhoto || p.photos?.[0] || LATEST_PROFILE_IMAGES[i % LATEST_PROFILE_IMAGES.length];
-        const slug = p.publicId || p.id;
+        const slug = getProfileSlug(p);
         return {
           href: slug ? `/profile/${slug}` : "/profiles",
           name: p.fullName?.split(" ")[0] || "Member",

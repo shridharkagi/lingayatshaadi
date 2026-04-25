@@ -5,7 +5,11 @@ import { Profile } from "@/types";
 import { createSupabaseClientSafe } from "@/lib/supabase";
 import { fromProfileRow } from "@/lib/profileMapper";
 import { upsertProfile } from "@/lib/api/profiles";
-import { normalizeIndianPhone, syntheticEmailForPhone } from "@/lib/phoneAuth";
+import {
+  normalizeIndianPhone,
+  syntheticEmailForPhone,
+  syntheticEmailCandidatesForPhone,
+} from "@/lib/phoneAuth";
 import { friendlyEmailChangeError, isAuthEmailRateLimitedMessage } from "@/lib/authUserFacingErrors";
 import { withTimeout } from "@/lib/withTimeout";
 import type { User } from "@supabase/supabase-js";
@@ -330,15 +334,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     const parsed = normalizeIndianPhone(phone);
     if (!parsed) return { error: "Enter a valid 10-digit mobile number" };
-    const email = syntheticEmailForPhone(parsed.digits10);
     try {
-      // Try synthetic email first (matches every account created via phone-OTP signup,
-      // including older rows whose phone column was never populated).
-      let { error } = await withTimeout(
-        supabase.auth.signInWithPassword({ email, password }),
-        SIGN_IN_TIMEOUT_MS,
-        "Sign in"
-      );
+      // Try current + legacy synthetic placeholder emails first so existing
+      // accounts continue to work after the domain-format correction.
+      let error: { message?: string } | null = null;
+      for (const email of syntheticEmailCandidatesForPhone(parsed.digits10)) {
+        const result = await withTimeout(
+          supabase.auth.signInWithPassword({ email, password }),
+          SIGN_IN_TIMEOUT_MS,
+          "Sign in"
+        );
+        if (!result.error) {
+          error = null;
+          break;
+        }
+        error = result.error;
+      }
       if (error) {
         // Fallback: phone-based sign-in (works for accounts whose phone column is set
         // and password was registered against that phone).

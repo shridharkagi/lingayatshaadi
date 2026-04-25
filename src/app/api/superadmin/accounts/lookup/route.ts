@@ -1,0 +1,43 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createSupabaseAdmin } from "@/lib/supabase";
+import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
+import { computeAccountCodes } from "@/lib/accountCode";
+
+export async function GET(req: NextRequest) {
+  const auth = await requireSuperAdmin(req);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+  const q = (new URL(req.url).searchParams.get("q") || "").trim().toLowerCase();
+  if (q.length < 2) return NextResponse.json({ items: [] });
+
+  const admin = createSupabaseAdmin();
+  const listed = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (listed.error) {
+    return NextResponse.json({ error: listed.error.message || "Could not fetch users" }, { status: 500 });
+  }
+
+  const users = listed.data.users || [];
+  const codeByUser = computeAccountCodes(users.map((u) => ({ id: u.id, created_at: u.created_at })));
+  const items = users
+    .map((u) => {
+      const name =
+        String((u.user_metadata?.full_name as string) || "").trim() ||
+        String((u.user_metadata?.first_name as string) || "").trim() ||
+        "User";
+      return {
+        userId: u.id,
+        accountCode: codeByUser.get(u.id) || "",
+        name,
+        email: u.email || null,
+        phone: u.phone || null,
+      };
+    })
+    .filter((u) => {
+      const hay = `${u.accountCode} ${u.userId} ${u.name} ${u.email || ""} ${u.phone || ""}`.toLowerCase();
+      return hay.includes(q);
+    })
+    .slice(0, 20);
+
+  return NextResponse.json({ items });
+}
+

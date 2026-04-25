@@ -12,6 +12,8 @@ import {
   Star,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { adminFetch } from "@/lib/api/adminClient";
+import { ProfileTransferModal } from "@/components/admin/ProfileTransferModal";
 import {
   listPendingProfiles,
   listPendingPhotos,
@@ -313,8 +315,9 @@ function PendingProfileCard({
   reviewerId: string;
   onChanged: () => void;
 }) {
-  const [busy, setBusy] = useState<"approve" | "reject" | null>(null);
+  const [busy, setBusy] = useState<"approve" | "reject" | "transfer" | null>(null);
   const [rejectMode, setRejectMode] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
 
@@ -361,7 +364,7 @@ function PendingProfileCard({
     onChanged();
   };
 
-  const viewHref = `/profile/${getProfileSlug(profile)}`;
+  const viewHref = `/profile/${getProfileSlug(profile)}?preview=admin`;
   const memberId = profile.publicId || profile.memberId || profile.id;
 
   return (
@@ -413,6 +416,20 @@ function PendingProfileCard({
             <ExternalLink size={14} />
             Open profile
           </Link>
+          <Link
+            href={`/superadmin/users/${profile.id}/edit`}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--primary)]/10 hover:bg-[var(--primary)]/15 text-sm font-medium text-[var(--primary)] border border-[var(--primary)]/20"
+          >
+            Edit
+          </Link>
+          <button
+            type="button"
+            onClick={() => setTransferOpen(true)}
+            disabled={busy !== null}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-sm font-medium text-indigo-700 border border-indigo-200 disabled:opacity-60"
+          >
+            Transfer
+          </button>
         </div>
       </div>
 
@@ -510,6 +527,13 @@ function PendingProfileCard({
           </div>
         )}
       </div>
+      <ProfileTransferModal
+        open={transferOpen}
+        profileId={profile.id}
+        note="Transferred from moderation queue"
+        onClose={() => setTransferOpen(false)}
+        onTransferred={onChanged}
+      />
     </div>
   );
 }

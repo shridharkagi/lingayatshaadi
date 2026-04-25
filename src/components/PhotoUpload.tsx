@@ -89,80 +89,59 @@ export function PhotoUpload({
   const showPrimaryUI = typeof primaryUrl === "string" && !!onSetPrimary;
 
   const handleSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const files = Array.from(e.target.files || []);
     // Reset the input so picking the same file again still fires onChange.
     e.target.value = "";
-    if (!file || !canAdd) return;
+    if (files.length === 0 || !canAdd) return;
 
     setError(null);
     setInfo(null);
     setLoading(true);
 
     try {
-      // Client-side: allow source files up to ~10MB; the compressor will
-      // bring them down to ~0.5MB WebP before hitting the network. Rejecting
-      // oversize sources early avoids a long wait ending in a 413.
       const SOURCE_LIMIT_MB = 10;
-      if (file.size > SOURCE_LIMIT_MB * 1024 * 1024) {
-        throw new Error(
-          `Photo is ${(file.size / 1024 / 1024).toFixed(1)}MB — please pick one under ${SOURCE_LIMIT_MB}MB.`
-        );
+      const availableSlots = Math.max(0, maxCount - currentPhotos.length);
+      const selected = files.slice(0, availableSlots);
+      if (selected.length < files.length) {
+        setInfo(`Only ${availableSlots} more photo${availableSlots === 1 ? "" : "s"} can be uploaded.`);
       }
 
-      const compressed = await compressAndConvertToWebP(file);
-
-      const formData = new FormData();
-      formData.append("file", compressed);
-      formData.append("userId", userId);
-
-      const res = await fetch("/api/upload-photo", {
-        method: "POST",
-        body: formData,
-      });
-
-      // Read the JSON body regardless of status so we can surface the
-      // server's friendly error message when res.ok === false.
-      let data: { url?: string; storagePath?: string; error?: string } = {};
-      try {
-        data = await res.json();
-      } catch {
-        // If the body isn't JSON (e.g. platform gateway returned HTML),
-        // fall through with whatever status text we have.
-      }
-
-      if (!res.ok) {
-        throw new Error(data.error || `Upload failed (${res.status})`);
-      }
-
-      if (!data.url) {
-        throw new Error("Upload succeeded but no URL was returned. Please retry.");
-      }
-
-      // Bookkeeping: when we know which profile this photo belongs to,
-      // record it in `profile_photos` with status='pending' so the admin
-      // queue can surface it. The first photo on a profile is also
-      // marked primary so "Set as primary" UX has a sensible default.
-      // Any error here is logged but swallowed: the storage upload itself
-      // has already succeeded, so we must never leave the user thinking
-      // the operation failed just because an auxiliary insert hiccuped.
-      if (profileId) {
-        const isFirstPhoto = currentPhotos.length === 0;
-        const { error: recordErr } = await createPhotoRecord({
-          profileId,
-          url: data.url,
-          storagePath: data.storagePath,
-          isPrimary: isFirstPhoto,
-          sortOrder: currentPhotos.length,
-        });
-        if (recordErr) {
-          console.warn(
-            "[PhotoUpload] photo uploaded but profile_photos insert failed:",
-            recordErr
+      for (let idx = 0; idx < selected.length; idx += 1) {
+        const file = selected[idx];
+        if (file.size > SOURCE_LIMIT_MB * 1024 * 1024) {
+          throw new Error(
+            `${file.name} is ${(file.size / 1024 / 1024).toFixed(1)}MB — choose files under ${SOURCE_LIMIT_MB}MB.`
           );
         }
-      }
+        const compressed = await compressAndConvertToWebP(file);
+        const formData = new FormData();
+        formData.append("file", compressed);
+        formData.append("userId", userId);
+        const res = await fetch("/api/upload-photo", { method: "POST", body: formData });
+        let data: { url?: string; storagePath?: string; error?: string } = {};
+        try {
+          data = await res.json();
+        } catch {
+          // no-op
+        }
+        if (!res.ok) throw new Error(data.error || `Upload failed (${res.status})`);
+        if (!data.url) throw new Error("Upload succeeded but no URL was returned. Please retry.");
 
-      onAdd(data.url);
+        if (profileId) {
+          const isFirstPhoto = currentPhotos.length === 0 && idx === 0;
+          const { error: recordErr } = await createPhotoRecord({
+            profileId,
+            url: data.url,
+            storagePath: data.storagePath,
+            isPrimary: isFirstPhoto,
+            sortOrder: currentPhotos.length + idx,
+          });
+          if (recordErr) {
+            console.warn("[PhotoUpload] photo uploaded but profile_photos insert failed:", recordErr);
+          }
+        }
+        onAdd(data.url);
+      }
     } catch (err) {
       setError(humanizeUploadError(err));
     } finally {
@@ -273,6 +252,7 @@ export function PhotoUpload({
         ref={inputRef}
         type="file"
         accept="image/*"
+        multiple
         onChange={handleSelect}
         className="hidden"
       />

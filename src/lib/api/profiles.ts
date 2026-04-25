@@ -218,6 +218,31 @@ export async function updateProfileById(
       !options.skipModeration &&
       (explicitStatus === "pending_review" ||
         (explicitStatus == null && touchesOwnerFields));
+
+    // Draft-created profiles may not have a public_id yet. When they are
+    // first submitted, assign one so all UI links can use canonical lb/lg slugs.
+    if (isSubmission) {
+      const { data: existingRow } = await supabase
+        .from("profiles")
+        .select("public_id, gender")
+        .eq("id", profileId)
+        .maybeSingle();
+      const existingPublicId = (existingRow as { public_id?: string | null } | null)?.public_id;
+      if (!existingPublicId) {
+        const genderForId =
+          (row.gender as Profile["gender"] | undefined) ||
+          ((existingRow as { gender?: Profile["gender"] | null } | null)?.gender as Profile["gender"] | undefined) ||
+          "male";
+        const { data: existingIds } = await supabase
+          .from("profiles")
+          .select("public_id")
+          .like("public_id", "L%");
+        const ids = (existingIds || [])
+          .map((r) => (r as { public_id?: string | null }).public_id || "")
+          .filter(Boolean);
+        row.public_id = generatePublicIdFromExistingIds(ids, genderForId);
+      }
+    }
     if (isSubmission) {
       row.moderation_status = "pending_review";
       row.last_submitted_at = new Date().toISOString();
@@ -306,10 +331,27 @@ export async function listProfilesByUserId(
       .order("created_at", { ascending: true });
 
     if (error) return { data: [], error: error.message };
-    return {
-      data: (data || []).map((r) => fromProfileRow(r as ProfileRow)),
-      error: null,
-    };
+    const rows = (data || []) as ProfileRow[];
+    const missing = rows.filter((r) => !(r.public_id as string | undefined));
+    if (missing.length > 0) {
+      const { data: existingIds } = await supabase
+        .from("profiles")
+        .select("public_id")
+        .like("public_id", "L%");
+      const seed = (existingIds || [])
+        .map((r) => (r as { public_id?: string | null }).public_id || "")
+        .filter(Boolean);
+      for (const m of missing) {
+        const id = String(m.id || "");
+        if (!id) continue;
+        const g = (m.gender as Profile["gender"] | undefined) || "male";
+        const next = generatePublicIdFromExistingIds(seed, g);
+        seed.push(next);
+        await supabase.from("profiles").update({ public_id: next }).eq("id", id);
+        m.public_id = next;
+      }
+    }
+    return { data: rows.map((r) => fromProfileRow(r)), error: null };
   } catch (err) {
     return { data: [], error: err instanceof Error ? err.message : "Failed to list profiles" };
   }
@@ -353,7 +395,7 @@ export async function getProfileByPublicId(publicId: string): Promise<{ data: Pr
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
-      .or(`public_id.eq.${publicId},member_id.eq.${publicId}`)
+      .eq("public_id", publicId)
       .is("deleted_at", null)
       .maybeSingle();
 

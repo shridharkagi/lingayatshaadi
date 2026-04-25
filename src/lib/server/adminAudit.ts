@@ -8,6 +8,7 @@ export type AdminAuditAction =
   | "profile.suspend"
   | "profile.unsuspend"
   | "profile.move_to_draft"
+  | "profile.transfer_ownership"
   | "profile.trash"
   | "profile_deletion_request.approve"
   | "profile_deletion_request.reject"

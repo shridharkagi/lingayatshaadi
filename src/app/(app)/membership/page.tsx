@@ -32,6 +32,9 @@ export default function MembershipPage() {
   const [callbackNumber, setCallbackNumber] = useState("");
   const [requestNote, setRequestNote] = useState("");
   const supportNumber = (config.callContactNumber || "6360130905").replace(/\D/g, "");
+  const supportWhatsapp = (config.whatsappContactNumber || config.callContactNumber || "6360130905").replace(/\D/g, "");
+  const accountName = accountMeta?.fullName || accountMeta?.firstName || "Member";
+  const upgradePrefill = `My name is ${accountName}, I would like to upgrade my account.`;
 
   useEffect(() => {
     const load = async () => {
@@ -184,6 +187,22 @@ export default function MembershipPage() {
         )}
         <div className="rounded-xl border border-[var(--primary)]/20 bg-[var(--primary)]/5 p-3 text-xs text-gray-700">
           Need upgrade help? Contact support at <span className="font-semibold">{config.callContactNumber || "6360130905"}</span>.
+          <div className="mt-2 flex flex-wrap gap-2">
+            <a
+              href={`tel:${supportNumber}`}
+              className="inline-flex items-center rounded-lg bg-[var(--primary)] px-3 py-1.5 text-xs font-semibold text-white"
+            >
+              Call
+            </a>
+            <a
+              href={`https://wa.me/${supportWhatsapp}?text=${encodeURIComponent(upgradePrefill)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center rounded-lg bg-[#25D366] px-3 py-1.5 text-xs font-semibold text-white"
+            >
+              WhatsApp
+            </a>
+          </div>
         </div>
         <div className="rounded-2xl border bg-white p-4">
           <h4 className="font-semibold text-[var(--foreground)]">Request Upgrade</h4>

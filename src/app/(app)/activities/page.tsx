@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Heart, Eye, Bookmark, UserX, FileText, Phone } from "lucide-react";
+import { Heart, Eye, Bookmark, UserX, Phone } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ProfileAvatar } from "@/components/ui/ProfileAvatar";
 import { useProfiles } from "@/contexts/ProfilesContext";
@@ -13,7 +13,6 @@ import { getProfileById as fetchProfile } from "@/lib/api/profiles";
 import { getProfileViews } from "@/lib/api/profileViews";
 import { getShortlistedIds, removeFromShortlist } from "@/lib/api/shortlist";
 import { getBlockedIds, unblockUser } from "@/lib/api/blocked";
-import { getNotes } from "@/lib/api/notes";
 import { getContactViews } from "@/lib/api/contactViews";
 import { getAge } from "@/lib/utils";
 import { getProfileSlug } from "@/lib/memberId";
@@ -24,7 +23,7 @@ import {
   formatTimeAgo,
 } from "@/lib/contactViewHistory";
 
-type TabId = "interests" | "views" | "contacted" | "shortlist" | "blocked" | "notes";
+type TabId = "interests" | "views" | "contacted" | "shortlist" | "blocked";
 
 const tabs: { id: TabId; label: string; icon: typeof Heart }[] = [
   { id: "interests", label: "Interests", icon: Heart },
@@ -32,7 +31,6 @@ const tabs: { id: TabId; label: string; icon: typeof Heart }[] = [
   { id: "contacted", label: "Contacts", icon: Phone },
   { id: "shortlist", label: "Shortlist", icon: Bookmark },
   { id: "blocked", label: "Blocked", icon: UserX },
-  { id: "notes", label: "Notes", icon: FileText },
 ];
 
 const RECENT_CONTACTS_LIMIT = 20;
@@ -59,9 +57,6 @@ export default function ActivitiesPage() {
   >([]);
   const [shortlistedProfiles, setShortlistedProfiles] = useState<Profile[]>([]);
   const [blockedProfiles, setBlockedProfiles] = useState<Profile[]>([]);
-  const [notes, setNotes] = useState<
-    Array<{ profileId: string; note: string; updatedAt: string; profile?: Profile }>
-  >([]);
   const [contactViews, setContactViews] = useState<
     Array<{ profileId: string; viewedAt: string; profile?: Profile; cached?: CachedContactInfo }>
   >([]);
@@ -238,36 +233,13 @@ export default function ActivitiesPage() {
     setLoading(false);
   }, [user?.id, getProfileById, profiles]);
 
-  const loadNotes = useCallback(async () => {
-    if (!user?.id) {
-      setNotes([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    const { data } = await getNotes(user.id);
-    const withProfiles = await Promise.all(
-      (data || []).map(async (n) => {
-        let profile = getProfileById(n.profileId) || profiles.find((p) => p.id === n.profileId);
-        if (!profile) {
-          const { data: p } = await fetchProfile(n.profileId);
-          profile = p ?? undefined;
-        }
-        return { ...n, profile };
-      })
-    );
-    setNotes(withProfiles.filter((n) => n.profile));
-    setLoading(false);
-  }, [user?.id, getProfileById, profiles]);
-
   useEffect(() => {
     if (activeTab === "interests") loadInterests();
     else if (activeTab === "views") loadProfileViews();
     else if (activeTab === "contacted") loadContacted();
     else if (activeTab === "shortlist") loadShortlist();
     else if (activeTab === "blocked") loadBlocked();
-    else if (activeTab === "notes") loadNotes();
-  }, [activeTab, loadInterests, loadProfileViews, loadContacted, loadShortlist, loadBlocked, loadNotes]);
+  }, [activeTab, loadInterests, loadProfileViews, loadContacted, loadShortlist, loadBlocked]);
 
   const tabCounts = useMemo<Record<TabId, number>>(
     () => ({
@@ -276,17 +248,15 @@ export default function ActivitiesPage() {
       contacted: contactsTotal,
       shortlist: shortlistedProfiles.length,
       blocked: blockedProfiles.length,
-      notes: notes.length,
     }),
-    [receivedInterests.length, sentInterests.length, profileViews.length, contactsTotal, shortlistedProfiles.length, blockedProfiles.length, notes.length]
+    [receivedInterests.length, sentInterests.length, profileViews.length, contactsTotal, shortlistedProfiles.length, blockedProfiles.length]
   );
 
   return (
     <div className="max-w-2xl mx-auto pb-6">
       <header className="bg-white border-b border-[var(--border)] px-4 py-4 sticky top-0 z-10">
         <h1 className="text-xl font-bold text-[var(--foreground)] mb-3">Activities</h1>
-        {/* Icon-bar tabs: 6 columns, all visible at once on every screen size. */}
-        <div role="tablist" aria-label="Activity sections" className="grid grid-cols-6 gap-1">
+        <div role="tablist" aria-label="Activity sections" className="grid grid-cols-5 gap-1">
           {tabs.map(({ id, label, icon: Icon }) => {
             const isActive = activeTab === id;
             const count = tabCounts[id];
@@ -442,9 +412,9 @@ export default function ActivitiesPage() {
               />
             ) : (
               <div className="space-y-3">
-                {profileViews.map((v) => (
+                {profileViews.map((v, idx) => (
                   <Link
-                    key={v.viewerId}
+                    key={`${v.viewerId}-${v.viewedAt}-${idx}`}
                     href={`/profile/${getProfileSlug(v.profile!)}`}
                     className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition"
                   >
@@ -623,38 +593,6 @@ export default function ActivitiesPage() {
           </div>
         )}
 
-        {activeTab === "notes" && (
-          <div className="space-y-4">
-            <h3 className="font-semibold text-[var(--foreground)]">My notes</h3>
-            {loading ? (
-              <div className="py-8 text-center text-gray-500">Loading...</div>
-            ) : notes.length === 0 ? (
-              <EmptyState
-                icon={FileText}
-                title="No notes saved"
-                description="Add personal notes to profiles from the profile page to remember important details"
-                action={{ label: "Browse Profiles", href: "/search" }}
-              />
-            ) : (
-              <div className="space-y-3">
-                {notes.map((n) => (
-                  <div key={`${n.profileId}-${n.updatedAt}`} className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm">
-                    <Link href={`/profile/${getProfileSlug(n.profile!)}`}>
-                      <ProfileAvatar src={n.profile!.profilePhoto} alt={n.profile!.fullName} size={64} />
-                    </Link>
-                    <div className="flex-1 min-w-0">
-                      <Link href={`/profile/${getProfileSlug(n.profile!)}`}>
-                        <h4 className="font-semibold text-[var(--foreground)]">{n.profile!.fullName}</h4>
-                      </Link>
-                      <p className="text-sm text-gray-600 mt-1">{n.note}</p>
-                      <p className="text-xs text-gray-400 mt-1">Updated {formatTimeAgo(n.updatedAt)}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

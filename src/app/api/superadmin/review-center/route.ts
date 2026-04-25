@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
+import { generatePublicIdFromExistingIds } from "@/lib/memberId";
 
 type ReviewTab =
   | "published"
@@ -146,7 +147,23 @@ export async function GET(req: NextRequest) {
   const { data, error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const items = data || [];
+  const items = (data || []) as Array<Record<string, unknown>>;
+  const missingPublicIdRows = items.filter((r) => !String(r.public_id || "").trim());
+  if (missingPublicIdRows.length > 0) {
+    const { data: existingIds } = await admin.from("profiles").select("public_id").like("public_id", "L%");
+    const seed = (existingIds || [])
+      .map((r) => (r as { public_id?: string | null }).public_id || "")
+      .filter(Boolean);
+    for (const row of missingPublicIdRows) {
+      const id = String(row.id || "");
+      if (!id) continue;
+      const gender = (String(row.gender || "male") === "female" ? "female" : "male") as "male" | "female";
+      const next = generatePublicIdFromExistingIds(seed, gender);
+      seed.push(next);
+      await admin.from("profiles").update({ public_id: next }).eq("id", id);
+      row.public_id = next;
+    }
+  }
   const profileIds = items.map((r) => (r as { id?: string }).id).filter(Boolean) as string[];
 
   const planByProfileId: Record<

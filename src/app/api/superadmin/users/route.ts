@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
 import { computeAccountCodes } from "@/lib/accountCode";
+import { generatePublicIdFromExistingIds } from "@/lib/memberId";
 
 type AuthUserLite = {
   id: string;
@@ -71,17 +72,36 @@ export async function GET(req: NextRequest) {
     .in("user_id", userIds);
   if (pErr) return NextResponse.json({ error: pErr.message }, { status: 500 });
 
+  // Backfill missing public IDs so admin/user links can stay on canonical lb/lg slugs.
+  const profileRows = (profiles || []) as Array<Record<string, unknown>>;
+  const missingPublicIdRows = profileRows.filter((p) => !String(p.public_id || "").trim());
+  if (missingPublicIdRows.length > 0) {
+    const { data: existingIds } = await admin.from("profiles").select("public_id").like("public_id", "L%");
+    const seed = (existingIds || [])
+      .map((r) => (r as { public_id?: string | null }).public_id || "")
+      .filter(Boolean);
+    for (const row of missingPublicIdRows) {
+      const id = String(row.id || "");
+      if (!id) continue;
+      const gender = (String(row.gender || "male") === "female" ? "female" : "male") as "male" | "female";
+      const next = generatePublicIdFromExistingIds(seed, gender);
+      seed.push(next);
+      await admin.from("profiles").update({ public_id: next }).eq("id", id);
+      row.public_id = next;
+    }
+  }
+
   const map = new Map<string, Array<Record<string, unknown>>>();
-  for (const p of profiles || []) {
+  for (const p of profileRows) {
     const uid = (p as { user_id?: string }).user_id;
     if (!uid) continue;
     if (!map.has(uid)) map.set(uid, []);
     map.get(uid)?.push(p as Record<string, unknown>);
   }
 
-  const profileIds = (profiles || []).map((p) => (p as { id?: string }).id).filter(Boolean) as string[];
+  const profileIds = profileRows.map((p) => (p as { id?: string }).id).filter(Boolean) as string[];
   const profileMeta = new Map<string, { user_id: string; public_id: string; full_name: string }>();
-  for (const p of profiles || []) {
+  for (const p of profileRows) {
     const row = p as { id?: string; user_id?: string; public_id?: string; full_name?: string };
     if (!row.id || !row.user_id) continue;
     profileMeta.set(row.id, {
@@ -220,7 +240,7 @@ export async function GET(req: NextRequest) {
       current.lastActivityAt = ts;
     }
   };
-  for (const p of profiles || []) {
+  for (const p of profileRows) {
     const row = p as { user_id?: string; updated_at?: string | null };
     if (row.user_id) bump(row.user_id, row.updated_at || null);
   }
