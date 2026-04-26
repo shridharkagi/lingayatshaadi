@@ -1,0 +1,261 @@
+"use client";
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import Script from "next/script";
+import {
+  TURNSTILE_SCRIPT_SRC,
+  getTurnstileSiteKey,
+  isTurnstileClientConfigured,
+} from "@/lib/turnstileConfig";
+
+/**
+ * Cloudflare Turnstile — managed widget mounted once at the app root.
+ *
+ * Why a single hidden widget instead of one per form:
+ *   - With appearance="interaction-only" + execution="execute" the widget is
+ *     hidden by default and only renders a challenge UI if Cloudflare needs
+ *     user interaction. We render it once, then call execute() right before
+ *     the network request that needs a token. That gives every form a fresh,
+ *     unused token (Cloudflare rejects reused tokens) without each form caring
+ *     about widget lifecycle.
+ *   - Tokens are valid ~5 min, so acquiring at submit time avoids the trap of
+ *     a token expiring while the user fills the form.
+ *
+ * Server contract:
+ *   The browser POSTs `turnstileToken` in the request body. The server uses
+ *   `requireTurnstileForRequest` (see lib/server/turnstile.ts) to honor
+ *   TURNSTILE_MODE / CAPTCHA_BYPASS.
+ */
+
+interface TurnstileRenderOpts {
+  sitekey: string;
+  // Cloudflare deprecated "invisible" as a size value. Only these three are
+  // accepted by the current SDK. We rely on appearance/execution to keep the
+  // widget hidden (see render call below).
+  size?: "normal" | "compact" | "flexible";
+  appearance?: "always" | "execute" | "interaction-only";
+  execution?: "render" | "execute";
+  callback?: (token: string) => void;
+  "error-callback"?: (errorCode: string) => void;
+  "expired-callback"?: () => void;
+  "timeout-callback"?: () => void;
+}
+
+interface TurnstileGlobal {
+  render: (
+    container: HTMLElement | string,
+    opts: TurnstileRenderOpts
+  ) => string;
+  execute: (widgetIdOrContainer: string | HTMLElement, opts?: { action?: string }) => void;
+  reset: (widgetIdOrContainer: string | HTMLElement) => void;
+  remove: (widgetId: string) => void;
+  ready: (cb: () => void) => void;
+}
+
+declare global {
+  interface Window {
+    turnstile?: TurnstileGlobal;
+  }
+}
+
+interface TurnstileContextValue {
+  /**
+   * Acquire a fresh Turnstile token. Resolves with an empty string when
+   * Turnstile is not configured (the server will then decide based on mode).
+   * Rejects with an Error if the widget loaded but the user/network failed
+   * the challenge — callers should treat that as a verification failure.
+   */
+  getToken: () => Promise<string>;
+  /** True when the widget is mounted and ready to execute. */
+  ready: boolean;
+}
+
+const TurnstileContext = createContext<TurnstileContextValue | null>(null);
+
+const TOKEN_WAIT_MS = 12000;
+
+export function TurnstileProvider({ children }: { children: ReactNode }) {
+  const enabled = isTurnstileClientConfigured();
+  const sitekey = getTurnstileSiteKey();
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const widgetIdRef = useRef<string | null>(null);
+  const pendingResolveRef = useRef<((token: string) => void) | null>(null);
+  const pendingRejectRef = useRef<((err: Error) => void) | null>(null);
+  const [ready, setReady] = useState(false);
+
+  const settle = useCallback(
+    (kind: "resolve" | "reject", value: string | Error) => {
+      const resolve = pendingResolveRef.current;
+      const reject = pendingRejectRef.current;
+      pendingResolveRef.current = null;
+      pendingRejectRef.current = null;
+      if (kind === "resolve" && resolve && typeof value === "string") resolve(value);
+      else if (kind === "reject" && reject && value instanceof Error) reject(value);
+    },
+    []
+  );
+
+  const tryInitWidget = useCallback(() => {
+    if (!enabled) return;
+    if (widgetIdRef.current) return;
+    if (typeof window === "undefined") return;
+    if (!containerRef.current) return;
+    const turnstile = window.turnstile;
+    if (!turnstile) return;
+
+    try {
+      widgetIdRef.current = turnstile.render(containerRef.current, {
+        sitekey,
+        // Modern equivalent of "invisible": run only on demand and only show
+        // a challenge UI if Cloudflare actually needs user interaction.
+        appearance: "interaction-only",
+        execution: "execute",
+        callback: (token: string) => settle("resolve", token),
+        "error-callback": (errorCode: string) => {
+          settle("reject", new Error(`turnstile error: ${errorCode || "unknown"}`));
+        },
+        "expired-callback": () => {
+          // Token expired before use. Next getToken() resets+executes again.
+          if (widgetIdRef.current && window.turnstile) {
+            try {
+              window.turnstile.reset(widgetIdRef.current);
+            } catch {
+              /* ignore */
+            }
+          }
+        },
+        "timeout-callback": () => {
+          settle("reject", new Error("turnstile timeout"));
+        },
+      });
+      setReady(true);
+    } catch (e) {
+      console.warn("[turnstile] widget render failed:", e);
+    }
+  }, [enabled, settle, sitekey]);
+
+  // Cover the case where the script is already loaded (e.g. client-side nav)
+  // by polling briefly for window.turnstile in addition to Script.onLoad.
+  useEffect(() => {
+    if (!enabled || typeof window === "undefined") return;
+    if (window.turnstile) {
+      tryInitWidget();
+      return;
+    }
+    const start = Date.now();
+    const id = window.setInterval(() => {
+      if (window.turnstile) {
+        tryInitWidget();
+        window.clearInterval(id);
+      } else if (Date.now() - start > TOKEN_WAIT_MS) {
+        window.clearInterval(id);
+      }
+    }, 200);
+    return () => window.clearInterval(id);
+  }, [enabled, tryInitWidget]);
+
+  const getToken = useCallback(async (): Promise<string> => {
+    if (!enabled) return "";
+    if (typeof window === "undefined") return "";
+
+    // Wait for the widget to mount in case getToken is called before the
+    // script loaded (slow phone network, immediate form submit, etc.).
+    const start = Date.now();
+    while (!widgetIdRef.current && Date.now() - start < TOKEN_WAIT_MS) {
+      tryInitWidget();
+      await new Promise((r) => setTimeout(r, 150));
+    }
+
+    const widgetId = widgetIdRef.current;
+    const turnstile = window.turnstile;
+    if (!widgetId || !turnstile) {
+      // Widget never loaded — return empty token. The server decides based on
+      // TURNSTILE_MODE (enforce → 403, shadow → log + pass).
+      console.warn("[turnstile] widget not ready; sending request without token");
+      return "";
+    }
+
+    return new Promise<string>((resolve, reject) => {
+      let settled = false;
+      const finish = (fn: () => void) => {
+        if (settled) return;
+        settled = true;
+        pendingResolveRef.current = null;
+        pendingRejectRef.current = null;
+        fn();
+      };
+
+      pendingResolveRef.current = (t) => finish(() => resolve(t));
+      pendingRejectRef.current = (e) => finish(() => reject(e));
+
+      try {
+        turnstile.reset(widgetId);
+        turnstile.execute(widgetId);
+      } catch (e) {
+        finish(() =>
+          reject(
+            new Error(
+              `turnstile execute failed: ${e instanceof Error ? e.message : String(e)}`
+            )
+          )
+        );
+        return;
+      }
+
+      window.setTimeout(() => {
+        finish(() => reject(new Error("turnstile timeout")));
+      }, TOKEN_WAIT_MS);
+    });
+  }, [enabled, tryInitWidget]);
+
+  if (!enabled) {
+    return (
+      <TurnstileContext.Provider value={{ getToken: async () => "", ready: false }}>
+        {children}
+      </TurnstileContext.Provider>
+    );
+  }
+
+  return (
+    <TurnstileContext.Provider value={{ getToken, ready }}>
+      <Script
+        src={TURNSTILE_SCRIPT_SRC}
+        strategy="afterInteractive"
+        onLoad={tryInitWidget}
+        onReady={tryInitWidget}
+      />
+      <div
+        ref={containerRef}
+        aria-hidden
+        style={{
+          position: "fixed",
+          left: 0,
+          bottom: 0,
+          width: 0,
+          height: 0,
+          opacity: 0,
+          pointerEvents: "none",
+        }}
+      />
+      {children}
+    </TurnstileContext.Provider>
+  );
+}
+
+export function useTurnstile(): TurnstileContextValue {
+  const ctx = useContext(TurnstileContext);
+  if (!ctx) {
+    // No provider in tree — degrade gracefully. The server will decide what
+    // to do with the empty token based on its mode.
+    return { getToken: async () => "", ready: false };
+  }
+  return ctx;
+}

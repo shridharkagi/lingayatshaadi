@@ -15,6 +15,7 @@ import {
 import { fast2smsSendDltOtp } from "@/lib/fast2smsVerify";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { findAuthUserByPhone } from "@/lib/server/authUsers";
+import { requireTurnstileForRequest } from "@/lib/server/turnstile";
 
 /** Ensure Node runtime (not Edge) so server-side fetch to Supabase matches local curl behavior. */
 export const runtime = "nodejs";
@@ -91,12 +92,20 @@ function explainSupabaseNetworkError(message: string): string | null {
 }
 
 export async function POST(request: NextRequest) {
-  let body: { phone?: string; purpose?: unknown };
+  let body: { phone?: string; purpose?: unknown; turnstileToken?: unknown };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
+
+  // Cloudflare Turnstile gate runs FIRST — before any phone parsing, account
+  // lookup, or SMS spend. A bot probing this endpoint should never reach the
+  // Supabase RPC or Fast2SMS request paths.
+  const captchaError = await requireTurnstileForRequest(request, body, {
+    route: "phone/send",
+  });
+  if (captchaError) return captchaError;
 
   const parsed = normalizeIndianPhone(body.phone ?? "");
   if (!parsed) {

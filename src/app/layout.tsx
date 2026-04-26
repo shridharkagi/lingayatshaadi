@@ -8,6 +8,7 @@ import { AppConfigProvider } from "@/contexts/AppConfigContext";
 import { ContactFloat } from "@/components/ui/ContactFloat";
 import { ConfigInjector } from "@/components/ConfigInjector";
 import { AuthModalProvider } from "@/contexts/AuthModalContext";
+import { TurnstileProvider } from "@/components/turnstile/TurnstileProvider";
 function getSeoConfig() {
   try {
     const path = join(process.cwd(), "data", "site-config.json");
@@ -92,16 +93,18 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased min-h-screen">
-        <AuthProvider>
-          <AppConfigProvider>
-            <AuthModalProvider>
-              {children}
-              <ContactFloat />
-              <ConfigInjector />
-              <div id="lingayat-external-scripts" suppressHydrationWarning />
-            </AuthModalProvider>
-          </AppConfigProvider>
-        </AuthProvider>
+        <TurnstileProvider>
+          <AuthProvider>
+            <AppConfigProvider>
+              <AuthModalProvider>
+                {children}
+                <ContactFloat />
+                <ConfigInjector />
+                <div id="lingayat-external-scripts" suppressHydrationWarning />
+              </AuthModalProvider>
+            </AppConfigProvider>
+          </AuthProvider>
+        </TurnstileProvider>
       </body>
     </html>
   );

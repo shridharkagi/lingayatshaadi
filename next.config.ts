@@ -29,12 +29,16 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+              // Cloudflare Turnstile loader script.
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co",
               "font-src 'self' data: https://fonts.gstatic.com",
               // Supabase Realtime uses wss://; https:// alone is not enough for connect-src on strict mobile browsers.
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+              // Cloudflare Turnstile makes XHR requests from inside its iframe.
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://challenges.cloudflare.com",
+              // Turnstile renders a challenge iframe served from challenges.cloudflare.com.
+              "frame-src https://challenges.cloudflare.com",
               "frame-ancestors 'none'",
             ]
               .join("; ")

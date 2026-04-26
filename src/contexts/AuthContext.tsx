@@ -12,6 +12,7 @@ import {
 } from "@/lib/phoneAuth";
 import { friendlyEmailChangeError, isAuthEmailRateLimitedMessage } from "@/lib/authUserFacingErrors";
 import { withTimeout } from "@/lib/withTimeout";
+import { useTurnstile } from "@/components/turnstile/TurnstileProvider";
 import type { User } from "@supabase/supabase-js";
 
 const GET_SESSION_TIMEOUT_MS = 20_000;
@@ -137,6 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
   const supabase = createSupabaseClientSafe();
+  const { getToken: getTurnstileToken } = useTurnstile();
 
   const fetchProfile = async (authUserId: string) => {
     if (!supabase) {
@@ -297,13 +299,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     phone: string,
     purpose: "login" | "signup" | "password_reset" = "login"
   ) => {
+    // Acquire a fresh Turnstile token right before the request. Tokens cannot
+    // be reused (Cloudflare enforces) and have a ~5 minute lifetime, so doing
+    // this at submit time avoids the trap of an expired token if the user
+    // sat on the form. Empty string when Turnstile is not configured — the
+    // server will decide based on TURNSTILE_MODE.
+    let turnstileToken = "";
+    try {
+      turnstileToken = await getTurnstileToken();
+    } catch (e) {
+      console.warn("[auth] turnstile getToken failed:", e);
+      // Continue with empty token; server enforce mode will return 403 with a
+      // friendly message we surface to the user.
+    }
+
     const controller = new AbortController();
     const abortTimer = window.setTimeout(() => controller.abort(), PHONE_AUTH_FETCH_MS);
     try {
       const res = await fetch("/api/auth/phone/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, purpose }),
+        body: JSON.stringify({ phone, purpose, turnstileToken }),
         signal: controller.signal,
       });
       const data = (await res.json()) as {
