@@ -10,14 +10,75 @@ import {
   fast2smsTemplateIdFor,
   normalizePurpose,
   resolveOtpChannel,
+  type OtpPurpose,
 } from "@/lib/phoneOtpConfig";
 import { fast2smsSendDltOtp } from "@/lib/fast2smsVerify";
+import { createSupabaseAdmin } from "@/lib/supabase";
+import { findAuthUserByPhone } from "@/lib/server/authUsers";
 
 /** Ensure Node runtime (not Edge) so server-side fetch to Supabase matches local curl behavior. */
 export const runtime = "nodejs";
 
 const OTP_TTL_MS = 10 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 30 * 1000;
+
+const NO_ACCOUNT_MESSAGE =
+  "No account found for this mobile number. Please create an account first.";
+const ACCOUNT_EXISTS_MESSAGE =
+  "An account with this mobile number already exists. Please sign in instead.";
+
+/**
+ * Enforce the right account-state for each OTP purpose so we never:
+ *  - send an OTP to a non-existent number on login / password_reset, or
+ *  - silently create a duplicate account on signup.
+ *
+ * Returns null when it is OK to proceed; otherwise returns the response to
+ * send straight back to the caller.
+ */
+async function assertAccountExistenceForPurpose(
+  parsed: { e164: string; digits10: string },
+  purpose: OtpPurpose
+): Promise<{ status: number; error: string } | null> {
+  let admin;
+  try {
+    admin = createSupabaseAdmin();
+  } catch (e) {
+    console.warn(
+      "[phone/send] createSupabaseAdmin failed; cannot enforce existence check:",
+      e instanceof Error ? e.message : String(e)
+    );
+    // Fail closed for login / password_reset (safer to reject than to send an
+    // OTP to an unknown number). For signup we keep the legacy behaviour and
+    // let the verify step surface the duplicate-user error.
+    if (purpose === "login" || purpose === "password_reset") {
+      return { status: 503, error: "Auth service is temporarily unavailable. Try again." };
+    }
+    return null;
+  }
+
+  let user;
+  try {
+    user = await findAuthUserByPhone(admin, parsed.e164, parsed.digits10);
+  } catch (e) {
+    console.warn(
+      "[phone/send] findAuthUserByPhone threw:",
+      e instanceof Error ? e.message : String(e)
+    );
+    if (purpose === "login" || purpose === "password_reset") {
+      return { status: 503, error: "Could not look up account. Please try again." };
+    }
+    return null;
+  }
+
+  if (purpose === "signup") {
+    if (user) return { status: 409, error: ACCOUNT_EXISTS_MESSAGE };
+    return null;
+  }
+
+  // login / password_reset → must already exist.
+  if (!user) return { status: 404, error: NO_ACCOUNT_MESSAGE };
+  return null;
+}
 
 function explainSupabaseNetworkError(message: string): string | null {
   if (/fetch failed|Failed to fetch|network|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|certificate|SSL/i.test(message)) {
@@ -44,6 +105,16 @@ export async function POST(request: NextRequest) {
 
   const purpose = normalizePurpose(body.purpose);
   const channel = resolveOtpChannel();
+
+  // Enforce purpose-based account existence BEFORE we burn an SMS or accept a
+  // bypass code. Skipping this is what allowed:
+  //   - login OTPs to be sent to phone numbers that have no account, and
+  //   - signup flows to silently log into a freshly-created auth row when an
+  //     account already existed under a legacy synthetic-email format.
+  const existenceError = await assertAccountExistenceForPurpose(parsed, purpose);
+  if (existenceError) {
+    return NextResponse.json({ error: existenceError.error }, { status: existenceError.status });
+  }
 
   if (channel === "bypass") {
     return NextResponse.json({ ok: true, channel: "bypass" });

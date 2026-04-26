@@ -1,32 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 import { normalizeIndianPhone, syntheticEmailForPhone } from "@/lib/phoneAuth";
 import { verifyPhoneOtpChallenge } from "@/lib/server/phoneOtpChallenge";
 import { issueMagicLinkSession } from "@/lib/server/issueMagicLinkSession";
 import { resolveOtpChannel } from "@/lib/phoneOtpConfig";
+import { findAuthUserByPhone } from "@/lib/server/authUsers";
 
 export const runtime = "nodejs";
-
-async function findUserForPasswordReset(
-  supabase: SupabaseClient,
-  phoneE164: string,
-  syntheticEmailLower: string
-): Promise<User | null> {
-  let page = 1;
-  const perPage = 1000;
-  for (;;) {
-    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
-    if (error) throw new Error(error.message);
-    const u = data.users.find(
-      (x) =>
-        x.phone === phoneE164 ||
-        (x.email && x.email.toLowerCase() === syntheticEmailLower)
-    );
-    if (u) return u;
-    if (!data.users.length || data.users.length < perPage) return null;
-    page += 1;
-  }
-}
 
 export async function POST(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
@@ -71,12 +51,14 @@ export async function POST(request: NextRequest) {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  const synthetic = syntheticEmailForPhone(parsed.digits10).toLowerCase();
+  // Use the shared helper so both legacy (`@phone.otp.lingayatshaadi`) and
+  // current (`@phone.otp.lingayatshaadi.in`) synthetic-email accounts match,
+  // and so reset-password and login/verify all use the SAME lookup contract.
   let user;
   try {
-    user = await findUserForPasswordReset(supabaseAdmin, parsed.e164, synthetic);
+    user = await findAuthUserByPhone(supabaseAdmin, parsed.e164, parsed.digits10);
   } catch (e) {
-    console.error("reset-password listUsers:", e);
+    console.error("reset-password findAuthUserByPhone:", e);
     return NextResponse.json({ error: "Could not look up account" }, { status: 500 });
   }
 

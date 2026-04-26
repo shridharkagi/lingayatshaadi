@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { syntheticEmailCandidatesForPhone } from "@/lib/phoneAuth";
 
 export type AuthUserLite = {
   id: string;
@@ -153,6 +154,186 @@ async function listUsersFromAuthTableFallback(admin: SupabaseClient): Promise<Au
     if (batch.length < pageSize) break;
   }
   return users;
+}
+
+/**
+ * Locate the Supabase Auth user matching a phone number.
+ *
+ * Looks at:
+ *   - `auth.users.phone` column with both `+91...` (E.164) and `91...` (no plus)
+ *     formats, since GoTrue historically stored phone without the plus sign.
+ *   - Both synthetic-email formats produced by our phone OTP flow:
+ *       `phone_<digits10>@phone.otp.lingayatshaadi.in` (current)
+ *       `phone_<digits10>@phone.otp.lingayatshaadi`    (legacy, no TLD)
+ *
+ * Strategy (in order — first one to return a match wins):
+ *   1. RPC `public.find_auth_user_by_phone` — a SECURITY DEFINER function that
+ *      reads `auth.users` server-side. This is the primary path because
+ *      PostgREST does not expose the `auth` schema by default, and
+ *      `auth.admin.listUsers` returns "Database error finding users" on this
+ *      project. The RPC bypasses both issues. It must be installed once via
+ *      `supabase-find-auth-user-by-phone.sql`.
+ *   2. Direct SELECT against `auth.users` — works only if the project has
+ *      explicitly exposed the `auth` schema to PostgREST.
+ *   3. Paginated `auth.admin.listUsers` filtered in memory — slowest, used
+ *      only when the first two paths are unavailable.
+ *
+ * If multiple rows match (e.g. a legacy duplicate plus a freshly-created broken
+ * row with NULL phone), prefer the one whose phone column matches the input
+ * phone, then the older `created_at` — that picks the real account and ignores
+ * partially-created junk rows.
+ */
+export async function findAuthUserByPhone(
+  admin: SupabaseClient,
+  phoneE164: string,
+  digits10: string
+): Promise<AuthUserLite | null> {
+  const phoneStripped = phoneE164.startsWith("+") ? phoneE164.slice(1) : phoneE164;
+  const emails = syntheticEmailCandidatesForPhone(digits10).map((e) => e.toLowerCase());
+
+  const matches: AuthUserLite[] = [];
+
+  type AuthUserRow = {
+    id?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    created_at?: string | null;
+    raw_user_meta_data?: Record<string, unknown> | null;
+  };
+
+  const pushRow = (row: AuthUserRow) => {
+    const id = String(row.id || "").trim();
+    if (!id) return;
+    matches.push({
+      id,
+      email: row.email || null,
+      phone: row.phone || null,
+      created_at: row.created_at || null,
+      user_metadata: row.raw_user_meta_data || null,
+    });
+  };
+
+  // 1. SECURITY DEFINER RPC — primary path.
+  // We track whether the RPC was authoritative (i.e. the call succeeded, even
+  // if it returned zero rows) so we don't waste round trips on the broken
+  // fallback paths when we already know the user doesn't exist.
+  let rpcAuthoritative = false;
+  try {
+    const { data, error } = await admin.rpc("find_auth_user_by_phone", {
+      p_phone_e164: phoneE164,
+      p_digits10: digits10,
+    });
+    if (!error && Array.isArray(data)) {
+      rpcAuthoritative = true;
+      for (const row of data as AuthUserRow[]) pushRow(row);
+    } else if (error) {
+      // Common when the migration hasn't been applied yet — log once at warn,
+      // do NOT throw, and fall through to the legacy paths below.
+      console.warn(
+        "[findAuthUserByPhone] RPC find_auth_user_by_phone failed:",
+        error.message,
+        "— falling back to direct/auth.users + listUsers paths. Apply",
+        "supabase-find-auth-user-by-phone.sql to silence this."
+      );
+    }
+  } catch (e) {
+    console.warn(
+      "[findAuthUserByPhone] RPC find_auth_user_by_phone threw:",
+      e instanceof Error ? e.message : String(e)
+    );
+  }
+
+  // If the RPC succeeded (regardless of row count), trust it as authoritative.
+  // No need to hit the broken direct-auth-schema or listUsers paths.
+  if (rpcAuthoritative) {
+    if (matches.length === 0) return null;
+    if (matches.length === 1) return matches[0];
+    return pickBestMatch(matches, phoneE164, phoneStripped);
+  }
+
+  // 2. Direct SELECT against auth.users (only works if PostgREST exposes auth).
+  if (matches.length === 0) {
+    try {
+      const orParts = [
+        `phone.eq.${phoneE164}`,
+        `phone.eq.${phoneStripped}`,
+        ...emails.map((e) => `email.eq.${e}`),
+      ];
+      const { data, error } = await admin
+        .schema("auth")
+        .from("users")
+        .select("id, email, phone, created_at, raw_user_meta_data")
+        .or(orParts.join(","));
+      if (!error && Array.isArray(data)) {
+        for (const row of data as AuthUserRow[]) pushRow(row);
+      } else if (error) {
+        console.warn("[findAuthUserByPhone] direct auth.users SELECT failed:", error.message);
+      }
+    } catch (e) {
+      console.warn(
+        "[findAuthUserByPhone] direct auth.users SELECT threw:",
+        e instanceof Error ? e.message : String(e)
+      );
+    }
+  }
+
+  // 3. listUsers paginated fallback.
+  if (matches.length === 0) {
+    try {
+      const perPage = 200;
+      // Page 1..N until we find the user or run out of pages. We cap at 50
+      // pages (10k users) — that is more than enough for our user base today
+      // and prevents runaway loops on misconfigured GoTrue deployments.
+      for (let page = 1; page <= 50; page += 1) {
+        const batch = await listUsersPageWithRetry(admin, page, perPage);
+        if (batch.length === 0) break;
+        for (const u of batch) {
+          const phone = (u.phone || "").trim();
+          const email = (u.email || "").toLowerCase();
+          const phoneHit =
+            phone === phoneE164 || phone === phoneStripped || phone === `+${phoneStripped}`;
+          const emailHit = email && emails.includes(email);
+          if (phoneHit || emailHit) matches.push(u);
+        }
+        if (matches.length > 0 || batch.length < perPage) break;
+      }
+    } catch (e) {
+      console.warn(
+        "[findAuthUserByPhone] listUsers fallback failed:",
+        e instanceof Error ? e.message : String(e)
+      );
+    }
+  }
+
+  if (matches.length === 0) return null;
+  if (matches.length === 1) return matches[0];
+  return pickBestMatch(matches, phoneE164, phoneStripped);
+}
+
+/**
+ * Prefer rows whose `phone` column actually matches the input (those are the
+ * "real" accounts; junk duplicate rows usually have NULL phone), then choose
+ * the oldest by `created_at` so we always return the original account, never a
+ * partially-created later row.
+ */
+function pickBestMatch(
+  matches: AuthUserLite[],
+  phoneE164: string,
+  phoneStripped: string
+): AuthUserLite {
+  const phoneMatched = matches.filter((m) => {
+    const p = (m.phone || "").trim();
+    return p === phoneE164 || p === phoneStripped || p === `+${phoneStripped}`;
+  });
+  const pool = phoneMatched.length > 0 ? phoneMatched : matches;
+
+  pool.sort((a, b) => {
+    const at = a.created_at ? new Date(a.created_at).getTime() : Number.MAX_SAFE_INTEGER;
+    const bt = b.created_at ? new Date(b.created_at).getTime() : Number.MAX_SAFE_INTEGER;
+    return at - bt;
+  });
+
+  return pool[0];
 }
 
 export async function listAllAuthUsers(admin: SupabaseClient): Promise<AuthUserLite[]> {

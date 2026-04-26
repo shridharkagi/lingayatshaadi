@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash, randomBytes } from "crypto";
 import { authServiceRolePost } from "@/lib/postgrestServer";
 import { normalizeIndianPhone, syntheticEmailForPhone } from "@/lib/phoneAuth";
-import { createHash, randomBytes } from "crypto";
-import { resolveOtpChannel } from "@/lib/phoneOtpConfig";
+import { resolveOtpChannel, normalizePurpose, type OtpPurpose } from "@/lib/phoneOtpConfig";
 import { verifyPhoneOtpChallenge } from "@/lib/server/phoneOtpChallenge";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { ensureAccountCodeForUser } from "@/lib/server/accountCodes";
+import { findAuthUserByPhone } from "@/lib/server/authUsers";
+import { issueMagicLinkSession } from "@/lib/server/issueMagicLinkSession";
 
 export const runtime = "nodejs";
 
@@ -58,6 +60,18 @@ function sanitizeMeta(raw: unknown): AccountMeta {
   return out;
 }
 
+/**
+ * Resolve the OTP purpose for a /verify call. The client now ideally sends a
+ * `purpose` field, but legacy clients only send `password` — so we fall back
+ * to the original convention: password present → signup, otherwise login.
+ */
+function resolveVerifyPurpose(rawPurpose: unknown, hasPassword: boolean): OtpPurpose {
+  if (rawPurpose === "signup" || rawPurpose === "login" || rawPurpose === "password_reset") {
+    return rawPurpose;
+  }
+  return hasPassword ? "signup" : "login";
+}
+
 export async function POST(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
@@ -65,7 +79,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Supabase is not configured" }, { status: 500 });
   }
 
-  let body: { phone?: string; otp?: string; password?: string; meta?: unknown };
+  let body: { phone?: string; otp?: string; password?: string; meta?: unknown; purpose?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -73,8 +87,8 @@ export async function POST(request: NextRequest) {
   }
 
   const rawPassword = typeof body.password === "string" ? body.password : "";
-  const useSignupPassword = rawPassword.length > 0;
-  if (useSignupPassword && rawPassword.length < 8) {
+  const hasPassword = rawPassword.length > 0;
+  if (hasPassword && rawPassword.length < 8) {
     return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
   }
 
@@ -88,6 +102,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Enter the 6-digit OTP" }, { status: 400 });
   }
 
+  const purpose = normalizePurpose(resolveVerifyPurpose(body.purpose, hasPassword));
   const channel = resolveOtpChannel();
 
   if (channel === "fast2sms") {
@@ -99,11 +114,127 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "OTP provider not configured" }, { status: 500 });
   }
 
-  const meta = sanitizeMeta(body.meta);
-  const email = syntheticEmailForPhone(parsed.digits10);
-  const password = useSignupPassword
-    ? rawPassword
-    : createHash("sha256").update(randomBytes(32)).digest("hex") + randomBytes(8).toString("hex");
+  // After OTP is verified, look up the existing account (if any) so we can
+  // route login vs signup deterministically. We accept BOTH the current and
+  // legacy synthetic-email formats so users created before the `.in` TLD
+  // correction continue to log into the SAME row instead of getting a fresh
+  // duplicate.
+  let admin;
+  try {
+    admin = createSupabaseAdmin();
+  } catch (e) {
+    console.error("[phone/verify] createSupabaseAdmin failed:", e);
+    return NextResponse.json({ error: "Auth service is temporarily unavailable" }, { status: 503 });
+  }
+
+  let existing;
+  try {
+    existing = await findAuthUserByPhone(admin, parsed.e164, parsed.digits10);
+  } catch (e) {
+    console.error("[phone/verify] findAuthUserByPhone threw:", e);
+    existing = null;
+  }
+
+  if (purpose === "signup") {
+    return handleSignup({
+      supabaseUrl,
+      serviceKey,
+      parsed,
+      rawPassword,
+      hasPassword,
+      meta: sanitizeMeta(body.meta),
+      existing,
+      admin,
+    });
+  }
+
+  // login / password_reset — never create a user.
+  return handleLoginOrReset({
+    supabaseUrl,
+    serviceKey,
+    parsed,
+    existing,
+    admin,
+  });
+}
+
+async function handleLoginOrReset({
+  supabaseUrl,
+  serviceKey,
+  parsed,
+  existing,
+  admin,
+}: {
+  supabaseUrl: string;
+  serviceKey: string;
+  parsed: { e164: string; digits10: string };
+  existing: Awaited<ReturnType<typeof findAuthUserByPhone>>;
+  admin: ReturnType<typeof createSupabaseAdmin>;
+}) {
+  if (!existing) {
+    return NextResponse.json(
+      {
+        error:
+          "No account found for this mobile number. Please create an account first.",
+      },
+      { status: 404 }
+    );
+  }
+
+  // Use the user's actual stored email — that may be the legacy synthetic
+  // email (no `.in`) or the current one. Falling back to the new format would
+  // sign the user into the WRONG row.
+  const sessionEmail =
+    (existing.email && existing.email.trim()) || syntheticEmailForPhone(parsed.digits10);
+
+  const session = await issueMagicLinkSession(supabaseUrl, serviceKey, sessionEmail);
+  if (!session.ok) {
+    return NextResponse.json({ error: session.error }, { status: session.status || 500 });
+  }
+
+  try {
+    await ensureAccountCodeForUser(admin, existing.id);
+  } catch (e) {
+    console.warn("[phone/verify] ensureAccountCodeForUser failed:", e);
+  }
+
+  return NextResponse.json({
+    access_token: session.access_token,
+    refresh_token: session.refresh_token,
+    expires_in: session.expires_in,
+    expires_at: session.expires_at,
+    token_type: session.token_type,
+  });
+}
+
+async function handleSignup({
+  supabaseUrl,
+  serviceKey,
+  parsed,
+  rawPassword,
+  hasPassword,
+  meta,
+  existing,
+  admin,
+}: {
+  supabaseUrl: string;
+  serviceKey: string;
+  parsed: { e164: string; digits10: string };
+  rawPassword: string;
+  hasPassword: boolean;
+  meta: AccountMeta;
+  existing: Awaited<ReturnType<typeof findAuthUserByPhone>>;
+  admin: ReturnType<typeof createSupabaseAdmin>;
+}) {
+  if (existing) {
+    return NextResponse.json(
+      {
+        error:
+          "An account with this mobile number already exists. Please sign in instead.",
+      },
+      { status: 409 }
+    );
+  }
 
   const computedFullName =
     meta.full_name ||
@@ -117,6 +248,16 @@ export async function POST(request: NextRequest) {
   if (meta.city) userMetadata.city = meta.city;
   if (meta.date_of_birth) userMetadata.date_of_birth = meta.date_of_birth;
   if (meta.birth_year) userMetadata.birth_year = meta.birth_year;
+
+  const email = syntheticEmailForPhone(parsed.digits10);
+
+  // For OTP signup without a password we still need *some* password on the
+  // auth row (Supabase requires it for password sign-ins later). Use a random
+  // 256-bit hex string so the user effectively has no usable password and
+  // must use OTP login.
+  const password = hasPassword
+    ? rawPassword
+    : createHash("sha256").update(randomBytes(32)).digest("hex") + randomBytes(8).toString("hex");
 
   const createPayload: Record<string, unknown> = {
     email,
@@ -139,89 +280,32 @@ export async function POST(request: NextRequest) {
   if (createRes.statusCode < 200 || createRes.statusCode >= 300) {
     const msg = authErrorMessage(createRes.body);
     if (isDuplicateUserError(msg)) {
-      if (useSignupPassword) {
-        return NextResponse.json(
-          { error: "An account with this mobile number already exists. Sign in instead." },
-          { status: 409 }
-        );
-      }
-      // Existing user, OTP login — fall through to issue a session via magic link.
-    } else {
-      console.error("createUser:", createRes.statusCode, createRes.body);
-      return NextResponse.json({ error: msg || "Could not create account" }, { status: 500 });
+      // findAuthUserByPhone missed it (e.g. listUsers fallback failed) but
+      // Supabase saw a collision — surface the same friendly 409 instead of
+      // silently signing into the existing account.
+      return NextResponse.json(
+        {
+          error:
+            "An account with this mobile number already exists. Please sign in instead.",
+        },
+        { status: 409 }
+      );
     }
+    console.error("createUser:", createRes.statusCode, createRes.body);
+    return NextResponse.json({ error: msg || "Could not create account" }, { status: 500 });
   }
 
-  const linkRes = await authServiceRolePost(supabaseUrl, serviceKey, "/auth/v1/admin/generate_link", {
-    type: "magiclink",
-    email,
-  });
-
-  if (linkRes.statusCode < 200 || linkRes.statusCode >= 300) {
-    console.error("generate_link:", linkRes.statusCode, linkRes.body);
-    return NextResponse.json(
-      { error: authErrorMessage(linkRes.body) || "Could not complete sign-in" },
-      { status: 500 }
-    );
+  const session = await issueMagicLinkSession(supabaseUrl, serviceKey, email);
+  if (!session.ok) {
+    return NextResponse.json({ error: session.error }, { status: session.status || 500 });
   }
 
-  let hashedToken: string | undefined;
-  try {
-    const linkJson = JSON.parse(linkRes.body) as {
-      properties?: { hashed_token?: string };
-      hashed_token?: string;
-    };
-    hashedToken = linkJson.properties?.hashed_token ?? linkJson.hashed_token;
-  } catch {
-    /* ignore */
-  }
-
-  if (!hashedToken) {
-    console.error("generate_link: missing hashed_token", linkRes.body);
-    return NextResponse.json({ error: "Could not complete sign-in" }, { status: 500 });
-  }
-
-  const verifyRes = await authServiceRolePost(supabaseUrl, serviceKey, "/auth/v1/verify", {
-    type: "email",
-    token_hash: hashedToken,
-    gotrue_meta_security: {},
-  });
-
-  if (verifyRes.statusCode < 200 || verifyRes.statusCode >= 300) {
-    console.error("verify:", verifyRes.statusCode, verifyRes.body);
-    return NextResponse.json(
-      { error: authErrorMessage(verifyRes.body) || "Could not establish session" },
-      { status: 500 }
-    );
-  }
-
-  let session: {
-    access_token?: string;
-    refresh_token?: string;
-    expires_in?: number;
-    expires_at?: number;
-    token_type?: string;
-  };
-  try {
-    const verifyJson = JSON.parse(verifyRes.body) as {
-      session?: typeof session;
-      access_token?: string;
-      user?: { id?: string };
-    };
-    session = verifyJson.session ?? verifyJson;
-    const sessionUserId = verifyJson.user?.id || null;
-    const codeUserId = sessionUserId || createdUserId;
-    if (codeUserId) {
-      const admin = createSupabaseAdmin();
-      await ensureAccountCodeForUser(admin, codeUserId);
+  if (createdUserId) {
+    try {
+      await ensureAccountCodeForUser(admin, createdUserId);
+    } catch (e) {
+      console.warn("[phone/verify] ensureAccountCodeForUser failed:", e);
     }
-  } catch {
-    return NextResponse.json({ error: "Could not establish session" }, { status: 500 });
-  }
-
-  if (!session?.access_token || !session.refresh_token) {
-    console.error("verify: no session in body", verifyRes.body);
-    return NextResponse.json({ error: "Could not establish session" }, { status: 500 });
   }
 
   return NextResponse.json({
