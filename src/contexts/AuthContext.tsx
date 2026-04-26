@@ -258,15 +258,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Supabase Auth has its own built-in CAPTCHA (Dashboard → Authentication →
+  // Bot and Abuse Protection) wired to the same Cloudflare Turnstile we use on
+  // /api/auth/phone/send. Every challenge endpoint (signInWithPassword,
+  // signInWithOtp, verifyOtp, etc.) therefore requires `options.captchaToken`.
+  // Tokens are single-use and ~5 min lifetime, so we always fetch a fresh one
+  // right before the call. If the widget fails we send an empty token and let
+  // Supabase return its own "captcha verification process failed" error which
+  // bubbles up to the UI.
+  const safeGetCaptchaToken = async (): Promise<string> => {
+    try {
+      return await getTurnstileToken();
+    } catch (e) {
+      console.warn("[auth] supabase captcha token unavailable:", e);
+      return "";
+    }
+  };
+
   const sendOtp = async (email: string) => {
     if (!supabase) {
       return { error: "Supabase is not configured" };
     }
     try {
+      const captchaToken = await safeGetCaptchaToken();
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
+          captchaToken,
         },
       });
 
@@ -282,10 +301,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: "Supabase is not configured" };
     }
     try {
+      const captchaToken = await safeGetCaptchaToken();
       const { error } = await supabase.auth.verifyOtp({
         email,
         token,
         type: "email",
+        options: { captchaToken },
       });
 
       if (error) return { error: error.message };
@@ -353,10 +374,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       // Try current + legacy synthetic placeholder emails first so existing
       // accounts continue to work after the domain-format correction.
+      // Each attempt needs a fresh captcha token (single-use).
       let error: { message?: string } | null = null;
       for (const email of syntheticEmailCandidatesForPhone(parsed.digits10)) {
+        const captchaToken = await safeGetCaptchaToken();
         const result = await withTimeout(
-          supabase.auth.signInWithPassword({ email, password }),
+          supabase.auth.signInWithPassword({
+            email,
+            password,
+            options: { captchaToken },
+          }),
           SIGN_IN_TIMEOUT_MS,
           "Sign in"
         );
@@ -369,10 +396,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         // Fallback: phone-based sign-in (works for accounts whose phone column is set
         // and password was registered against that phone).
+        const captchaToken = await safeGetCaptchaToken();
         const phoneAttempt = await withTimeout(
           supabase.auth.signInWithPassword({
             phone: parsed.e164,
             password,
+            options: { captchaToken },
           }),
           SIGN_IN_TIMEOUT_MS,
           "Sign in"
@@ -398,10 +427,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!id) return { error: "Enter mobile number or email" };
     if (id.includes("@")) {
       try {
+        const captchaToken = await safeGetCaptchaToken();
         const { error } = await withTimeout(
           supabase.auth.signInWithPassword({
             email: id.toLowerCase(),
             password,
+            options: { captchaToken },
           }),
           SIGN_IN_TIMEOUT_MS,
           "Sign in"
@@ -554,10 +585,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const clean = token.replace(/\D/g, "");
     if (clean.length !== 6) return { error: "Enter the 6-digit code from your email" };
     try {
+      const captchaToken = await safeGetCaptchaToken();
       const { error } = await supabase.auth.verifyOtp({
         email: email.trim().toLowerCase(),
         token: clean,
         type: "email_change",
+        options: { captchaToken },
       });
       if (error) return { error: error.message };
       const { data: userData, error: userErr } = await supabase.auth.getUser();
