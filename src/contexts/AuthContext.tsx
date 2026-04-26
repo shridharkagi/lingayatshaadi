@@ -143,7 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
   const supabase = createSupabaseClientSafe();
-  const { getToken: getTurnstileToken } = useTurnstile();
+  const { getToken: getTurnstileToken, prime: primeTurnstile } = useTurnstile();
 
   const fetchProfile = async (authUserId: string) => {
     if (!supabase) {
@@ -404,19 +404,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const parsed = normalizeIndianPhone(phone);
     if (!parsed) return { error: "Enter a valid 10-digit mobile number" };
     try {
-      // Try current + legacy synthetic placeholder emails first so existing
-      // accounts continue to work after the domain-format correction.
-      // Each attempt needs a fresh captcha token (single-use).
+      // Attempt order is tuned for latency (each attempt = fresh captcha +
+      // Supabase round-trip, ~500-700ms):
+      //   1. current synthetic email — matches all accounts created after the
+      //      domain-format fix (the vast majority).
+      //   2. phone (E.164) — covers legacy accounts whose phone column is
+      //      populated. This is the more common legacy case.
+      //   3. legacy synthetic email — catches the rare accounts where neither
+      //      the current email format nor the phone column matches.
+      const [emailCurrent, emailLegacy] = syntheticEmailCandidatesForPhone(parsed.digits10);
+      const attempts: Array<{
+        kind: "email_current" | "phone" | "email_legacy";
+        run: (captchaToken: string) =>
+          ReturnType<NonNullable<typeof supabase>["auth"]["signInWithPassword"]>;
+      }> = [
+        {
+          kind: "email_current",
+          run: (captchaToken) =>
+            supabase.auth.signInWithPassword({
+              email: emailCurrent,
+              password,
+              options: { captchaToken },
+            }),
+        },
+        {
+          kind: "phone",
+          run: (captchaToken) =>
+            supabase.auth.signInWithPassword({
+              phone: parsed.e164,
+              password,
+              options: { captchaToken },
+            }),
+        },
+        {
+          kind: "email_legacy",
+          run: (captchaToken) =>
+            supabase.auth.signInWithPassword({
+              email: emailLegacy,
+              password,
+              options: { captchaToken },
+            }),
+        },
+      ];
+
       let error: { message?: string } | null = null;
-      for (const email of syntheticEmailCandidatesForPhone(parsed.digits10)) {
+      for (const attempt of attempts) {
         const cap = await acquireCaptchaToken();
         if (cap.blocked) return { error: CAPTCHA_BLOCKED_MESSAGE };
         const result = await withTimeout(
-          supabase.auth.signInWithPassword({
-            email,
-            password,
-            options: { captchaToken: cap.token },
-          }),
+          attempt.run(cap.token),
           SIGN_IN_TIMEOUT_MS,
           "Sign in"
         );
@@ -425,22 +461,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           break;
         }
         error = result.error;
-      }
-      if (error) {
-        // Fallback: phone-based sign-in (works for accounts whose phone column is set
-        // and password was registered against that phone).
-        const cap = await acquireCaptchaToken();
-        if (cap.blocked) return { error: CAPTCHA_BLOCKED_MESSAGE };
-        const phoneAttempt = await withTimeout(
-          supabase.auth.signInWithPassword({
-            phone: parsed.e164,
-            password,
-            options: { captchaToken: cap.token },
-          }),
-          SIGN_IN_TIMEOUT_MS,
-          "Sign in"
-        );
-        error = phoneAttempt.error;
       }
       if (error) {
         return {

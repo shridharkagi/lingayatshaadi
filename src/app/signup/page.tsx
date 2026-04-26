@@ -7,10 +7,12 @@ import { Heart } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTurnstile } from "@/components/turnstile/TurnstileProvider";
 
 export default function SignupPage() {
   const router = useRouter();
   const { sendPhoneOtp, verifyPhoneOtp, isLoggedIn, profileComplete, loading: authLoading } = useAuth();
+  const { prime: primeCaptcha } = useTurnstile();
   const [step, setStep] = useState<1 | 2>(1);
   const [form, setForm] = useState({
     gender: "" as "" | "male" | "female",
@@ -34,6 +36,13 @@ export default function SignupPage() {
     if (!isLoggedIn) return;
     router.replace(profileComplete ? "/home" : "/profile/complete");
   }, [authLoading, isLoggedIn, profileComplete, router]);
+
+  // Pre-fetch the Cloudflare Turnstile token in the background while the
+  // user fills in the form, so the captcha round-trip doesn't block the
+  // Send OTP click.
+  useEffect(() => {
+    primeCaptcha();
+  }, [primeCaptcha]);
 
   const updateForm = (key: keyof typeof form, value: string) => {
     setForm((f) => ({ ...f, [key]: value }));

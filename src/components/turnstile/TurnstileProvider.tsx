@@ -74,6 +74,14 @@ interface TurnstileContextValue {
    * the challenge — callers should treat that as a verification failure.
    */
   getToken: () => Promise<string>;
+  /**
+   * Hint that a token will likely be needed soon — auth forms call this on
+   * mount or on first input so Cloudflare's challenge runs in parallel with
+   * the user typing instead of blocking the submit click. Idempotent and
+   * safe to call repeatedly; if a primed token is already in flight or
+   * fresh, it's a no-op.
+   */
+  prime: () => void;
   /** True when the widget is mounted and ready to execute. */
   ready: boolean;
 }
@@ -81,6 +89,9 @@ interface TurnstileContextValue {
 const TurnstileContext = createContext<TurnstileContextValue | null>(null);
 
 const TOKEN_WAIT_MS = 12000;
+// Cloudflare tokens are valid ~5 min. Keep our cache shorter so a primed
+// token never arrives at Supabase already-expired.
+const PRIMED_TOKEN_TTL_MS = 4 * 60 * 1000;
 
 export function TurnstileProvider({ children }: { children: ReactNode }) {
   const enabled = isTurnstileClientConfigured();
@@ -89,6 +100,11 @@ export function TurnstileProvider({ children }: { children: ReactNode }) {
   const widgetIdRef = useRef<string | null>(null);
   const pendingResolveRef = useRef<((token: string) => void) | null>(null);
   const pendingRejectRef = useRef<((err: Error) => void) | null>(null);
+  // Primed token state — populated by prime() so getToken() can return
+  // immediately on the first call after a form mount. Single-use; cleared
+  // the moment getToken() consumes it.
+  const primedPromiseRef = useRef<Promise<string> | null>(null);
+  const primedTokenRef = useRef<{ token: string; expiresAt: number } | null>(null);
   const [ready, setReady] = useState(false);
 
   const settle = useCallback(
@@ -162,7 +178,8 @@ export function TurnstileProvider({ children }: { children: ReactNode }) {
     return () => window.clearInterval(id);
   }, [enabled, tryInitWidget]);
 
-  const getToken = useCallback(async (): Promise<string> => {
+  /** Run the actual Cloudflare challenge and resolve with the resulting token. */
+  const fetchFreshToken = useCallback(async (): Promise<string> => {
     if (!enabled) return "";
     if (typeof window === "undefined") return "";
 
@@ -216,16 +233,75 @@ export function TurnstileProvider({ children }: { children: ReactNode }) {
     });
   }, [enabled, tryInitWidget]);
 
+  const prime = useCallback(() => {
+    if (!enabled) return;
+    // Already have a fresh primed token — don't waste a Cloudflare call.
+    const cached = primedTokenRef.current;
+    if (cached && cached.expiresAt > Date.now()) return;
+    // Already primed and the request is in flight — let it complete.
+    if (primedPromiseRef.current) return;
+
+    const p = fetchFreshToken()
+      .then((token) => {
+        if (token) {
+          primedTokenRef.current = {
+            token,
+            expiresAt: Date.now() + PRIMED_TOKEN_TTL_MS,
+          };
+        }
+        return token;
+      })
+      .catch((err) => {
+        // Swallow — getToken() will retry inline and surface the real error.
+        console.warn("[turnstile] prime failed:", err instanceof Error ? err.message : err);
+        return "";
+      })
+      .finally(() => {
+        primedPromiseRef.current = null;
+      });
+    primedPromiseRef.current = p;
+  }, [enabled, fetchFreshToken]);
+
+  const getToken = useCallback(async (): Promise<string> => {
+    if (!enabled) return "";
+
+    // Fast path: a primed token is sitting ready. Consume and return.
+    const cached = primedTokenRef.current;
+    if (cached && cached.expiresAt > Date.now()) {
+      primedTokenRef.current = null;
+      return cached.token;
+    }
+
+    // A prime() call is in flight — await it instead of issuing a parallel
+    // execute() (Cloudflare rejects concurrent challenges on one widget).
+    const inflight = primedPromiseRef.current;
+    if (inflight) {
+      const token = await inflight;
+      // Whether prime succeeded or failed, the cache is now drained.
+      const fresh = primedTokenRef.current;
+      if (fresh) {
+        primedTokenRef.current = null;
+        return fresh.token;
+      }
+      if (token) return token;
+      // prime resolved with empty (e.g. widget not ready) — fall through.
+    }
+
+    return fetchFreshToken();
+  }, [enabled, fetchFreshToken]);
+
   if (!enabled) {
     return (
-      <TurnstileContext.Provider value={{ getToken: async () => "", ready: false }}>
+      <TurnstileContext.Provider
+        value={{ getToken: async () => "", prime: () => {}, ready: false }}
+      >
         {children}
       </TurnstileContext.Provider>
     );
   }
 
   return (
-    <TurnstileContext.Provider value={{ getToken, ready }}>
+    <TurnstileContext.Provider value={{ getToken, prime, ready }}>
       <Script
         src={TURNSTILE_SCRIPT_SRC}
         strategy="afterInteractive"
@@ -255,7 +331,7 @@ export function useTurnstile(): TurnstileContextValue {
   if (!ctx) {
     // No provider in tree — degrade gracefully. The server will decide what
     // to do with the empty token based on its mode.
-    return { getToken: async () => "", ready: false };
+    return { getToken: async () => "", prime: () => {}, ready: false };
   }
   return ctx;
 }

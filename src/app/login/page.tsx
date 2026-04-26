@@ -8,6 +8,7 @@ import { Heart, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTurnstile } from "@/components/turnstile/TurnstileProvider";
 
 const LOGIN_IMAGE =
   "https://images.unsplash.com/photo-1605649487212-47bdab064df7?w=800&q=80";
@@ -25,6 +26,7 @@ export default function LoginPage() {
     profileComplete,
     loading: authLoading,
   } = useAuth();
+  const { prime: primeCaptcha } = useTurnstile();
   const [loginMode, setLoginMode] = useState<LoginMode>("otp");
   const [mobile, setMobile] = useState("");
   const [passwordId, setPasswordId] = useState("");
@@ -62,6 +64,14 @@ export default function LoginPage() {
     if (!isLoggedIn) return;
     router.replace(profileComplete ? "/home" : "/profile/complete");
   }, [authLoading, isLoggedIn, profileComplete, router]);
+
+  // Start the Cloudflare Turnstile challenge in the background as soon as
+  // the user reaches this page. By the time they finish typing and click
+  // Sign In / Send OTP the token is usually already cached, taking the
+  // captcha round-trip off the critical path.
+  useEffect(() => {
+    primeCaptcha();
+  }, [primeCaptcha]);
 
   useEffect(() => {
     if (resendIn <= 0) return;
