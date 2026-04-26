@@ -10,7 +10,12 @@ import {
   syntheticEmailForPhone,
   syntheticEmailCandidatesForPhone,
 } from "@/lib/phoneAuth";
-import { friendlyEmailChangeError, isAuthEmailRateLimitedMessage } from "@/lib/authUserFacingErrors";
+import {
+  CAPTCHA_BLOCKED_MESSAGE,
+  friendlyEmailChangeError,
+  isAuthEmailRateLimitedMessage,
+  isCaptchaErrorMessage,
+} from "@/lib/authUserFacingErrors";
 import { withTimeout } from "@/lib/withTimeout";
 import { useTurnstile } from "@/components/turnstile/TurnstileProvider";
 import type { User } from "@supabase/supabase-js";
@@ -263,16 +268,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // /api/auth/phone/send. Every challenge endpoint (signInWithPassword,
   // signInWithOtp, verifyOtp, etc.) therefore requires `options.captchaToken`.
   // Tokens are single-use and ~5 min lifetime, so we always fetch a fresh one
-  // right before the call. If the widget fails we send an empty token and let
-  // Supabase return its own "captcha verification process failed" error which
-  // bubbles up to the UI.
-  const safeGetCaptchaToken = async (): Promise<string> => {
+  // right before the call.
+  //
+  // Two failure modes to distinguish:
+  //   - Turnstile not configured at all (e.g. local dev without keys) → token
+  //     is "" and `blocked` is false. Server-side captcha verification will
+  //     decide what to do.
+  //   - Turnstile configured but token acquisition threw (timeout, widget
+  //     error). This almost always means the user is behind a corporate
+  //     proxy / VPN or aggressive ad-blocker that's interfering with
+  //     challenges.cloudflare.com. We surface CAPTCHA_BLOCKED_MESSAGE rather
+  //     than letting Supabase return its cryptic "captcha verification
+  //     process failed".
+  const acquireCaptchaToken = async (): Promise<{
+    token: string;
+    blocked: boolean;
+  }> => {
     try {
-      return await getTurnstileToken();
+      const token = await getTurnstileToken();
+      return { token, blocked: false };
     } catch (e) {
-      console.warn("[auth] supabase captcha token unavailable:", e);
-      return "";
+      const reason = e instanceof Error ? e.message : String(e);
+      console.warn("[auth] captcha token unavailable:", reason);
+      return { token: "", blocked: true };
     }
+  };
+
+  /** If the Supabase error mentions captcha/turnstile, swap in our actionable copy. */
+  const friendlyAuthError = (raw: string | undefined, fallback: string): string => {
+    if (!raw) return fallback;
+    if (isCaptchaErrorMessage(raw)) return CAPTCHA_BLOCKED_MESSAGE;
+    return raw;
   };
 
   const sendOtp = async (email: string) => {
@@ -280,16 +306,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: "Supabase is not configured" };
     }
     try {
-      const captchaToken = await safeGetCaptchaToken();
+      const cap = await acquireCaptchaToken();
+      if (cap.blocked) return { error: CAPTCHA_BLOCKED_MESSAGE };
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
-          captchaToken,
+          captchaToken: cap.token,
         },
       });
 
-      if (error) return { error: error.message };
+      if (error) return { error: friendlyAuthError(error.message, "Failed to send OTP") };
       return {};
     } catch {
       return { error: "Failed to send OTP" };
@@ -301,15 +328,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: "Supabase is not configured" };
     }
     try {
-      const captchaToken = await safeGetCaptchaToken();
+      const cap = await acquireCaptchaToken();
+      if (cap.blocked) return { error: CAPTCHA_BLOCKED_MESSAGE };
       const { error } = await supabase.auth.verifyOtp({
         email,
         token,
         type: "email",
-        options: { captchaToken },
+        options: { captchaToken: cap.token },
       });
 
-      if (error) return { error: error.message };
+      if (error) return { error: friendlyAuthError(error.message, "Failed to verify OTP") };
       return {};
     } catch {
       return { error: "Failed to verify OTP" };
@@ -323,16 +351,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Acquire a fresh Turnstile token right before the request. Tokens cannot
     // be reused (Cloudflare enforces) and have a ~5 minute lifetime, so doing
     // this at submit time avoids the trap of an expired token if the user
-    // sat on the form. Empty string when Turnstile is not configured — the
-    // server will decide based on TURNSTILE_MODE.
-    let turnstileToken = "";
-    try {
-      turnstileToken = await getTurnstileToken();
-    } catch (e) {
-      console.warn("[auth] turnstile getToken failed:", e);
-      // Continue with empty token; server enforce mode will return 403 with a
-      // friendly message we surface to the user.
-    }
+    // sat on the form.
+    //
+    // If acquisition fails outright (corporate proxy / VPN / ad-blocker
+    // intercepting challenges.cloudflare.com), short-circuit with the friendly
+    // captcha-blocked message instead of sending an empty token and watching
+    // the server bounce it.
+    const cap = await acquireCaptchaToken();
+    if (cap.blocked) return { error: CAPTCHA_BLOCKED_MESSAGE };
 
     const controller = new AbortController();
     const abortTimer = window.setTimeout(() => controller.abort(), PHONE_AUTH_FETCH_MS);
@@ -340,15 +366,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await fetch("/api/auth/phone/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, purpose, turnstileToken }),
+        body: JSON.stringify({ phone, purpose, turnstileToken: cap.token }),
         signal: controller.signal,
       });
       const data = (await res.json()) as {
         error?: string;
         cooldown_seconds?: number;
         retry_after?: number;
+        captcha?: string;
       };
       if (!res.ok) {
+        // Server flagged the request as captcha-failed (enforce mode) — give
+        // the user actionable copy rather than the generic server message.
+        if (res.status === 403 && data.captcha === "failed") {
+          return { error: CAPTCHA_BLOCKED_MESSAGE };
+        }
         return {
           error: data.error || "Failed to send SMS OTP",
           retryAfter: data.retry_after,
@@ -377,12 +409,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Each attempt needs a fresh captcha token (single-use).
       let error: { message?: string } | null = null;
       for (const email of syntheticEmailCandidatesForPhone(parsed.digits10)) {
-        const captchaToken = await safeGetCaptchaToken();
+        const cap = await acquireCaptchaToken();
+        if (cap.blocked) return { error: CAPTCHA_BLOCKED_MESSAGE };
         const result = await withTimeout(
           supabase.auth.signInWithPassword({
             email,
             password,
-            options: { captchaToken },
+            options: { captchaToken: cap.token },
           }),
           SIGN_IN_TIMEOUT_MS,
           "Sign in"
@@ -396,19 +429,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         // Fallback: phone-based sign-in (works for accounts whose phone column is set
         // and password was registered against that phone).
-        const captchaToken = await safeGetCaptchaToken();
+        const cap = await acquireCaptchaToken();
+        if (cap.blocked) return { error: CAPTCHA_BLOCKED_MESSAGE };
         const phoneAttempt = await withTimeout(
           supabase.auth.signInWithPassword({
             phone: parsed.e164,
             password,
-            options: { captchaToken },
+            options: { captchaToken: cap.token },
           }),
           SIGN_IN_TIMEOUT_MS,
           "Sign in"
         );
         error = phoneAttempt.error;
       }
-      if (error) return { error: error.message || "Invalid mobile number or password" };
+      if (error) {
+        return {
+          error: friendlyAuthError(error.message, "Invalid mobile number or password"),
+        };
+      }
       return {};
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -427,17 +465,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!id) return { error: "Enter mobile number or email" };
     if (id.includes("@")) {
       try {
-        const captchaToken = await safeGetCaptchaToken();
+        const cap = await acquireCaptchaToken();
+        if (cap.blocked) return { error: CAPTCHA_BLOCKED_MESSAGE };
         const { error } = await withTimeout(
           supabase.auth.signInWithPassword({
             email: id.toLowerCase(),
             password,
-            options: { captchaToken },
+            options: { captchaToken: cap.token },
           }),
           SIGN_IN_TIMEOUT_MS,
           "Sign in"
         );
-        if (error) return { error: error.message || "Invalid email or password" };
+        if (error) {
+          return {
+            error: friendlyAuthError(error.message, "Invalid email or password"),
+          };
+        }
         return {};
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -585,14 +628,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const clean = token.replace(/\D/g, "");
     if (clean.length !== 6) return { error: "Enter the 6-digit code from your email" };
     try {
-      const captchaToken = await safeGetCaptchaToken();
+      const cap = await acquireCaptchaToken();
+      if (cap.blocked) return { error: CAPTCHA_BLOCKED_MESSAGE };
       const { error } = await supabase.auth.verifyOtp({
         email: email.trim().toLowerCase(),
         token: clean,
         type: "email_change",
-        options: { captchaToken },
+        options: { captchaToken: cap.token },
       });
-      if (error) return { error: error.message };
+      if (error) return { error: friendlyAuthError(error.message, "Verification failed") };
       const { data: userData, error: userErr } = await supabase.auth.getUser();
       if (userErr) return { error: userErr.message };
       if (userData.user) {

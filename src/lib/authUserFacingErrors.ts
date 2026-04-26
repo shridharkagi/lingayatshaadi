@@ -1,6 +1,29 @@
 /**
  * Turns Supabase Auth / GoTrue messages into short, actionable copy for the UI.
  */
+
+/**
+ * Shown to the user when Cloudflare Turnstile cannot deliver a token, typically
+ * because a corporate proxy (Zscaler, Cisco Umbrella, Palo Alto Prisma, Netskope,
+ * Symantec) or strict ad-blocker is intercepting Cloudflare's challenge platform
+ * traffic. The wording deliberately avoids saying "captcha failed" because that
+ * sounds like the user did something wrong.
+ */
+export const CAPTCHA_BLOCKED_MESSAGE =
+  "Couldn't verify your browser. This usually means a corporate VPN/proxy or " +
+  "strict ad-blocker is blocking our security check. Try mobile data, " +
+  "switch to a personal network, or see Help → Sign-in issues.";
+
+/**
+ * Detect captcha-related error messages bubbling up from Supabase Auth so we
+ * can replace them with a more actionable instruction.
+ */
+export function isCaptchaErrorMessage(raw: string): boolean {
+  if (!raw) return false;
+  const m = raw.toLowerCase();
+  return m.includes("captcha") || m.includes("turnstile");
+}
+
 export function friendlyEmailChangeError(raw: string): string {
   const m = raw.toLowerCase();
   if (
