@@ -311,29 +311,73 @@ export async function findAuthUserByPhone(
 }
 
 /**
- * Prefer rows whose `phone` column actually matches the input (those are the
- * "real" accounts; junk duplicate rows usually have NULL phone), then choose
- * the oldest by `created_at` so we always return the original account, never a
- * partially-created later row.
+ * Pick the canonical row out of a candidate set.
+ *
+ * Historically this function preferred phone-matched rows and then the oldest
+ * `created_at`. That broke down when a phone number had two rows:
+ *   • an old "junk" row (phone column populated but email + metadata NULL —
+ *     residue of the older OTP-login auto-create bug), and
+ *   • the real account row (phone + email + metadata all populated).
+ *
+ * The old "oldest wins" rule picked the junk row, after which
+ * `handleLoginOrReset` would synthesise an email from `digits10` (because
+ * existing.email was NULL). That synthesised email would not exist in
+ * auth.users, and `generate_link` with type='magiclink' silently created a
+ * brand-new third row — exactly the regression we are fixing.
+ *
+ * The new rule scores rows by how "complete" they are. A row that has the
+ * phone column populated AND an email AND non-empty user_metadata is far
+ * more likely to be the real account than a phone-only stub. Tie-break on
+ * `created_at` ASC so when two equally-complete rows exist (very rare) we
+ * still return the original.
+ *
+ * Score weights:
+ *   +4  phone column populated AND it matches the input phone
+ *   +2  has an email column set
+ *   +1  has non-empty user_metadata
  */
 function pickBestMatch(
   matches: AuthUserLite[],
   phoneE164: string,
   phoneStripped: string
 ): AuthUserLite {
-  const phoneMatched = matches.filter((m) => {
-    const p = (m.phone || "").trim();
-    return p === phoneE164 || p === phoneStripped || p === `+${phoneStripped}`;
-  });
-  const pool = phoneMatched.length > 0 ? phoneMatched : matches;
+  const score = (m: AuthUserLite): number => {
+    const phone = (m.phone || "").trim();
+    const phoneMatches =
+      phone === phoneE164 || phone === phoneStripped || phone === `+${phoneStripped}`;
+    let s = 0;
+    if (phoneMatches) s += 4;
+    if (m.email && m.email.trim().length > 0) s += 2;
+    if (m.user_metadata && Object.keys(m.user_metadata).length > 0) s += 1;
+    return s;
+  };
 
-  pool.sort((a, b) => {
+  const sorted = [...matches].sort((a, b) => {
+    const sb = score(b);
+    const sa = score(a);
+    if (sa !== sb) return sb - sa;
     const at = a.created_at ? new Date(a.created_at).getTime() : Number.MAX_SAFE_INTEGER;
     const bt = b.created_at ? new Date(b.created_at).getTime() : Number.MAX_SAFE_INTEGER;
     return at - bt;
   });
 
-  return pool[0];
+  if (sorted.length > 1) {
+    console.warn(
+      "[findAuthUserByPhone] multiple matches; selected highest-scoring:",
+      JSON.stringify(
+        sorted.map((m) => ({
+          id: m.id,
+          phone: m.phone || null,
+          has_email: !!(m.email && m.email.trim()),
+          has_metadata: !!(m.user_metadata && Object.keys(m.user_metadata).length > 0),
+          score: score(m),
+          created_at: m.created_at || null,
+        }))
+      )
+    );
+  }
+
+  return sorted[0];
 }
 
 /**

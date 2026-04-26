@@ -181,11 +181,31 @@ async function handleLoginOrReset({
     );
   }
 
-  // Use the user's actual stored email — that may be the legacy synthetic
-  // email (no `.in`) or the current one. Falling back to the new format would
-  // sign the user into the WRONG row.
-  const sessionEmail =
-    (existing.email && existing.email.trim()) || syntheticEmailForPhone(parsed.digits10);
+  // Use the user's ACTUAL stored email. Do NOT synthesise a fallback — if the
+  // canonical row truly has no email column populated, synthesising would
+  // either (a) match a different row's email and sign us into the wrong
+  // account, or (b) match no row at all and (with the old magiclink flow)
+  // create a brand-new duplicate. Either way it is unsafe. Surface a clear
+  // admin-actionable error instead so we can repair the data.
+  const sessionEmail = (existing.email && existing.email.trim()) || "";
+  if (!sessionEmail) {
+    console.error(
+      "[phone/verify] login: matched auth row has NULL email — refusing to issue session",
+      {
+        user_id: existing.id,
+        phone_e164: parsed.e164,
+      }
+    );
+    return NextResponse.json(
+      {
+        error:
+          "We could not complete sign-in for this account. Please contact support and quote reference " +
+          existing.id.slice(0, 8) +
+          ".",
+      },
+      { status: 500 }
+    );
+  }
 
   const session = await issueMagicLinkSession(supabaseUrl, serviceKey, sessionEmail);
   if (!session.ok) {

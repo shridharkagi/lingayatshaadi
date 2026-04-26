@@ -10,8 +10,28 @@ function authErrorMessage(body: string): string {
 }
 
 /**
- * Issues access + refresh tokens by exchanging a one-time magic link for the given auth email.
- * Same pattern as phone OTP verify (login path for existing users).
+ * Issues access + refresh tokens for an EXISTING auth user identified by email.
+ *
+ * IMPORTANT — why we use `type: "recovery"` instead of `type: "magiclink"`:
+ *   GoTrue's `generate_link` with `type=magiclink` will SILENTLY CREATE a new
+ *   auth user when the email doesn't exist (whenever "Allow new user signups"
+ *   is on at the project level). That turned a benign caller bug — passing
+ *   the wrong synthetic-email format into a phone-OTP login — into a
+ *   duplicate-user bug: a fresh row would be created and the user would be
+ *   signed into it, orphaning their real account. See the U26049 incident
+ *   (26/04/2026) for a real-world example.
+ *
+ *   `type=recovery` returns a 422 user_not_found if the email doesn't exist,
+ *   so we fail loudly instead of silently corrupting the database. The
+ *   subsequent `/auth/v1/verify` exchange returns a normal session (the
+ *   "recovery" naming is historical — gotrue does not require a password
+ *   change to consume the token). For our flow this is purely a session
+ *   issuance; the user is logged into the SAME account they already had.
+ *
+ *   Callers that want to create-or-login should call `/auth/v1/admin/users`
+ *   themselves first (we already do this in the OTP-signup flow) and then
+ *   issue a session through this helper. That way auth-row creation is
+ *   always an explicit, intentional act.
  */
 export async function issueMagicLinkSession(
   supabaseUrl: string,
@@ -29,12 +49,28 @@ export async function issueMagicLinkSession(
   | { ok: false; error: string; status: number }
 > {
   const linkRes = await authServiceRolePost(supabaseUrl, serviceKey, "/auth/v1/admin/generate_link", {
-    type: "magiclink",
+    type: "recovery",
     email,
   });
 
   if (linkRes.statusCode < 200 || linkRes.statusCode >= 300) {
-    console.error("generate_link:", linkRes.statusCode, linkRes.body);
+    // user_not_found → surface a friendly login-style error instead of a 500.
+    // Anything else is logged so we can investigate.
+    const lowerBody = linkRes.body.toLowerCase();
+    const isNotFound =
+      linkRes.statusCode === 422 ||
+      linkRes.statusCode === 404 ||
+      lowerBody.includes("user not found") ||
+      lowerBody.includes("user_not_found");
+    if (isNotFound) {
+      console.warn("generate_link(recovery) user_not_found:", email, linkRes.body);
+      return {
+        ok: false,
+        error: "No account found for this sign-in. Please create an account first.",
+        status: 404,
+      };
+    }
+    console.error("generate_link(recovery):", linkRes.statusCode, linkRes.body);
     return {
       ok: false,
       error: authErrorMessage(linkRes.body) || "Could not complete sign-in",
@@ -58,8 +94,10 @@ export async function issueMagicLinkSession(
     return { ok: false, error: "Could not complete sign-in", status: 500 };
   }
 
+  // gotrue's /auth/v1/verify accepts type='recovery' with token_hash and
+  // returns a normal session — exactly what we want.
   const verifyRes = await authServiceRolePost(supabaseUrl, serviceKey, "/auth/v1/verify", {
-    type: "email",
+    type: "recovery",
     token_hash: hashedToken,
     gotrue_meta_security: {},
   });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { normalizeIndianPhone, syntheticEmailForPhone } from "@/lib/phoneAuth";
+import { normalizeIndianPhone } from "@/lib/phoneAuth";
 import { verifyPhoneOtpChallenge } from "@/lib/server/phoneOtpChallenge";
 import { issueMagicLinkSession } from "@/lib/server/issueMagicLinkSession";
 import { resolveOtpChannel } from "@/lib/phoneOtpConfig";
@@ -66,7 +66,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No account found for this mobile number" }, { status: 404 });
   }
 
-  const sessionEmail = (user.email && user.email.trim()) || syntheticEmailForPhone(parsed.digits10);
+  // Same defence as /phone/verify: never synthesise an email when the
+  // matched row has none. If a user truly has no email column we cannot
+  // safely issue a session via the email-based gotrue flow without risking
+  // creating a duplicate row. The user's password update is harmless to do
+  // either way (it is keyed by user_id), but we ABORT before issuing the
+  // session if email is missing — surfacing a clear support-quotable error
+  // — instead of silently routing into a parallel account.
+  const sessionEmail = (user.email && user.email.trim()) || "";
+  if (!sessionEmail) {
+    console.error(
+      "[reset-password] matched auth row has NULL email — refusing to issue session",
+      { user_id: user.id, phone_e164: parsed.e164 }
+    );
+    return NextResponse.json(
+      {
+        error:
+          "We could not complete sign-in for this account. Please contact support and quote reference " +
+          user.id.slice(0, 8) +
+          ".",
+      },
+      { status: 500 }
+    );
+  }
 
   const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
     password: newPassword,
