@@ -68,7 +68,9 @@ export async function GET(req: NextRequest) {
   if (userIds.length === 0) return NextResponse.json({ users: [] });
   const { data: profiles, error: pErr } = await admin
     .from("profiles")
-    .select("id, user_id, public_id, full_name, profile_status, moderation_status, updated_at, contact, deleted_at")
+    .select(
+      "id, user_id, public_id, full_name, account_holder_name, profile_status, moderation_status, updated_at, contact, deleted_at"
+    )
     .in("user_id", userIds);
   if (pErr) return NextResponse.json({ error: pErr.message }, { status: 500 });
 
@@ -311,6 +313,42 @@ export async function GET(req: NextRequest) {
     bump(viewer.user_id, ev.created_at || null);
   }
 
+  /**
+   * Resolve the account holder's display name, in decreasing order of
+   * accuracy:
+   *   1. auth.users.user_metadata.full_name — captured at signup, the most
+   *      reliable signal for "who owns this account".
+   *   2. user_metadata.first_name — partial signup data.
+   *   3. profile.account_holder_name — explicitly set when the profile was
+   *      created on behalf of a relative (parent/guardian-managed).
+   *   4. profile.full_name — the candidate's name. For self-managed
+   *      profiles this IS the account holder; for relative-managed it's at
+   *      least better than "-".
+   *   5. "-" — genuine blank: signed up but never captured a name.
+   */
+  const resolveAccountHolderName = (
+    u: AuthUserLite,
+    profilesForUser: Array<Record<string, unknown>>
+  ): string => {
+    const meta = u.user_metadata || {};
+    const fromMetaFull = String((meta as { full_name?: string }).full_name || "").trim();
+    if (fromMetaFull) return fromMetaFull;
+    const fromMetaFirst = String((meta as { first_name?: string }).first_name || "").trim();
+    if (fromMetaFirst) return fromMetaFirst;
+    const live = profilesForUser.filter(
+      (p) => !(p as { deleted_at?: string | null }).deleted_at
+    );
+    for (const p of live) {
+      const ahn = String((p as { account_holder_name?: string }).account_holder_name || "").trim();
+      if (ahn) return ahn;
+    }
+    for (const p of live) {
+      const fn = String((p as { full_name?: string }).full_name || "").trim();
+      if (fn) return fn;
+    }
+    return "-";
+  };
+
   const rows = users.map((u) => {
     const owned = (map.get(u.id) || []).filter((p) => !(p as { deleted_at?: string | null }).deleted_at);
     const published = owned.filter(
@@ -338,10 +376,7 @@ export async function GET(req: NextRequest) {
       : null;
     return {
       id: u.id,
-      accountHolderName:
-        String(u.user_metadata?.full_name || "").trim() ||
-        String(u.user_metadata?.first_name || "").trim() ||
-        "-",
+      accountHolderName: resolveAccountHolderName(u, map.get(u.id) || []),
       email: u.email || null,
       phone: u.phone || null,
       createdAt: u.created_at || null,

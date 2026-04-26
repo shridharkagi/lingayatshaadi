@@ -336,9 +336,71 @@ function pickBestMatch(
   return pool[0];
 }
 
+/**
+ * Primary path for listing auth users on this project.
+ *
+ * Uses the SECURITY DEFINER RPC `public.list_all_auth_users` (see
+ * `supabase-list-all-auth-users.sql`). This is the only path that reliably
+ * returns `raw_user_meta_data` — every other path either fails with
+ * "Database error finding users" (gotrue listUsers) or "Invalid schema:
+ * auth" (PostgREST direct), or it loses metadata entirely (the
+ * profiles/account-codes fallbacks).
+ *
+ * Returns null when the RPC is missing or errors, so the caller can fall
+ * back to the legacy paths instead of failing the whole request.
+ */
+async function listUsersFromRpc(admin: SupabaseClient): Promise<AuthUserLite[] | null> {
+  type RpcRow = {
+    id?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    created_at?: string | null;
+    raw_user_meta_data?: Record<string, unknown> | null;
+  };
+  try {
+    const { data, error } = await admin.rpc("list_all_auth_users");
+    if (error) {
+      console.warn(
+        "[listAllAuthUsers] RPC list_all_auth_users failed:",
+        error.message,
+        "— falling back to listUsers / direct auth.users / profiles paths.",
+        "Apply supabase-list-all-auth-users.sql to silence this."
+      );
+      return null;
+    }
+    if (!Array.isArray(data)) return null;
+    const out: AuthUserLite[] = [];
+    for (const raw of data as RpcRow[]) {
+      const id = String(raw.id || "").trim();
+      if (!id) continue;
+      out.push({
+        id,
+        email: raw.email || null,
+        phone: raw.phone || null,
+        created_at: raw.created_at || null,
+        user_metadata: raw.raw_user_meta_data || null,
+      });
+    }
+    return out;
+  } catch (e) {
+    console.warn(
+      "[listAllAuthUsers] RPC list_all_auth_users threw:",
+      e instanceof Error ? e.message : String(e)
+    );
+    return null;
+  }
+}
+
 export async function listAllAuthUsers(admin: SupabaseClient): Promise<AuthUserLite[]> {
+  // 1. Primary: SECURITY DEFINER RPC. Reliable on this project where the
+  //    standard listUsers + auth-schema paths both fail, and unlike the
+  //    profiles-based fallbacks this one preserves raw_user_meta_data
+  //    (so account-holder names show up in the superadmin UI).
+  const fromRpc = await listUsersFromRpc(admin);
+  if (fromRpc !== null) return fromRpc;
+
+  // 2. gotrue admin listUsers — works on most projects, broken on ours.
   const users: AuthUserLite[] = [];
-  // GoTrue listUsers is more reliable with smaller pages on some projects.
   const perPage = 100;
   try {
     for (let page = 1; page <= 200; page += 1) {
@@ -350,21 +412,23 @@ export async function listAllAuthUsers(admin: SupabaseClient): Promise<AuthUserL
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     if (!/database error finding users/i.test(msg)) throw error;
-    // First fallback: read auth.users directly.
+    // 3. Direct SELECT against the auth schema (works only if PostgREST
+    //    has been configured to expose it).
     try {
       const fromAuthSchema = await listUsersFromAuthTableFallback(admin);
       if (fromAuthSchema.length > 0) return fromAuthSchema;
     } catch {
-      // If auth schema access is unavailable, continue to last-resort fallback.
+      // continue to next fallback
     }
-    // Second fallback: use persisted account-code rows (all account owners).
+    // 4. user_account_codes + profiles join — loses user_metadata, names
+    //    only land for profiles whose `account_holder_name` is populated.
     try {
       const fromAccountCodes = await listUsersFromAccountCodesFallback(admin);
       if (fromAccountCodes.length > 0) return fromAccountCodes;
     } catch {
-      // Continue to last-resort fallback.
+      // continue to last-resort fallback
     }
-    // Last-resort fallback: derive account owners from profiles.
+    // 5. Last-resort: derive account owners from profiles only.
     return await listUsersFromProfilesFallback(admin);
   }
   return users;
