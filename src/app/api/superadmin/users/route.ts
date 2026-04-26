@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
-import { computeAccountCodes } from "@/lib/accountCode";
 import { generatePublicIdFromExistingIds } from "@/lib/memberId";
 import { listAllAuthUsers, type AuthUserLite } from "@/lib/server/authUsers";
+import { resolveAccountCodeMap } from "@/lib/server/accountCodes";
 
 type Range = "all" | "today" | "last7" | "last30" | "this_month";
 
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
     id: u.id,
     created_at: u.created_at,
   }));
-  const codeByUser = computeAccountCodes(allUsersForCodes);
+  const codeByUser = await resolveAccountCodeMap(admin, allUsersForCodes);
 
   let users = listedUsers;
   const signupFloor = getFloor(signupRange);

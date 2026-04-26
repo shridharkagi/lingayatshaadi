@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
 import { logAdminAudit } from "@/lib/server/adminAudit";
-import { computeAccountCodes } from "@/lib/accountCode";
+import { resolveAccountCodeMap } from "@/lib/server/accountCodes";
+import { listAllAuthUsers, type AuthUserLite } from "@/lib/server/authUsers";
 
 type UpgradeRow = {
   id: string;
@@ -38,9 +39,15 @@ export async function GET(req: NextRequest) {
   const requests = (data || []) as UpgradeRow[];
   const userIds = [...new Set(requests.map((r) => r.user_id).filter(Boolean))];
 
-  const { data: listed } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  const codeByUser = computeAccountCodes(
-    (listed?.users || []).map((u) => ({ id: u.id, created_at: u.created_at }))
+  let authUsers: AuthUserLite[] = [];
+  try {
+    authUsers = await listAllAuthUsers(admin);
+  } catch {
+    authUsers = [];
+  }
+  const codeByUser = await resolveAccountCodeMap(
+    admin,
+    authUsers.map((u) => ({ id: u.id, created_at: u.created_at }))
   );
 
   type Prof = { id: string; full_name: string | null; user_id: string };

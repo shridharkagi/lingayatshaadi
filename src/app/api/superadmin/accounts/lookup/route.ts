@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
-import { computeAccountCodes } from "@/lib/accountCode";
+import { resolveAccountCodeMap } from "@/lib/server/accountCodes";
+import { listAllAuthUsers } from "@/lib/server/authUsers";
 
 export async function GET(req: NextRequest) {
   const auth = await requireSuperAdmin(req);
@@ -11,13 +12,19 @@ export async function GET(req: NextRequest) {
   if (q.length < 2) return NextResponse.json({ items: [] });
 
   const admin = createSupabaseAdmin();
-  const listed = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  if (listed.error) {
-    return NextResponse.json({ error: listed.error.message || "Could not fetch users" }, { status: 500 });
+  let users;
+  try {
+    users = await listAllAuthUsers(admin);
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Could not fetch users" },
+      { status: 500 }
+    );
   }
-
-  const users = listed.data.users || [];
-  const codeByUser = computeAccountCodes(users.map((u) => ({ id: u.id, created_at: u.created_at })));
+  const codeByUser = await resolveAccountCodeMap(
+    admin,
+    users.map((u) => ({ id: u.id, created_at: u.created_at }))
+  );
   const items = users
     .map((u) => {
       const name =

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
-import { computeAccountCodes } from "@/lib/accountCode";
 import { logAdminAudit } from "@/lib/server/adminAudit";
+import { resolveAccountCodeMap } from "@/lib/server/accountCodes";
+import { listAllAuthUsers } from "@/lib/server/authUsers";
 
 type Body = {
   profileId?: string;
@@ -34,12 +35,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: profileErr?.message || "Profile not found" }, { status: 404 });
   }
 
-  const listed = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  if (listed.error) {
-    return NextResponse.json({ error: listed.error.message || "Could not load users" }, { status: 500 });
+  let users;
+  try {
+    users = await listAllAuthUsers(admin);
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Could not load users" },
+      { status: 500 }
+    );
   }
-  const users = listed.data.users || [];
-  const codeByUser = computeAccountCodes(
+  const codeByUser = await resolveAccountCodeMap(
+    admin,
     users.map((u) => ({ id: u.id, created_at: u.created_at }))
   );
   const userByCode = new Map<string, (typeof users)[number]>();

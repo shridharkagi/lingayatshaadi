@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireAuthUser } from "@/lib/server/requireAuthUser";
-import { computeAccountCodes } from "@/lib/accountCode";
 import { listAllAuthUsers } from "@/lib/server/authUsers";
+import { ensureAccountCodeForUser, resolveAccountCodeMap } from "@/lib/server/accountCodes";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuthUser(req);
@@ -20,8 +20,12 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const codes = computeAccountCodes(users);
-  const accountCode = codes.get(auth.userId) || null;
+  const codes = await resolveAccountCodeMap(admin, users);
+  let accountCode = codes.get(auth.userId) || null;
+  if (!accountCode) {
+    const createdAt = users.find((u) => u.id === auth.userId)?.created_at || null;
+    accountCode = await ensureAccountCodeForUser(admin, auth.userId, createdAt);
+  }
 
   return NextResponse.json({ accountCode });
 }

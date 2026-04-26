@@ -4,6 +4,8 @@ import { normalizeIndianPhone, syntheticEmailForPhone } from "@/lib/phoneAuth";
 import { createHash, randomBytes } from "crypto";
 import { resolveOtpChannel } from "@/lib/phoneOtpConfig";
 import { verifyPhoneOtpChallenge } from "@/lib/server/phoneOtpChallenge";
+import { createSupabaseAdmin } from "@/lib/supabase";
+import { ensureAccountCodeForUser } from "@/lib/server/accountCodes";
 
 export const runtime = "nodejs";
 
@@ -126,6 +128,13 @@ export async function POST(request: NextRequest) {
   if (Object.keys(userMetadata).length > 0) createPayload.user_metadata = userMetadata;
 
   const createRes = await authServiceRolePost(supabaseUrl, serviceKey, "/auth/v1/admin/users", createPayload);
+  let createdUserId: string | null = null;
+  try {
+    const createJson = JSON.parse(createRes.body) as { id?: string; user?: { id?: string } };
+    createdUserId = createJson.user?.id || createJson.id || null;
+  } catch {
+    /* ignore */
+  }
 
   if (createRes.statusCode < 200 || createRes.statusCode >= 300) {
     const msg = authErrorMessage(createRes.body);
@@ -197,8 +206,15 @@ export async function POST(request: NextRequest) {
     const verifyJson = JSON.parse(verifyRes.body) as {
       session?: typeof session;
       access_token?: string;
+      user?: { id?: string };
     };
     session = verifyJson.session ?? verifyJson;
+    const sessionUserId = verifyJson.user?.id || null;
+    const codeUserId = sessionUserId || createdUserId;
+    if (codeUserId) {
+      const admin = createSupabaseAdmin();
+      await ensureAccountCodeForUser(admin, codeUserId);
+    }
   } catch {
     return NextResponse.json({ error: "Could not establish session" }, { status: 500 });
   }

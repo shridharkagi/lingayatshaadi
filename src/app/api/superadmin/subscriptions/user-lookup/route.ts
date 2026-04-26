@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
+import { getPersistedAccountCodeMap } from "@/lib/server/accountCodes";
 
 export async function GET(req: NextRequest) {
   const auth = await requireSuperAdmin(req);
@@ -19,25 +20,18 @@ export async function GET(req: NextRequest) {
   const accountCodeByUser = new Map<string, string>();
 
   if (isAccountCodeQuery) {
-    const { data: listed, error: listErr } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-    if (listErr) return NextResponse.json({ error: listErr.message }, { status: 500 });
-    const sorted = (listed.users || [])
-      .slice()
-      .sort(
-        (a, b) =>
-          new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
-      );
-    const monthSeq = new Map<string, number>();
-    for (const u of sorted) {
-      const dt = new Date(u.created_at || new Date().toISOString());
-      const yy = String(dt.getFullYear()).slice(-2);
-      const mm = String(dt.getMonth() + 1).padStart(2, "0");
-      const key = `${yy}${mm}`;
-      const n = (monthSeq.get(key) || 0) + 1;
-      monthSeq.set(key, n);
-      const code = `U${yy}${mm}${n}`;
-      accountCodeByUser.set(u.id, code);
-      if (code === qUpper || code.startsWith(qUpper)) matchedUserIds.add(u.id);
+    const { data: rows, error: codeErr } = await admin
+      .from("user_account_codes")
+      .select("user_id, account_code")
+      .ilike("account_code", `${qUpper}%`)
+      .limit(100);
+    if (codeErr) return NextResponse.json({ error: codeErr.message }, { status: 500 });
+    for (const raw of (rows || []) as Array<{ user_id?: string; account_code?: string }>) {
+      const uid = String(raw.user_id || "");
+      const code = String(raw.account_code || "");
+      if (!uid || !code) continue;
+      matchedUserIds.add(uid);
+      accountCodeByUser.set(uid, code);
     }
   }
 
@@ -52,7 +46,20 @@ export async function GET(req: NextRequest) {
       : await baseQuery.or(orClauses.join(","));
   if (profileRes.error) return NextResponse.json({ error: profileRes.error.message }, { status: 500 });
 
-  const users = ((profileRes.data || []) as Array<Record<string, unknown>>).map((r) => {
+  const profileRows = (profileRes.data || []) as Array<Record<string, unknown>>;
+  const rowUserIds = [
+    ...new Set(
+      profileRows
+        .map((r) => String((r as { user_id?: string }).user_id || ""))
+        .filter(Boolean)
+    ),
+  ];
+  if (rowUserIds.length > 0) {
+    const persisted = await getPersistedAccountCodeMap(admin, rowUserIds);
+    for (const [uid, code] of persisted.entries()) accountCodeByUser.set(uid, code);
+  }
+
+  const users = profileRows.map((r) => {
     const row = r as {
       id?: string;
       user_id?: string;
