@@ -53,11 +53,15 @@ export default function LoginPage() {
       if (target.closest('[aria-label="Open menu"], [aria-label="Close menu"]')) {
         e.preventDefault();
         setMenuOpen((prev) => !prev);
+        return;
+      }
+      if (menuOpen && !target.closest("#login-menu-panel")) {
+        setMenuOpen(false);
       }
     };
     document.addEventListener("click", handleClick, true);
     return () => document.removeEventListener("click", handleClick, true);
-  }, []);
+  }, [menuOpen]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -286,8 +290,15 @@ export default function LoginPage() {
             {menuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
-        {menuOpen && (
-          <div className="md:hidden border-t border-[var(--color-border)] bg-white p-4 flex flex-col gap-3">
+        <div
+          id="login-menu-panel"
+          className={`md:hidden bg-white overflow-hidden grid transition-all duration-200 ease-out origin-top ${
+            menuOpen
+              ? "grid-rows-[1fr] opacity-100 translate-y-0 pointer-events-auto border-t border-[var(--color-border)]"
+              : "grid-rows-[0fr] opacity-0 -translate-y-2 pointer-events-none border-t-0"
+          }`}
+        >
+          <div className={`overflow-hidden flex flex-col gap-3 ${menuOpen ? "p-4" : "p-0"}`}>
             <Link
               href="/"
               onClick={() => setMenuOpen(false)}
@@ -306,7 +317,7 @@ export default function LoginPage() {
               <Button fullWidth>Register</Button>
             </Link>
           </div>
-        )}
+        </div>
       </header>
 
       <div className="flex-1 flex flex-col lg:flex-row">

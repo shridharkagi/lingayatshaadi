@@ -102,10 +102,12 @@ export const PROFESSION_TYPES = [
   "Business",
   "Doctor",
   "Engineer",
+  "Lawyer / Legal",
   "Teacher",
   "Private Job",
   "Self Employed",
   "Not Working",
+  "Other",
 ] as const;
 
 // Sub-caste options (alphabetically ordered, Others at end)

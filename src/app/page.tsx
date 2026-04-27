@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   Heart,
   Menu,
+  X,
   Shield,
   CheckCircle2,
   Handshake,
@@ -211,7 +212,14 @@ export default function LandingPage() {
       if (target.closest("#mobile-menu-btn")) {
         e.preventDefault();
         setMobileMenuOpen((prev) => !prev);
+        return;
       }
+
+      // Close the mobile menu when clicking anywhere outside menu panel.
+      if (mobileMenuOpen && !target.closest("#mobile-menu-panel")) {
+        setMobileMenuOpen(false);
+      }
+
       const faqBtn = target.closest("[data-faq-index]");
       if (faqBtn) {
         e.preventDefault();
@@ -221,7 +229,7 @@ export default function LandingPage() {
     };
     document.addEventListener("click", handleClick, true);
     return () => document.removeEventListener("click", handleClick, true);
-  }, []);
+  }, [mobileMenuOpen]);
 
   return (
     <div className="min-h-screen" style={{ background: "var(--gradient-bg-warm)" }}>
@@ -274,16 +282,7 @@ export default function LandingPage() {
           </nav>
           {/* Mobile sticky primary CTA near the hamburger. */}
           <div className="md:hidden flex items-center gap-1">
-            {!loading && isLoggedIn ? (
-              <Link href="/account" aria-label="My account">
-                <Button
-                  size="sm"
-                  className="px-3 py-1.5 text-sm rounded-full shadow-sm"
-                >
-                  My account
-                </Button>
-              </Link>
-            ) : (
+            {!loading && !isLoggedIn && (
               <Button
                 size="sm"
                 className="px-3 py-1.5 text-sm rounded-full shadow-sm"
@@ -308,12 +307,19 @@ export default function LandingPage() {
               aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
               aria-expanded={mobileMenuOpen}
             >
-              <Menu size={22} strokeWidth={2} />
+              {mobileMenuOpen ? <X size={22} strokeWidth={2} /> : <Menu size={22} strokeWidth={2} />}
             </button>
           </div>
         </div>
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t border-[var(--color-border)] bg-white p-4 flex flex-col gap-2 shadow-lg relative z-[60]">
+        <div
+          id="mobile-menu-panel"
+          className={`md:hidden bg-white shadow-lg relative z-[60] overflow-hidden grid transition-all duration-200 ease-out origin-top ${
+            mobileMenuOpen
+              ? "grid-rows-[1fr] opacity-100 translate-y-0 pointer-events-auto border-t border-[var(--color-border)]"
+              : "grid-rows-[0fr] opacity-0 -translate-y-2 pointer-events-none border-t-0"
+          }`}
+        >
+          <div className={`overflow-hidden flex flex-col gap-2 ${mobileMenuOpen ? "px-4 pb-4 pt-0" : "px-0 pb-0 pt-0"}`}>
             <Link href="/profiles" onClick={() => setMobileMenuOpen(false)}>
               Profiles
             </Link>
@@ -353,7 +359,7 @@ export default function LandingPage() {
               </>
             )}
           </div>
-        )}
+        </div>
       </header>
 
       {/* Hero */}
