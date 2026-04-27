@@ -14,7 +14,7 @@ export function buildProfileShareText(
   profile: Pick<Profile, "fullName" | "dateOfBirth" | "profession" | "city">
 ): string {
   const firstName = getFirstName(profile.fullName);
-  const age = profile.dateOfBirth ? String(getAge(profile.dateOfBirth)) : "";
+  const age = profile.dateOfBirth ? `${getAge(profile.dateOfBirth)} yrs` : "";
   const profession = (profile.profession || "").trim();
   const city = (profile.city || "").trim();
 

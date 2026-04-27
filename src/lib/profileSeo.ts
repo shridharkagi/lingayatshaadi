@@ -15,7 +15,7 @@ export function buildProfileSeoTitle(profile: Pick<Profile, "fullName" | "dateOf
 export function buildProfileSeoDescription(
   profile: Pick<Profile, "fullName" | "dateOfBirth" | "height" | "profession" | "city" | "state" | "qualification">
 ): string {
-  const name = (profile.fullName || "Member").trim();
+  const name = ((profile.fullName || "Member").trim().split(/\s+/)[0] || "Member");
   const age = profile.dateOfBirth ? getAge(profile.dateOfBirth) : "";
   const bits = [
     age ? `${age} yrs` : "",
