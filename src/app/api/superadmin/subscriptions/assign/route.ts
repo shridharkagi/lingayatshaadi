@@ -27,13 +27,11 @@ function isUserSubscriptionsPlanFkError(message: string | undefined): boolean {
   );
 }
 
-function isUserSubscriptionsUserFkError(message: string | undefined): boolean {
-  if (!message) return false;
-  const m = message.toLowerCase();
-  return (
-    m.includes("user_subscriptions_user_id_fkey") ||
-    (m.includes("foreign key") && m.includes("user_subscriptions") && m.includes("user_id"))
-  );
+function appendReplacementNote(existing: unknown, addedNote: string): string {
+  const prev = String(existing || "").trim();
+  if (!prev) return addedNote;
+  if (prev.includes(addedNote)) return prev;
+  return `${prev}\n${addedNote}`;
 }
 
 type SubscriptionPlanRow = {
@@ -168,7 +166,6 @@ export async function POST(req: NextRequest) {
 
   const admin = createSupabaseAdmin();
   let normalizedUserId = String(body.userId || "").trim();
-  const normalizedProfileId = String(body.profileId || "").trim();
   const accountCodeCandidate = normalizedUserId.toUpperCase();
   if (/^U\d{4,}$/.test(accountCodeCandidate)) {
     const { data: codeRow } = await admin
@@ -179,11 +176,11 @@ export async function POST(req: NextRequest) {
     const mappedUserId = String((codeRow as { user_id?: string } | null)?.user_id || "").trim();
     if (mappedUserId) normalizedUserId = mappedUserId;
   }
-  if (normalizedProfileId) {
+  if (body.profileId) {
     const { data: ownerRow } = await admin
       .from("profiles")
       .select("user_id")
-      .eq("id", normalizedProfileId)
+      .eq("id", String(body.profileId || ""))
       .maybeSingle();
     const ownerUserId = String((ownerRow as { user_id?: string } | null)?.user_id || "").trim();
     if (ownerUserId) normalizedUserId = ownerUserId;
@@ -308,24 +305,60 @@ export async function POST(req: NextRequest) {
     return { data: null as Record<string, unknown> | null, error: r.error };
   };
 
-  const subscriptionUserIdCandidates: string[] = [];
-  subscriptionUserIdCandidates.push(normalizedUserId);
-  let ownerProfileId = normalizedProfileId;
-  if (!ownerProfileId) {
-    const { data: ownerProfile } = await admin
-      .from("profiles")
-      .select("id")
-      .eq("user_id", normalizedUserId)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    ownerProfileId = String((ownerProfile as { id?: string } | null)?.id || "").trim();
-  }
-  if (ownerProfileId && !subscriptionUserIdCandidates.includes(ownerProfileId)) {
-    subscriptionUserIdCandidates.push(ownerProfileId);
+  const { data: ownedProfiles } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("user_id", normalizedUserId)
+    .is("deleted_at", null)
+    .limit(500);
+  const ownedProfileIds = (ownedProfiles || [])
+    .map((r) => String((r as { id?: string }).id || ""))
+    .filter(Boolean);
+  const legacyLookupUserIds = Array.from(new Set([normalizedUserId, ...ownedProfileIds]));
+
+  // Enforce account-level single active plan:
+  // expire existing active rows for this account before creating a new one.
+  const { data: existingSubs } = await admin
+    .from("user_subscriptions")
+    .select("id, user_id, status, starts_at, expires_at, notes")
+    .in("user_id", legacyLookupUserIds)
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  const nowIso = now;
+  const replacementNote = `Expired automatically: replaced by newly assigned plan ${planRow.name} on ${new Date(nowIso).toLocaleString("en-IN")}.`;
+  for (const row of (existingSubs || []) as Array<{
+    id?: string;
+    starts_at?: string | null;
+    expires_at?: string | null;
+    notes?: string | null;
+  }>) {
+    const sid = String(row.id || "");
+    if (!sid) continue;
+    const startsAtOld = String(row.starts_at || "");
+    const alreadyFuture = startsAtOld && startsAtOld > nowIso;
+    const targetExpiresAt = alreadyFuture ? startsAtOld : nowIso;
+    const noteValue = appendReplacementNote(row.notes, replacementNote);
+    let upd = await admin
+      .from("user_subscriptions")
+      .update({
+        status: "expired",
+        expires_at: targetExpiresAt,
+        notes: noteValue,
+      })
+      .eq("id", sid);
+    if (upd.error && isSchemaMismatchError(upd.error.message)) {
+      upd = await admin
+        .from("user_subscriptions")
+        .update({
+          status: "expired",
+          expires_at: targetExpiresAt,
+        })
+        .eq("id", sid);
+    }
   }
 
-  let subscriptionRowUserId = subscriptionUserIdCandidates[0];
+  const subscriptionRowUserId = normalizedUserId;
   let { data: subscription, error: subError } = await insertSubscriptionRow(subscriptionRowUserId, effectivePlanId);
   if (subError && isUserSubscriptionsPlanFkError(subError.message)) {
     const { legacyPlanId, membershipPlansRowCount } = await resolveMembershipPlanIdForFk(admin, planRow);
@@ -344,15 +377,7 @@ export async function POST(req: NextRequest) {
     effectivePlanId = legacyPlanId;
     ({ data: subscription, error: subError } = await insertSubscriptionRow(subscriptionRowUserId, effectivePlanId));
   }
-  if (subError && isUserSubscriptionsUserFkError(subError.message) && subscriptionUserIdCandidates.length > 1) {
-    const fallbackUserId = subscriptionUserIdCandidates[1];
-    const retry = await insertSubscriptionRow(fallbackUserId, effectivePlanId);
-    if (!retry.error && retry.data) {
-      subscriptionRowUserId = fallbackUserId;
-      subscription = retry.data;
-      subError = null;
-    }
-  }
+  // No profile-level fallback for new assignments: plans are account-level only.
   if (subError || !subscription) {
     return NextResponse.json({ error: subError?.message || "Failed to create subscription" }, { status: 500 });
   }

@@ -899,6 +899,14 @@ export default function AccountPage() {
                           {String(txn.payment_mode || "—")}
                         </span>
                       )}
+                      {String((s as { notes?: string | null }).notes || "").trim() && (
+                        <span
+                          className="text-gray-500 w-full sm:w-auto sm:max-w-[320px] truncate"
+                          title={String((s as { notes?: string | null }).notes || "")}
+                        >
+                          {String((s as { notes?: string | null }).notes || "")}
+                        </span>
+                      )}
                     </div>
                   </div>
                 );

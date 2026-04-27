@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
 import { generatePublicIdFromExistingIds } from "@/lib/memberId";
+import { listAllAuthUsers } from "@/lib/server/authUsers";
 
 type ReviewTab =
   | "published"
@@ -165,6 +166,52 @@ export async function GET(req: NextRequest) {
     }
   }
   const profileIds = items.map((r) => (r as { id?: string }).id).filter(Boolean) as string[];
+  const ownerUserIds = [
+    ...new Set(
+      items
+        .map((r) => String((r as { user_id?: string }).user_id || ""))
+        .filter(Boolean)
+    ),
+  ];
+
+  const ownerNameByUserId = new Map<string, string>();
+  const ownerPhoneByUserId = new Map<string, string>();
+  if (ownerUserIds.length > 0) {
+    try {
+      const authUsers = await listAllAuthUsers(admin);
+      for (const u of authUsers) {
+        if (!ownerUserIds.includes(u.id)) continue;
+        const fullName = String((u.user_metadata?.full_name as string) || "").trim();
+        if (fullName) ownerNameByUserId.set(u.id, fullName);
+        const phone = String(u.phone || "").trim();
+        if (phone) ownerPhoneByUserId.set(u.id, phone);
+      }
+    } catch {
+      // Fallback to profile-derived owner info below.
+    }
+    const { data: ownerProfiles } = await admin
+      .from("profiles")
+      .select("user_id, account_holder_name, contact, updated_at")
+      .in("user_id", ownerUserIds)
+      .order("updated_at", { ascending: false })
+      .limit(1000);
+    for (const row of (ownerProfiles || []) as Array<{
+      user_id?: string;
+      account_holder_name?: string | null;
+      contact?: string | null;
+    }>) {
+      const uid = String(row.user_id || "").trim();
+      if (!uid) continue;
+      if (!ownerNameByUserId.has(uid)) {
+        const n = String(row.account_holder_name || "").trim();
+        if (n) ownerNameByUserId.set(uid, n);
+      }
+      if (!ownerPhoneByUserId.has(uid)) {
+        const p = String(row.contact || "").trim();
+        if (p) ownerPhoneByUserId.set(uid, p);
+      }
+    }
+  }
 
   const planByProfileId: Record<
     string,
@@ -201,6 +248,7 @@ export async function GET(req: NextRequest) {
   const enriched = items.map((row) => {
     const r = row as Record<string, unknown>;
     const pid = String(r.id || "");
+    const ownerUserId = String(r.user_id || "");
     const plan = planByProfileId[pid] || {
       name: "Free",
       code: "free",
@@ -210,8 +258,12 @@ export async function GET(req: NextRequest) {
     };
     return {
       ...r,
-      account_owner_name: String(r.account_holder_name || r.full_name || "-"),
-      account_owner_number: String(r.contact || "-"),
+      account_owner_name:
+        ownerNameByUserId.get(ownerUserId) ||
+        String(r.account_holder_name || r.full_name || "-"),
+      account_owner_number:
+        ownerPhoneByUserId.get(ownerUserId) ||
+        String(r.contact || "-"),
       published_at: r.approved_at || r.updated_at || r.created_at || null,
       plan_name: plan.name,
       plan_code: plan.code,

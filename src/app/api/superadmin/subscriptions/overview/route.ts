@@ -41,12 +41,12 @@ export async function GET(req: NextRequest) {
       .limit(2000),
     admin
       .from("user_subscriptions")
-      .select("id, user_id, plan_id, status, starts_at, expires_at, created_at, total_contact_views_snapshot, daily_contact_view_limit_snapshot")
+      .select("id, user_id, plan_id, status, starts_at, expires_at, created_at, total_contact_views_snapshot, daily_contact_view_limit_snapshot, notes")
       .order("created_at", { ascending: false })
       .limit(25),
     admin
       .from("user_subscriptions")
-      .select("id, user_id, plan_id, status, starts_at, expires_at, created_at, total_contact_views_snapshot, daily_contact_view_limit_snapshot")
+      .select("id, user_id, plan_id, status, starts_at, expires_at, created_at, total_contact_views_snapshot, daily_contact_view_limit_snapshot, notes")
       .order("created_at", { ascending: false })
       .limit(5000),
   ]);
@@ -144,6 +144,7 @@ export async function GET(req: NextRequest) {
     createdAt: string | null;
     totalContactViews: number;
     dailyContactViewLimit: number;
+    notes: string | null;
     memberLabel: string;
     userLinkId: string;
     subscriptionUserId: string;
@@ -189,6 +190,7 @@ export async function GET(req: NextRequest) {
       createdAt: r.created_at || null,
       totalContactViews: Number((r as { total_contact_views_snapshot?: number }).total_contact_views_snapshot || 0),
       dailyContactViewLimit: Number((r as { daily_contact_view_limit_snapshot?: number }).daily_contact_view_limit_snapshot || 0),
+      notes: String((r as { notes?: string | null }).notes || "") || null,
       memberLabel: memberLabel(r.user_id),
       userLinkId: r.user_id,
       subscriptionUserId: r.user_id,
@@ -216,6 +218,7 @@ export async function GET(req: NextRequest) {
         activeSubscriptionId: string | null;
         activeTotalContactViews: number;
         activeDailyContactViewLimit: number;
+          activeNotes: string | null;
         previousPlansCount: number;
         totalPlansCount: number;
         totalPaidAmount: number;
@@ -240,6 +243,7 @@ export async function GET(req: NextRequest) {
         activeSubscriptionId: null,
         activeTotalContactViews: 0,
         activeDailyContactViewLimit: 0,
+        activeNotes: null,
         previousPlansCount: 0,
         totalPlansCount: 0,
         totalPaidAmount: 0,
@@ -261,6 +265,7 @@ export async function GET(req: NextRequest) {
           existing.activeDailyContactViewLimit = Number(
             (h as { daily_contact_view_limit_snapshot?: number }).daily_contact_view_limit_snapshot || 0
           );
+          existing.activeNotes = String((h as { notes?: string | null }).notes || "") || null;
         }
       }
       summaryMap.set(owner, existing);

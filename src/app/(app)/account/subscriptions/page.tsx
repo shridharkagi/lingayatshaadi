@@ -15,6 +15,7 @@ type SubscriptionRow = {
   plan_name_snapshot?: string;
   price_snapshot?: number;
   currency_snapshot?: string;
+  notes?: string | null;
 };
 
 type TransactionRow = {
@@ -202,6 +203,11 @@ export default function AccountSubscriptionsTimelinePage() {
               <p className="sm:col-span-2">
                 Payer source: <span className="font-medium text-[var(--foreground)]">{r.txn?.payer_source || "—"}</span>
               </p>
+              {r.notes && (
+                <p className="sm:col-span-2">
+                  Note: <span className="font-medium text-[var(--foreground)]">{r.notes}</span>
+                </p>
+              )}
             </div>
           </div>
         ))

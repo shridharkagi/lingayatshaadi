@@ -356,11 +356,17 @@ export default function ActivitiesPage() {
               receivedInterests.map(({ id, profile, message }) => (
                 <div key={id} className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm">
                   <Link href={`/profile/${getProfileSlug(profile!)}`}>
-                    <ProfileAvatar src={profile!.profilePhoto} alt={profile!.fullName} size={64} />
+                    <ProfileAvatar
+                      src={profile!.profilePhoto}
+                      alt={canViewSensitiveFields ? profile!.fullName : maskLastName(profile!.fullName || "")}
+                      size={64}
+                    />
                   </Link>
                   <div className="flex-1 min-w-0">
                     <Link href={`/profile/${getProfileSlug(profile!)}`}>
-                      <h4 className="font-semibold text-[var(--foreground)]">{profile!.fullName}</h4>
+                      <h4 className="font-semibold text-[var(--foreground)]">
+                        {canViewSensitiveFields ? profile!.fullName : maskLastName(profile!.fullName || "")}
+                      </h4>
                     </Link>
                     <p className="text-sm text-gray-500">
                       {getAge(profile!.dateOfBirth)} yrs • {profile!.profession}
@@ -424,11 +430,15 @@ export default function ActivitiesPage() {
                       href={`/profile/${getProfileSlug(profile!)}`}
                       className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition"
                     >
-                      <ProfileAvatar src={profile!.profilePhoto} alt={profile!.fullName} size={64} />
+                      <ProfileAvatar
+                        src={profile!.profilePhoto}
+                        alt={canViewSensitiveFields ? profile!.fullName : maskLastName(profile!.fullName || "")}
+                        size={64}
+                      />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
                           <h4 className="font-semibold text-[var(--foreground)] truncate">
-                            {profile!.fullName}
+                            {canViewSensitiveFields ? profile!.fullName : maskLastName(profile!.fullName || "")}
                           </h4>
                           <span
                             className={`shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-full border ${statusStyle}`}
@@ -469,9 +479,15 @@ export default function ActivitiesPage() {
                     href={`/profile/${getProfileSlug(v.profile!)}`}
                     className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition"
                   >
-                    <ProfileAvatar src={v.profile!.profilePhoto} alt={v.profile!.fullName} size={64} />
+                    <ProfileAvatar
+                      src={v.profile!.profilePhoto}
+                      alt={canViewSensitiveFields ? v.profile!.fullName : maskLastName(v.profile!.fullName || "")}
+                      size={64}
+                    />
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold text-[var(--foreground)]">{v.profile!.fullName}</h4>
+                      <h4 className="font-semibold text-[var(--foreground)]">
+                        {canViewSensitiveFields ? v.profile!.fullName : maskLastName(v.profile!.fullName || "")}
+                      </h4>
                       <p className="text-sm text-gray-500">
                         {getAge(v.profile!.dateOfBirth)} yrs • {v.profile!.profession}
                       </p>

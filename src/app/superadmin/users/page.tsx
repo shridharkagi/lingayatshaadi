@@ -252,7 +252,7 @@ export default function SuperAdminUsersPage() {
                       Activity
                     </button>
                     <Link
-                      href={`/superadmin/subscriptions?user=${encodeURIComponent(u.accountCode || u.id)}`}
+                      href={`/superadmin/subscriptions?user=${encodeURIComponent(u.accountCode || u.id)}&openEditCurrent=1`}
                       className="text-[var(--primary)] text-sm font-medium hover:underline"
                     >
                       Edit Plan

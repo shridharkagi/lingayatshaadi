@@ -31,6 +31,7 @@ type RecentSubscriptionRow = {
   createdAt: string | null;
   totalContactViews?: number;
   dailyContactViewLimit?: number;
+  notes?: string | null;
   memberLabel: string;
   userLinkId: string;
   subscriptionUserId?: string;
@@ -44,6 +45,7 @@ type MemberSummaryRow = {
   activeSubscriptionId?: string | null;
   activeTotalContactViews?: number;
   activeDailyContactViewLimit?: number;
+  activeNotes?: string | null;
   previousPlansCount: number;
   totalPlansCount: number;
   totalPaidAmount: number;
@@ -94,6 +96,7 @@ export default function SuperAdminSubscriptionsPage() {
   const [assigning, setAssigning] = useState(false);
   const [editingSub, setEditingSub] = useState<RecentSubscriptionRow | null>(null);
   const [savingSubEdit, setSavingSubEdit] = useState(false);
+  const [autoOpenCurrentEdit, setAutoOpenCurrentEdit] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
   const [memberPlanFilter, setMemberPlanFilter] = useState("all");
   const [memberExpiryFilter, setMemberExpiryFilter] = useState<
@@ -167,7 +170,10 @@ export default function SuperAdminSubscriptionsPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const userQuery = (new URLSearchParams(window.location.search).get("user") || "").trim();
+    const params = new URLSearchParams(window.location.search);
+    const userQuery = (params.get("user") || "").trim();
+    const openEdit = (params.get("openEditCurrent") || "").trim() === "1";
+    if (openEdit) setAutoOpenCurrentEdit(true);
     if (!userQuery) return;
     setForm((prev) => ({ ...prev, userQuery }));
     void resolveUser(userQuery);
@@ -379,6 +385,19 @@ export default function SuperAdminSubscriptionsPage() {
     () => (overview?.memberSummaries as MemberSummaryRow[] | undefined) || [],
     [overview]
   );
+  useEffect(() => {
+    if (!autoOpenCurrentEdit || memberSummaries.length === 0) return;
+    const query = form.userQuery.trim().toUpperCase();
+    if (!query) return;
+    const match = memberSummaries.find((m) => {
+      const code = String(m.ownerAccountCode || "").toUpperCase();
+      const uid = String(m.ownerAuthUserId || "").toUpperCase();
+      return code === query || uid === query;
+    });
+    if (!match || !match.activeSubscriptionId) return;
+    openEditFromSummary(match);
+    setAutoOpenCurrentEdit(false);
+  }, [autoOpenCurrentEdit, memberSummaries, form.userQuery]);
   const memberPlanOptions = useMemo(() => {
     const set = new Set<string>();
     memberSummaries.forEach((m) => {
@@ -436,6 +455,7 @@ export default function SuperAdminSubscriptionsPage() {
       createdAt: null,
       totalContactViews: Number(m.activeTotalContactViews || 0),
       dailyContactViewLimit: Number(m.activeDailyContactViewLimit || 0),
+      notes: m.activeNotes || null,
       memberLabel: m.ownerLabel || m.ownerAccountCode || "Member",
       userLinkId: m.ownerAuthUserId,
       subscriptionUserId: m.ownerAuthUserId,
@@ -579,7 +599,14 @@ export default function SuperAdminSubscriptionsPage() {
                       <td className="py-2 pr-2">
                         <span className="text-gray-900">{r.memberLabel}</span>
                       </td>
-                      <td className="py-2 pr-2">{r.planName}</td>
+                      <td className="py-2 pr-2">
+                        <div className="text-gray-900">{r.planName}</div>
+                        {r.notes && (
+                          <p className="mt-0.5 max-w-[240px] truncate text-[11px] text-gray-500" title={r.notes}>
+                            {r.notes}
+                          </p>
+                        )}
+                      </td>
                       <td className="py-2 pr-2 capitalize">{r.status}</td>
                       <td className="py-2 pr-2 whitespace-nowrap">{fmtIn(r.expiresAt)}</td>
                       <td className="py-2">
