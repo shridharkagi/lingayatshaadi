@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { adminFetch } from "@/lib/api/adminClient";
 
 type Plan = {
@@ -83,7 +82,6 @@ function addDays(yyyyMmDd: string, days: number): string {
 }
 
 export default function SuperAdminSubscriptionsPage() {
-  const searchParams = useSearchParams();
   const [overview, setOverview] = useState<Record<string, unknown> | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -168,11 +166,12 @@ export default function SuperAdminSubscriptionsPage() {
   }, []);
 
   useEffect(() => {
-    const userQuery = (searchParams.get("user") || "").trim();
+    if (typeof window === "undefined") return;
+    const userQuery = (new URLSearchParams(window.location.search).get("user") || "").trim();
     if (!userQuery) return;
     setForm((prev) => ({ ...prev, userQuery }));
     void resolveUser(userQuery);
-  }, [searchParams]);
+  }, []);
 
   const selectedPlan = useMemo(
     () => plans.find((p) => p.id === form.planId),
