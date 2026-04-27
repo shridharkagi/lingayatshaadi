@@ -10,10 +10,13 @@ import { useFilteredProfiles } from "@/hooks/useFilteredProfiles";
 import { debounce } from "@/lib/security";
 import { useAuth } from "@/contexts/AuthContext";
 import { ViewerForensicWatermark } from "@/components/ViewerForensicWatermark";
+import { adminFetch } from "@/lib/api/adminClient";
+import { maskLastName, type AccountAccessState } from "@/lib/accessPolicy";
 
 export default function SearchPage() {
   const { profiles } = useProfiles();
   const { isLoggedIn } = useAuth();
+  const [accessState, setAccessState] = useState<AccountAccessState | null>(null);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [view, setView] = useState<"list" | "grid">("grid");
@@ -42,6 +45,22 @@ export default function SearchPage() {
     return () => window.removeEventListener("resize", checkDesktop);
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!isLoggedIn) {
+      setAccessState(null);
+      return;
+    }
+    void (async () => {
+      const res = await adminFetch("/api/account/access-state");
+      const json = (await res.json()) as { access?: AccountAccessState };
+      if (!cancelled && res.ok && json.access) setAccessState(json.access);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn]);
+
   // Memoized filtered profiles
   const filteredProfiles = useFilteredProfiles(profiles, filters, debouncedQuery);
 
@@ -61,6 +80,7 @@ export default function SearchPage() {
     setDebouncedQuery("");
     setFilters(defaultFilters);
   }, []);
+  const canViewSensitiveFields = isLoggedIn && !!accessState?.hasValidSubscription;
 
   return (
     <div className={`max-w-6xl mx-auto w-full ${isLoggedIn ? "pb-20" : "pb-6"}`}>
@@ -134,13 +154,34 @@ export default function SearchPage() {
         ) : view === "list" ? (
           <div className="space-y-4">
             {filteredProfiles.map((profile) => (
-              <ProfileCard key={profile.id} profile={profile} variant="list" />
+              <ProfileCard
+                key={profile.id}
+                profile={profile}
+                variant="list"
+                displayName={
+                  canViewSensitiveFields
+                    ? profile.fullName
+                    : isLoggedIn
+                      ? maskLastName(profile.fullName)
+                      : undefined
+                }
+              />
             ))}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
             {filteredProfiles.map((profile) => (
-              <ProfileCard key={profile.id} profile={profile} />
+              <ProfileCard
+                key={profile.id}
+                profile={profile}
+                displayName={
+                  canViewSensitiveFields
+                    ? profile.fullName
+                    : isLoggedIn
+                      ? maskLastName(profile.fullName)
+                      : undefined
+                }
+              />
             ))}
           </div>
         )}

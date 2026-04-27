@@ -18,6 +18,8 @@ import { getAge } from "@/lib/utils";
 import { getProfileSlug } from "@/lib/memberId";
 import { FEATURE_MESSAGING_ENABLED } from "@/lib/featureFlags";
 import type { Profile } from "@/types";
+import { adminFetch } from "@/lib/api/adminClient";
+import { maskLastName, type AccountAccessState } from "@/lib/accessPolicy";
 import {
   loadContactViewHistory,
   formatTimeAgo,
@@ -62,6 +64,30 @@ export default function ActivitiesPage() {
   >([]);
   const [contactsTotal, setContactsTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [accessState, setAccessState] = useState<AccountAccessState | null>(null);
+  const shortlistOwnerId = user?.id || "";
+  const canViewSensitiveFields = !!accessState?.hasValidSubscription;
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!user?.id) {
+      setAccessState(null);
+      return;
+    }
+    void (async () => {
+      try {
+        const res = await adminFetch("/api/account/access-state");
+        if (!res.ok) return;
+        const json = (await res.json()) as { access?: AccountAccessState };
+        if (!cancelled) setAccessState(json.access || null);
+      } catch {
+        if (!cancelled) setAccessState(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   const loadInterests = useCallback(async () => {
     if (!user?.id) {
@@ -190,13 +216,38 @@ export default function ActivitiesPage() {
   }, [user?.id, getProfileById, profiles]);
 
   const loadShortlist = useCallback(async () => {
-    if (!user?.id) {
-      setShortlistedProfiles([]);
+    if (!shortlistOwnerId) {
+      // Logged-in accounts without a created profile can still save cards.
+      // Those saves are stored locally until they create their first profile.
+      const raw = typeof window !== "undefined" ? localStorage.getItem("saved_profiles_no_profile") : null;
+      let ids: string[] = [];
+      try {
+        ids = raw ? ((JSON.parse(raw) as string[]) || []) : [];
+      } catch {
+        ids = [];
+      }
+      if (!Array.isArray(ids) || ids.length === 0) {
+        setShortlistedProfiles([]);
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      const profs = await Promise.all(
+        ids.map(async (id) => {
+          let p = getProfileById(id) || profiles.find((x) => x.id === id);
+          if (!p) {
+            const { data: d } = await fetchProfile(id);
+            p = d ?? undefined;
+          }
+          return p;
+        })
+      );
+      setShortlistedProfiles(profs.filter((p): p is Profile => !!p));
       setLoading(false);
       return;
     }
     setLoading(true);
-    const { data } = await getShortlistedIds(user.id);
+    const { data } = await getShortlistedIds(shortlistOwnerId);
     const profs = await Promise.all(
       (data || []).map(async (id) => {
         let p = getProfileById(id) || profiles.find((x) => x.id === id);
@@ -209,7 +260,7 @@ export default function ActivitiesPage() {
     );
     setShortlistedProfiles(profs.filter((p): p is Profile => !!p));
     setLoading(false);
-  }, [user?.id, getProfileById, profiles]);
+  }, [shortlistOwnerId, getProfileById, profiles]);
 
   const loadBlocked = useCallback(async () => {
     if (!user?.id) {
@@ -523,7 +574,9 @@ export default function ActivitiesPage() {
                     </Link>
                     <div className="flex-1 min-w-0">
                       <Link href={`/profile/${getProfileSlug(profile)}`}>
-                        <h4 className="font-semibold text-[var(--foreground)]">{profile.fullName}</h4>
+                        <h4 className="font-semibold text-[var(--foreground)]">
+                          {canViewSensitiveFields ? profile.fullName : maskLastName(profile.fullName || "")}
+                        </h4>
                       </Link>
                       <p className="text-sm text-gray-500">
                         {getAge(profile.dateOfBirth)} yrs • {profile.profession}
@@ -537,8 +590,22 @@ export default function ActivitiesPage() {
                         </Link>
                         <button
                           onClick={async () => {
-                            if (!user?.id) return;
-                            await removeFromShortlist(user.id, profile.id);
+                            if (!shortlistOwnerId) {
+                              const raw = typeof window !== "undefined" ? localStorage.getItem("saved_profiles_no_profile") : null;
+                              let ids: string[] = [];
+                              try {
+                                ids = raw ? ((JSON.parse(raw) as string[]) || []) : [];
+                              } catch {
+                                ids = [];
+                              }
+                              const next = ids.filter((id) => id !== profile.id);
+                              if (typeof window !== "undefined") {
+                                localStorage.setItem("saved_profiles_no_profile", JSON.stringify(next));
+                              }
+                              await loadShortlist();
+                              return;
+                            }
+                            await removeFromShortlist(shortlistOwnerId, profile.id);
                             loadShortlist();
                           }}
                           className="px-4 py-1.5 rounded-lg border border-[var(--border)] text-sm"

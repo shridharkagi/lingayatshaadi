@@ -119,14 +119,15 @@ export async function GET(req: NextRequest) {
   let interestRows: Array<Record<string, unknown>> = [];
   let subscriptionRows: Array<Record<string, unknown>> = [];
   let paymentRows: Array<Record<string, unknown>> = [];
+  const subscriptionLookupIds = [...new Set([...userIds, ...profileIds])];
 
   const emptyRows = Promise.resolve({ data: [] as Record<string, unknown>[], error: null as { message: string } | null });
   const subsQ =
-    userIds.length > 0
+    subscriptionLookupIds.length > 0
       ? admin
           .from("user_subscriptions")
           .select("user_id, plan_id, status, starts_at, expires_at")
-          .in("user_id", userIds)
+          .in("user_id", subscriptionLookupIds)
           .limit(5000)
       : emptyRows;
   const payQ =
@@ -196,9 +197,10 @@ export async function GET(req: NextRequest) {
     const starts = raw.starts_at || "";
     const ends = raw.expires_at || "";
     if (starts > nowIso || ends < nowIso) continue;
-    const prev = activeSubByAuthId.get(raw.user_id);
+    const ownerAuthUserId = profileMeta.get(raw.user_id)?.user_id || raw.user_id;
+    const prev = activeSubByAuthId.get(ownerAuthUserId);
     if (!prev || new Date(ends).getTime() > new Date(prev.expires_at || 0).getTime()) {
-      activeSubByAuthId.set(raw.user_id, raw);
+      activeSubByAuthId.set(ownerAuthUserId, raw);
     }
   }
 

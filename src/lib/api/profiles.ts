@@ -2,6 +2,7 @@ import { createSupabaseClient, createSupabaseClientSafe } from "@/lib/supabase";
 import { toProfileRow, fromProfileRow, type ProfileRow } from "@/lib/profileMapper";
 import { generatePublicIdFromExistingIds, genderFlag } from "@/lib/memberId";
 import type { Profile } from "@/types";
+import { MAX_ACTIVE_OR_PENDING_PROFILES } from "@/lib/accessPolicy";
 
 /**
  * For public-facing surfaces (search, home cards, other-member profile
@@ -91,6 +92,23 @@ export async function createProfile(
     const supabase = createSupabaseClient();
     const row = toProfileRow(data);
     row.user_id = userId;
+
+    const { count: nonDeletedProfileCount, error: countError } = await withTimeout(
+      supabase
+        .from("profiles")
+        .select("id", { head: true, count: "exact" })
+        .eq("user_id", userId)
+        .is("deleted_at", null),
+      PROFILE_WRITE_TIMEOUT_MS,
+      "createProfile count"
+    );
+    if (countError) return { data: null, error: describeSupabaseError(countError) };
+    if (Number(nonDeletedProfileCount || 0) >= MAX_ACTIVE_OR_PENDING_PROFILES) {
+      return {
+        data: null,
+        error: `You can create up to ${MAX_ACTIVE_OR_PENDING_PROFILES} profiles. Delete one to add a new profile.`,
+      };
+    }
 
     // Moderation (Batch 5B): every brand-new profile enters the admin
     // review queue by default. `approved_snapshot` stays NULL until an

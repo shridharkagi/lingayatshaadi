@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { adminFetch } from "@/lib/api/adminClient";
 
 type Plan = {
@@ -29,8 +30,24 @@ type RecentSubscriptionRow = {
   startsAt: string | null;
   expiresAt: string | null;
   createdAt: string | null;
+  totalContactViews?: number;
+  dailyContactViewLimit?: number;
   memberLabel: string;
   userLinkId: string;
+  subscriptionUserId?: string;
+};
+type MemberSummaryRow = {
+  ownerAuthUserId: string;
+  ownerAccountCode?: string | null;
+  ownerLabel: string;
+  activePlanName: string;
+  activePlanEndsAt: string | null;
+  activeSubscriptionId?: string | null;
+  activeTotalContactViews?: number;
+  activeDailyContactViewLimit?: number;
+  previousPlansCount: number;
+  totalPlansCount: number;
+  totalPaidAmount: number;
 };
 type UpgradeRequest = {
   id: string;
@@ -66,6 +83,7 @@ function addDays(yyyyMmDd: string, days: number): string {
 }
 
 export default function SuperAdminSubscriptionsPage() {
+  const searchParams = useSearchParams();
   const [overview, setOverview] = useState<Record<string, unknown> | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +94,19 @@ export default function SuperAdminSubscriptionsPage() {
   const [userCandidates, setUserCandidates] = useState<UserLookup[]>([]);
   const [expiresEdited, setExpiresEdited] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const [editingSub, setEditingSub] = useState<RecentSubscriptionRow | null>(null);
+  const [savingSubEdit, setSavingSubEdit] = useState(false);
+  const [memberSearch, setMemberSearch] = useState("");
+  const [memberPlanFilter, setMemberPlanFilter] = useState("all");
+  const [memberExpiryFilter, setMemberExpiryFilter] = useState<
+    "all" | "expiring_7" | "expiring_30" | "expired" | "no_active"
+  >("all");
+  const [subEditForm, setSubEditForm] = useState({
+    expiresAt: "",
+    totalContactViews: "",
+    dailyContactViewLimit: "",
+    reason: "",
+  });
   const [form, setForm] = useState({
     userQuery: "",
     userId: "",
@@ -103,12 +134,19 @@ export default function SuperAdminSubscriptionsPage() {
       adminFetch("/api/superadmin/subscriptions/plans"),
       adminFetch("/api/superadmin/subscriptions/upgrade-requests"),
     ]);
-    const ovJson = (await ovRes.json()) as Record<string, unknown>;
-    const planJson = (await planRes.json()) as { plans?: Plan[]; error?: string };
-    const reqJson = (await reqRes.json()) as { requests?: UpgradeRequest[]; error?: string };
-    if (!ovRes.ok) setError(String(ovJson.error || "Failed to load overview"));
-    if (!planRes.ok) setError(planJson.error || "Failed to load plans");
-    if (!reqRes.ok) setError(reqJson.error || "Failed to load upgrade requests");
+    const safeJson = async <T,>(res: Response, fallback: T): Promise<T> => {
+      try {
+        return (await res.json()) as T;
+      } catch {
+        return fallback;
+      }
+    };
+    const ovJson = await safeJson<Record<string, unknown>>(ovRes, {});
+    const planJson = await safeJson<{ plans?: Plan[]; error?: string }>(planRes, {});
+    const reqJson = await safeJson<{ requests?: UpgradeRequest[]; error?: string }>(reqRes, {});
+    if (!ovRes.ok) setError(String(ovJson.error || `Failed to load overview (${ovRes.status})`));
+    if (!planRes.ok) setError(planJson.error || `Failed to load plans (${planRes.status})`);
+    if (!reqRes.ok) setError(reqJson.error || `Failed to load upgrade requests (${reqRes.status})`);
     setOverview(ovRes.ok ? ovJson : null);
     const basePlans = planJson.plans || [];
     if (ovRes.ok && Array.isArray(ovJson.plans)) {
@@ -128,6 +166,13 @@ export default function SuperAdminSubscriptionsPage() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    const userQuery = (searchParams.get("user") || "").trim();
+    if (!userQuery) return;
+    setForm((prev) => ({ ...prev, userQuery }));
+    void resolveUser(userQuery);
+  }, [searchParams]);
 
   const selectedPlan = useMemo(
     () => plans.find((p) => p.id === form.planId),
@@ -331,8 +376,102 @@ export default function SuperAdminSubscriptionsPage() {
     () => (overview?.recentSubscriptions as RecentSubscriptionRow[] | undefined) || [],
     [overview]
   );
+  const memberSummaries = useMemo(
+    () => (overview?.memberSummaries as MemberSummaryRow[] | undefined) || [],
+    [overview]
+  );
+  const memberPlanOptions = useMemo(() => {
+    const set = new Set<string>();
+    memberSummaries.forEach((m) => {
+      const name = String(m.activePlanName || "—").trim();
+      if (!name || name === "—") return;
+      set.add(name);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [memberSummaries]);
+  const filteredMemberSummaries = useMemo(() => {
+    const now = Date.now();
+    const dayMs = 86400000;
+    const q = memberSearch.trim().toLowerCase();
+    return memberSummaries.filter((m) => {
+      if (q) {
+        const hay = `${m.ownerAccountCode || ""} ${m.ownerLabel || ""}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      if (memberPlanFilter !== "all" && m.activePlanName !== memberPlanFilter) return false;
+      const endsAtMs = m.activePlanEndsAt ? new Date(m.activePlanEndsAt).getTime() : NaN;
+      const hasActive = !!m.activeSubscriptionId && !!m.activePlanEndsAt && Number.isFinite(endsAtMs) && endsAtMs >= now;
+      if (memberExpiryFilter === "no_active") return !hasActive;
+      if (memberExpiryFilter === "expired") return !!m.activePlanEndsAt && Number.isFinite(endsAtMs) && endsAtMs < now;
+      if (memberExpiryFilter === "expiring_7")
+        return hasActive && endsAtMs <= now + 7 * dayMs;
+      if (memberExpiryFilter === "expiring_30")
+        return hasActive && endsAtMs <= now + 30 * dayMs;
+      return true;
+    });
+  }, [memberSummaries, memberSearch, memberPlanFilter, memberExpiryFilter]);
   const fmtIn = (iso?: string | null) =>
     iso ? new Date(iso).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "—";
+  const toDateInput = (iso?: string | null) => (iso ? new Date(iso).toISOString().slice(0, 10) : "");
+
+  const openEditSubscription = (sub: RecentSubscriptionRow) => {
+    setEditingSub(sub);
+    setSubEditForm({
+      expiresAt: toDateInput(sub.expiresAt),
+      totalContactViews: String(sub.totalContactViews || 0),
+      dailyContactViewLimit: String(sub.dailyContactViewLimit || 0),
+      reason: "",
+    });
+  };
+  const openEditFromSummary = (m: MemberSummaryRow) => {
+    if (!m.activeSubscriptionId) {
+      setError("No active subscription found to edit for this member.");
+      return;
+    }
+    openEditSubscription({
+      id: m.activeSubscriptionId,
+      planName: m.activePlanName || "Plan",
+      status: "active",
+      startsAt: null,
+      expiresAt: m.activePlanEndsAt || null,
+      createdAt: null,
+      totalContactViews: Number(m.activeTotalContactViews || 0),
+      dailyContactViewLimit: Number(m.activeDailyContactViewLimit || 0),
+      memberLabel: m.ownerLabel || m.ownerAccountCode || "Member",
+      userLinkId: m.ownerAuthUserId,
+      subscriptionUserId: m.ownerAuthUserId,
+    });
+  };
+
+  const saveSubscriptionEdit = async () => {
+    if (!editingSub) return;
+    if (!subEditForm.reason.trim()) {
+      setError("Reason is required to edit a user subscription.");
+      return;
+    }
+    setSavingSubEdit(true);
+    setError(null);
+    const res = await adminFetch("/api/superadmin/subscriptions/adjust", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        subscriptionId: editingSub.id,
+        expiresAt: subEditForm.expiresAt ? `${subEditForm.expiresAt}T00:00:00.000Z` : undefined,
+        totalContactViews: Number(subEditForm.totalContactViews || 0),
+        dailyContactViewLimit: Number(subEditForm.dailyContactViewLimit || 0),
+        reason: subEditForm.reason.trim(),
+      }),
+    });
+    const json = (await res.json()) as { error?: string };
+    setSavingSubEdit(false);
+    if (!res.ok) {
+      setError(json.error || "Failed to update subscription");
+      return;
+    }
+    setEditingSub(null);
+    setSubEditForm({ expiresAt: "", totalContactViews: "", dailyContactViewLimit: "", reason: "" });
+    await load();
+  };
 
   const updateUpgradeStatus = async (id: string, status: UpgradeRequest["status"]) => {
     const res = await adminFetch("/api/superadmin/subscriptions/upgrade-requests", {
@@ -424,13 +563,14 @@ export default function SuperAdminSubscriptionsPage() {
                   <th className="py-2 pr-2">Member</th>
                   <th className="py-2 pr-2">Plan</th>
                   <th className="py-2 pr-2">Status</th>
-                  <th className="py-2">Ends</th>
+                  <th className="py-2 pr-2">Ends</th>
+                  <th className="py-2">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {recentSubscriptions.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-4 text-gray-500">
+                    <td colSpan={5} className="py-4 text-gray-500">
                       No subscription rows yet.
                     </td>
                   </tr>
@@ -442,13 +582,119 @@ export default function SuperAdminSubscriptionsPage() {
                       </td>
                       <td className="py-2 pr-2">{r.planName}</td>
                       <td className="py-2 pr-2 capitalize">{r.status}</td>
-                      <td className="py-2 whitespace-nowrap">{fmtIn(r.expiresAt)}</td>
+                      <td className="py-2 pr-2 whitespace-nowrap">{fmtIn(r.expiresAt)}</td>
+                      <td className="py-2">
+                        <button
+                          type="button"
+                          onClick={() => openEditSubscription(r)}
+                          className="rounded-md border border-gray-200 px-2.5 py-1 text-xs font-medium hover:bg-gray-50"
+                        >
+                          Edit
+                        </button>
+                      </td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-xl border bg-white p-5">
+        <h2 className="text-lg font-semibold text-gray-900">Subscribed members dashboard</h2>
+        <p className="text-xs text-gray-500 mt-1">
+          Account-level details of active subscribers, previous plans and total paid amount.
+        </p>
+        <div className="mt-3 grid grid-cols-1 md:grid-cols-4 gap-2">
+          <input
+            value={memberSearch}
+            onChange={(e) => setMemberSearch(e.target.value)}
+            placeholder="Search by Account ID or name"
+            className="rounded-lg border border-gray-200 px-3 py-2 text-xs"
+          />
+          <select
+            value={memberPlanFilter}
+            onChange={(e) => setMemberPlanFilter(e.target.value)}
+            className="rounded-lg border border-gray-200 px-3 py-2 text-xs"
+          >
+            <option value="all">All plans</option>
+            {memberPlanOptions.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+          <select
+            value={memberExpiryFilter}
+            onChange={(e) => setMemberExpiryFilter(e.target.value as typeof memberExpiryFilter)}
+            className="rounded-lg border border-gray-200 px-3 py-2 text-xs"
+          >
+            <option value="all">All expiry states</option>
+            <option value="expiring_7">Expiring in 7 days</option>
+            <option value="expiring_30">Expiring in 30 days</option>
+            <option value="expired">Expired</option>
+            <option value="no_active">No active plan</option>
+          </select>
+          <button
+            type="button"
+            onClick={() => {
+              setMemberSearch("");
+              setMemberPlanFilter("all");
+              setMemberExpiryFilter("all");
+            }}
+            className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium hover:bg-gray-50"
+          >
+            Reset filters
+          </button>
+        </div>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b text-left text-gray-500">
+                <th className="py-2 pr-3">Account ID</th>
+                <th className="py-2 pr-3">Member</th>
+                <th className="py-2 pr-3">Current plan</th>
+                <th className="py-2 pr-3">Expires</th>
+                <th className="py-2 pr-3">Previous plans</th>
+                <th className="py-2 pr-3">Total plans</th>
+                <th className="py-2 pr-3">Total paid</th>
+                <th className="py-2">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredMemberSummaries.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-4 text-gray-500">
+                    No subscribed member summary available yet.
+                  </td>
+                </tr>
+              ) : (
+                filteredMemberSummaries.map((m) => (
+                  <tr key={m.ownerAuthUserId} className="border-b border-gray-100">
+                    <td className="py-2 pr-3 font-medium text-gray-900">{m.ownerAccountCode || "—"}</td>
+                    <td className="py-2 pr-3 font-medium text-gray-900">{m.ownerLabel}</td>
+                    <td className="py-2 pr-3">{m.activePlanName}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap">{fmtIn(m.activePlanEndsAt)}</td>
+                    <td className="py-2 pr-3">{m.previousPlansCount}</td>
+                    <td className="py-2 pr-3">{m.totalPlansCount}</td>
+                    <td className="py-2 pr-3">₹{Number(m.totalPaidAmount || 0).toLocaleString("en-IN")}</td>
+                    <td className="py-2">
+                      <button
+                        type="button"
+                        onClick={() => openEditFromSummary(m)}
+                        disabled={!m.activeSubscriptionId}
+                        className="rounded-md border border-gray-200 px-2.5 py-1 text-xs font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={m.activeSubscriptionId ? "Edit active subscription" : "No active subscription"}
+                      >
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -653,6 +899,76 @@ export default function SuperAdminSubscriptionsPage() {
           {assigning ? "Assigning…" : "Assign subscription"}
         </button>
       </div>
+
+      {editingSub && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="w-full max-w-lg rounded-xl border bg-white p-5 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900">Edit user subscription</h3>
+            <p className="text-xs text-gray-500 mt-1">
+              {editingSub.memberLabel} — {editingSub.planName}
+            </p>
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="text-sm text-gray-600">
+                Expiry date
+                <input
+                  type="date"
+                  value={subEditForm.expiresAt}
+                  onChange={(e) => setSubEditForm((s) => ({ ...s, expiresAt: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="text-sm text-gray-600">
+                Total contact limit
+                <input
+                  type="number"
+                  value={subEditForm.totalContactViews}
+                  onChange={(e) => setSubEditForm((s) => ({ ...s, totalContactViews: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="text-sm text-gray-600">
+                Daily contact limit
+                <input
+                  type="number"
+                  value={subEditForm.dailyContactViewLimit}
+                  onChange={(e) => setSubEditForm((s) => ({ ...s, dailyContactViewLimit: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="text-sm text-gray-600 sm:col-span-2">
+                Reason (required)
+                <input
+                  value={subEditForm.reason}
+                  onChange={(e) => setSubEditForm((s) => ({ ...s, reason: e.target.value }))}
+                  placeholder="Reason for this change"
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                />
+              </label>
+            </div>
+            <p className="mt-3 text-xs text-gray-500">
+              To switch the member to another plan, use Manual assignment and assign a new plan row.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditingSub(null)}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void saveSubscriptionEdit()}
+                disabled={savingSubEdit}
+                className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+              >
+                {savingSubEdit ? "Saving..." : "Save changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mt-8 rounded-xl border bg-white p-6">
         <h2 className="text-lg font-semibold">Upgrade Requests</h2>
         <p className="text-sm text-gray-500 mt-1">Requests submitted from membership page.</p>

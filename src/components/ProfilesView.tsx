@@ -18,6 +18,8 @@ import { BottomNav } from "@/components/ui/BottomNav";
 import { useAuthModal } from "@/contexts/AuthModalContext";
 import { ViewerForensicWatermark } from "@/components/ViewerForensicWatermark";
 import { SiteFooter } from "@/components/SiteFooter";
+import { adminFetch } from "@/lib/api/adminClient";
+import { maskLastName, type AccountAccessState } from "@/lib/accessPolicy";
 
 const AGE_MIN = 18;
 const AGE_MAX = 60;
@@ -62,6 +64,7 @@ export function ProfilesView({
 }: ProfilesViewProps) {
   const { profiles, profilesLoading } = useProfiles();
   const { isLoggedIn } = useAuth();
+  const [accessState, setAccessState] = useState<AccountAccessState | null>(null);
   const { openAuthModal } = useAuthModal();
 
   const lockedProfileType = lockedGender
@@ -82,6 +85,22 @@ export function ProfilesView({
     () => countActiveFilters(filters, lockedGender),
     [filters, lockedGender]
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!isLoggedIn) {
+      setAccessState(null);
+      return;
+    }
+    void (async () => {
+      const res = await adminFetch("/api/account/access-state");
+      const json = (await res.json()) as { access?: AccountAccessState };
+      if (!cancelled && res.ok && json.access) setAccessState(json.access);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn]);
 
   useEffect(() => {
     if (filterOpen) {
@@ -106,6 +125,7 @@ export function ProfilesView({
 
   const resetFilters = () =>
     setFilters({ ...defaultFilters, profileType: lockedProfileType ?? "" });
+  const canViewSensitiveFields = isLoggedIn && !!accessState?.hasValidSubscription;
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)]">
@@ -238,7 +258,13 @@ export function ProfilesView({
                 <ProfileCard
                   key={profile.id}
                   profile={profile}
-                  displayName={isLoggedIn ? profile.fullName : maskName(profile.fullName)}
+                  displayName={
+                    canViewSensitiveFields
+                      ? profile.fullName
+                      : isLoggedIn
+                        ? maskLastName(profile.fullName)
+                        : maskName(profile.fullName)
+                  }
                 />
               ))}
             </div>

@@ -39,6 +39,7 @@ import {
   completionTone,
 } from "@/lib/profileCompletion";
 import { BrideIcon, GroomIcon } from "@/components/ui/icons/BrideGroomIcons";
+import { MAX_ACTIVE_OR_PENDING_PROFILES } from "@/lib/accessPolicy";
 
 type RelationshipValue = NonNullable<Profile["relationship"]>;
 type SimpleIcon = ComponentType<SVGProps<SVGSVGElement> & { size?: number }>;
@@ -187,6 +188,8 @@ export default function AccountPage() {
     }
     return { drafts: d, submittedProfiles: active, deletedProfiles: del };
   }, [profiles]);
+  const nonDeletedOwnedCount = drafts.length + submittedProfiles.length;
+  const canCreateMoreProfiles = nonDeletedOwnedCount < MAX_ACTIVE_OR_PENDING_PROFILES;
 
   const handleResumeDraft = (draft: Profile) => {
     // Going through the normal /profile/complete route with the draft
@@ -814,9 +817,18 @@ export default function AccountPage() {
                 </div>
               )}
 
+              {!canCreateMoreProfiles && (
+                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  You can create up to {MAX_ACTIVE_OR_PENDING_PROFILES} profiles. Delete one to add a new profile.
+                </div>
+              )}
               <button
-                onClick={() => setShowRelPicker(true)}
-                className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-[var(--primary)]/30 text-[var(--primary)] font-medium hover:bg-[var(--primary)]/5 hover:border-[var(--primary)]/60 transition"
+                onClick={() => {
+                  if (!canCreateMoreProfiles) return;
+                  setShowRelPicker(true);
+                }}
+                disabled={!canCreateMoreProfiles}
+                className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-[var(--primary)]/30 text-[var(--primary)] font-medium hover:bg-[var(--primary)]/5 hover:border-[var(--primary)]/60 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Plus size={18} />
                 {submittedProfiles.length === 0

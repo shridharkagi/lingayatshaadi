@@ -74,6 +74,8 @@ import { trackContactView } from "@/lib/contactViewHistory";
 import { hasMeaningfulPreferences } from "@/lib/partnerPreferenceDefaults";
 import { computeProfileCompletion } from "@/lib/profileCompletion";
 import { buildProfileSeoTitle } from "@/lib/profileSeo";
+import { adminFetch } from "@/lib/api/adminClient";
+import { maskBirthDateKeepYear, maskLastName, MASKED_VALUE, type AccountAccessState } from "@/lib/accessPolicy";
 
 /** Session-only: user dismissed the confidential-use strip for this browser session. */
 const CONFIDENTIAL_STRIP_SESSION_KEY = "profile_confidential_notice_dismiss";
@@ -221,11 +223,41 @@ export default function OtherProfilePage() {
   const [stripNoticeDismissed, setStripNoticeDismissed] = useState(false);
   const [stripNoticeAutoHidden, setStripNoticeAutoHidden] = useState(false);
   const [contactHintVisible, setContactHintVisible] = useState(true);
+  const [accessState, setAccessState] = useState<AccountAccessState | null>(null);
+  const [localSavedIds, setLocalSavedIds] = useState<string[]>([]);
 
   const showToast = useCallback((msg: string, type: "success" | "error" = "success") => {
     setToast({ msg, type });
     window.setTimeout(() => setToast(null), 2500);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!isLoggedIn) {
+      setAccessState(null);
+      return;
+    }
+    void (async () => {
+      const res = await adminFetch("/api/account/access-state");
+      const json = (await res.json()) as { access?: AccountAccessState };
+      if (cancelled) return;
+      if (res.ok && json.access) setAccessState(json.access);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    if (!isLoggedIn || actorId) return;
+    try {
+      const raw = localStorage.getItem("saved_profiles_no_profile");
+      const ids = raw ? (JSON.parse(raw) as string[]) : [];
+      setLocalSavedIds(Array.isArray(ids) ? ids : []);
+    } catch {
+      setLocalSavedIds([]);
+    }
+  }, [isLoggedIn, actorId]);
 
   const slugFromParams = typeof params.id === "string" ? params.id : params.id?.[0] ?? "";
   const [displayedSlug, setDisplayedSlug] = useState(slugFromParams);
@@ -450,13 +482,20 @@ export default function OtherProfilePage() {
     if (!profile?.id || !actorId) {
       setInterestAccepted(false);
       setHasShownInterest(false);
+    } else {
+      hasAcceptedInterest(actorId, profile.id).then(({ data }) => setInterestAccepted(!!data));
+      hasSentInterest(actorId, profile.id).then(({ data }) => setHasShownInterest(!!data));
+    }
+    if (!profile?.id || !isLoggedIn) {
       setIsSaved(false);
       return;
     }
-    hasAcceptedInterest(actorId, profile.id).then(({ data }) => setInterestAccepted(!!data));
-    hasSentInterest(actorId, profile.id).then(({ data }) => setHasShownInterest(!!data));
+    if (!actorId) {
+      setIsSaved(localSavedIds.includes(profile.id));
+      return;
+    }
     isShortlisted(actorId, profile.id).then(({ data }) => setIsSaved(!!data));
-  }, [profile?.id, actorId]);
+  }, [profile?.id, actorId, isLoggedIn, localSavedIds]);
 
   /** Slide direction after route change (enter-from side). Consumed in useLayoutEffect. */
   const pendingEnterRef = useRef<"next" | "prev" | null>(null);
@@ -830,14 +869,22 @@ export default function OtherProfilePage() {
     );
   }
 
-  const displayName = isLoggedIn ? profile.fullName : maskString(profile.fullName, 5);
-  const displaySubCaste = isLoggedIn ? profile.subCaste : maskString(profile.subCaste, 3);
-  const displayFatherName = isLoggedIn ? profile.fatherName : maskString(profile.fatherName, 2);
-  const displayMotherName = isLoggedIn ? profile.motherName : maskString(profile.motherName, 2);
-  const displaySibling = isLoggedIn ? profile.siblingDetails : maskString(profile.siblingDetails, 2);
-  const displayDateOfBirth = isLoggedIn
+  const hasValidSubscription = !!accessState?.hasValidSubscription;
+  const canViewSensitiveFields = isLoggedIn && hasValidSubscription;
+  const canUseContact = !!accessState?.canContact;
+  const canSendInterestNow = !!accessState?.canSendInterest;
+  const displayName = canViewSensitiveFields
+    ? profile.fullName
+    : isLoggedIn
+      ? maskLastName(profile.fullName)
+      : maskString(profile.fullName, 5);
+  const displaySubCaste = canViewSensitiveFields ? profile.subCaste : maskString(profile.subCaste, 3);
+  const displayFatherName = canViewSensitiveFields ? profile.fatherName : MASKED_VALUE;
+  const displayMotherName = canViewSensitiveFields ? profile.motherName : MASKED_VALUE;
+  const displaySibling = canViewSensitiveFields ? profile.siblingDetails : maskString(profile.siblingDetails, 2);
+  const displayDateOfBirth = canViewSensitiveFields
     ? formatDateDDMMYYYY(profile.dateOfBirth)
-    : "**/**/****";
+    : maskBirthDateKeepYear(profile.dateOfBirth);
 
   const aboutMeTruncated = truncateToWords(profile.aboutMe, 100);
   const aboutMeWords = wordCount(profile.aboutMe);
@@ -1015,8 +1062,8 @@ export default function OtherProfilePage() {
                   src={allPhotos[currentImageIndex]}
                   alt={`${profile.fullName} photo ${currentImageIndex + 1}`}
                   fill
-                  className={`object-contain ${!isLoggedIn ? "select-none pointer-events-none" : ""}`}
-                  style={!isLoggedIn ? { filter: "blur(var(--blur-md))" } : undefined}
+                  className={`object-contain ${!canViewSensitiveFields ? "select-none pointer-events-none" : ""}`}
+                  style={!canViewSensitiveFields ? { filter: "blur(var(--blur-md))" } : undefined}
                   unoptimized
                   sizes="100vw"
                 />
@@ -1247,16 +1294,16 @@ export default function OtherProfilePage() {
         </div>
       </div>
 
-      {/* Action buttons - improved mobile responsiveness */}
-      <div className="px-3 py-2 rounded-b-2xl rounded-t-none bg-gradient-to-b from-white to-gray-50 border border-gray-100 border-t-gray-200/70">
-        <div className={`grid ${FEATURE_MESSAGING_ENABLED ? "grid-cols-5" : "grid-cols-4"} gap-1 sm:gap-1.5`}>
+      {/* Action buttons - mobile-first, large tap targets */}
+      <div className="px-2 sm:px-3 py-2.5 rounded-b-2xl rounded-t-none bg-gradient-to-b from-white to-gray-50 border border-gray-100 border-t-gray-200/70">
+        <div className={`grid ${FEATURE_MESSAGING_ENABLED ? "grid-cols-5" : "grid-cols-4"} gap-2`}>
           <button
             onClick={async () => {
               if (!isLoggedIn) {
                 openAuthModal("login");
                 return;
               }
-              if (needsOwnProfile) {
+              if (!canSendInterestNow || needsOwnProfile) {
                 setShowCreateProfileModal(true);
                 return;
               }
@@ -1278,52 +1325,58 @@ export default function OtherProfilePage() {
               }
             }}
             disabled={hasShownInterest || sendingInterest}
-            className={`flex flex-col items-center justify-center gap-0.5 px-1.5 py-2 sm:py-1.5 rounded-xl transition min-h-[40px] border ${
+            className={`flex flex-col items-center justify-center gap-1 px-1.5 py-2 rounded-xl transition min-h-[56px] border ${
               hasShownInterest
-                ? "bg-red-50 border-red-200 text-red-600"
-                : "hover:bg-gray-100 active:bg-gray-200 border-transparent hover:border-gray-200"
+                ? "bg-red-50 border-red-200 text-red-600 shadow-[inset_0_0_0_1px_rgba(239,68,68,0.08)]"
+                : "bg-white hover:bg-gray-100 active:bg-gray-200 border-gray-200/80"
             } ${sendingInterest ? "opacity-70" : ""}`}
           >
-            <Heart size={18} className={`flex-shrink-0 ${hasShownInterest ? 'fill-red-600' : ''}`} />
-            <span className="text-[11px] font-medium truncate">Interest</span>
+            <Heart size={18} className={`flex-shrink-0 ${hasShownInterest ? "fill-red-600" : ""}`} />
+            <span className="text-[11px] sm:text-xs font-semibold truncate">Interest</span>
           </button>
           {FEATURE_MESSAGING_ENABLED &&
             (interestAccepted ? (
-              <Link href={`/messages/${profile.id}`} className="min-h-[40px]">
-                <button className="w-full h-full flex flex-col items-center justify-center gap-0.5 px-1.5 py-2 sm:py-1.5 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition border border-transparent hover:border-gray-200">
+              <Link href={`/messages/${profile.id}`} className="min-h-[56px]">
+                <button className="w-full h-full flex flex-col items-center justify-center gap-1 px-1.5 py-2 rounded-xl bg-white hover:bg-gray-100 active:bg-gray-200 transition border border-gray-200/80">
                   <MessageCircle size={18} className="flex-shrink-0" />
-                  <span className="text-[11px] font-medium truncate">Message</span>
+                  <span className="text-[11px] sm:text-xs font-semibold truncate">Message</span>
                 </button>
               </Link>
             ) : (
               <button
                 disabled
                 title="Accept interest request first to message"
-                className="flex flex-col items-center justify-center gap-0.5 px-1.5 py-2 sm:py-1.5 rounded-xl opacity-50 cursor-not-allowed min-h-[40px] border border-gray-200"
+                className="flex flex-col items-center justify-center gap-1 px-1.5 py-2 rounded-xl opacity-50 cursor-not-allowed min-h-[56px] border border-gray-200 bg-white"
               >
                 <MessageCircle size={18} className="flex-shrink-0" />
-                <span className="text-[11px] font-medium truncate">Message</span>
+                <span className="text-[11px] sm:text-xs font-semibold truncate">Message</span>
               </button>
             ))}
           {!isLoggedIn ? (
             <a
               href={`tel:${(config.callContactNumber || "6360130905").replace(/\D/g, "")}`}
-              className="flex flex-col items-center justify-center gap-0.5 px-1.5 py-2 sm:py-1.5 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition min-h-[40px] border border-transparent hover:border-gray-200"
+              className="flex flex-col items-center justify-center gap-1 px-1.5 py-2 rounded-xl bg-white hover:bg-gray-100 active:bg-gray-200 transition min-h-[56px] border border-gray-200/80"
             >
               <Phone size={18} className="flex-shrink-0" />
-              <span className="text-[11px] font-medium truncate">Contact</span>
+              <span className="text-[11px] sm:text-xs font-semibold truncate">Contact</span>
             </a>
           ) : (
             <button
-              onClick={toggleContactDetails}
-              className={`flex flex-col items-center justify-center gap-0.5 px-1.5 py-2 sm:py-1.5 rounded-xl transition min-h-[40px] border ${
+              onClick={() => {
+                if (!canUseContact) {
+                  showToast("Upgrade your plan to view full profile details and contact information.", "error");
+                  return;
+                }
+                toggleContactDetails();
+              }}
+              className={`flex flex-col items-center justify-center gap-1 px-1.5 py-2 rounded-xl transition min-h-[56px] border ${
                 showContact 
-                  ? 'bg-blue-50 border-blue-200 text-blue-600' 
-                  : 'hover:bg-gray-100 active:bg-gray-200 border-transparent hover:border-gray-200'
+                  ? "bg-blue-50 border-blue-200 text-blue-600 shadow-[inset_0_0_0_1px_rgba(59,130,246,0.08)]"
+                  : "bg-white hover:bg-gray-100 active:bg-gray-200 border-gray-200/80"
               }`}
             >
               <Phone size={18} className="flex-shrink-0" />
-              <span className="text-[11px] font-medium truncate">Contact</span>
+              <span className="text-[11px] sm:text-xs font-semibold truncate">Contact</span>
             </button>
           )}
           <button
@@ -1332,11 +1385,22 @@ export default function OtherProfilePage() {
                 openAuthModal("login");
                 return;
               }
-              if (needsOwnProfile) {
-                setShowCreateProfileModal(true);
+              if (!profile || savingShortlist) return;
+              if (!actorId) {
+                const next = !isSaved;
+                const nextIds = next
+                  ? Array.from(new Set([...localSavedIds, profile.id]))
+                  : localSavedIds.filter((id) => id !== profile.id);
+                try {
+                  localStorage.setItem("saved_profiles_no_profile", JSON.stringify(nextIds));
+                } catch {
+                  // ignore localStorage errors
+                }
+                setLocalSavedIds(nextIds);
+                setIsSaved(next);
+                showToast(next ? "Added to saved profiles" : "Removed from saved profiles");
                 return;
               }
-              if (!actorId || !profile || savingShortlist) return;
               setSavingShortlist(true);
               const { error } = isSaved
                 ? await removeFromShortlist(actorId, profile.id)
@@ -1352,24 +1416,24 @@ export default function OtherProfilePage() {
               }
             }}
             disabled={savingShortlist}
-            className={`flex flex-col items-center justify-center gap-0.5 px-1.5 py-2 sm:py-1.5 rounded-xl transition min-h-[40px] border ${
+            className={`flex flex-col items-center justify-center gap-1 px-1.5 py-2 rounded-xl transition min-h-[56px] border ${
               isSaved
-                ? "bg-yellow-50 border-yellow-200 text-yellow-700"
-                : "hover:bg-gray-100 active:bg-gray-200 border-transparent hover:border-gray-200"
+                ? "bg-amber-50 border-amber-200 text-amber-700 shadow-[inset_0_0_0_1px_rgba(245,158,11,0.1)]"
+                : "bg-white hover:bg-gray-100 active:bg-gray-200 border-gray-200/80"
             }`}
             aria-label="Save to shortlist"
           >
-            <Bookmark size={18} className={`flex-shrink-0 ${isSaved ? 'fill-yellow-700' : ''}`} />
-            <span className="text-[11px] font-medium truncate">Save</span>
+            <Bookmark size={18} className={`flex-shrink-0 ${isSaved ? "fill-amber-700" : ""}`} />
+            <span className="text-[11px] sm:text-xs font-semibold truncate">Save</span>
           </button>
           <button
             type="button"
             onClick={openSupportPopup}
-            className="flex flex-col items-center justify-center gap-0.5 px-1.5 py-2 sm:py-1.5 rounded-xl transition min-h-[40px] border hover:bg-gray-100 active:bg-gray-200 border-transparent hover:border-gray-200"
+            className="flex flex-col items-center justify-center gap-1 px-1.5 py-2 rounded-xl transition min-h-[56px] border bg-white hover:bg-gray-100 active:bg-gray-200 border-gray-200/80"
             aria-label="Contact support"
           >
             <Phone size={18} className="flex-shrink-0" />
-            <span className="text-[11px] font-medium truncate">Support</span>
+            <span className="text-[11px] sm:text-xs font-semibold truncate">Support</span>
           </button>
         </div>
         
@@ -1444,6 +1508,38 @@ export default function OtherProfilePage() {
               </span>
             </button>
           )}
+          {isLoggedIn && !hasValidSubscription && (
+            <div className="w-full text-left mb-4 rounded-xl bg-amber-50 border border-amber-200 p-3 sm:p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-full bg-amber-500 text-white flex items-center justify-center flex-shrink-0">
+                  <Lock size={18} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-[var(--foreground)]">
+                    Upgrade your plan to view full profile details and contact information.
+                  </p>
+                  <p className="text-xs sm:text-sm text-gray-600 mt-0.5">
+                    Upgrade to reveal sensitive details, or contact support for help.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <Link
+                  href="/membership"
+                  className="inline-flex items-center justify-center px-3 py-2 rounded-lg bg-[var(--primary)] text-white text-sm font-medium"
+                >
+                  Upgrade Plan
+                </Link>
+                <button
+                  type="button"
+                  onClick={openSupportPopup}
+                  className="inline-flex items-center justify-center px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 bg-white"
+                >
+                  Contact Support
+                </button>
+              </div>
+            </div>
+          )}
           <div className="divide-y divide-gray-100">
             <DetailSection icon={User} heading="Basic Info">
               {(() => {
@@ -1514,11 +1610,11 @@ export default function OtherProfilePage() {
                   key context without leaking company details publicly. */}
               <p>
                 {profile.profession || "—"}
-                {isLoggedIn && profile.companyName ? ` at ${profile.companyName}` : ""}
+                {canViewSensitiveFields && profile.companyName ? ` at ${profile.companyName}` : ""}
               </p>
               {/* Annual income (package) is a sensitive field — hidden for
                   non-logged-in viewers to discourage scraping. */}
-              {isLoggedIn && profile.annualIncome && <p>{profile.annualIncome}</p>}
+              {canViewSensitiveFields && profile.annualIncome && <p>{profile.annualIncome}</p>}
             </DetailSection>
             <DetailSection icon={Users} heading="Family">
               <p>Father: {displayFatherName || "—"} ({profile.fatherOccupation || "—"})</p>
@@ -1532,11 +1628,11 @@ export default function OtherProfilePage() {
         {/* Horoscope block: Time of Birth is considered sensitive and is
             hidden for non-logged-in viewers. We still show the card if any
             of the remaining astrology fields are present. */}
-        {(profile.rashi || profile.nakshatra || (isLoggedIn && profile.timeOfBirth) || profile.placeOfBirth) && (
+        {(profile.rashi || profile.nakshatra || (canViewSensitiveFields && profile.timeOfBirth) || profile.placeOfBirth) && (
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <h3 className="font-semibold text-[var(--foreground)] mb-1">Horoscope Details</h3>
             <DetailSection icon={Calendar} heading="Birth & Astrology">
-              {isLoggedIn && profile.timeOfBirth && <p>Time of Birth: {profile.timeOfBirth}</p>}
+              {canViewSensitiveFields && profile.timeOfBirth && <p>Time of Birth: {profile.timeOfBirth}</p>}
               {profile.placeOfBirth && <p>Place of Birth: {profile.placeOfBirth}</p>}
               {profile.rashi && <p>Zodiac Sign: {profile.rashi}</p>}
               {profile.nakshatra && <p>Nakshatra: {profile.nakshatra}</p>}
@@ -1633,12 +1729,31 @@ export default function OtherProfilePage() {
               <>
                 <button
                   type="button"
-                  onClick={toggleContactDetails}
+                  onClick={() => {
+                    if (!canUseContact) {
+                      showToast("Upgrade your plan to view full profile details and contact information.", "error");
+                      return;
+                    }
+                    toggleContactDetails();
+                  }}
                   className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors text-[var(--primary)] font-medium"
                 >
                   <Phone size={18} />
                   {showContact ? "Hide Contact" : "View Contact"}
                 </button>
+                {!hasValidSubscription && (
+                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                    <p className="text-sm text-amber-900">Upgrade your plan to view full profile details and contact information.</p>
+                    <div className="mt-2 flex gap-2">
+                      <Link href="/membership" className="px-3 py-1.5 rounded-lg bg-[var(--primary)] text-white text-xs font-medium">
+                        Upgrade Plan
+                      </Link>
+                      <button type="button" onClick={openSupportPopup} className="px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-medium text-gray-700">
+                        Contact Support
+                      </button>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </DetailSection>
@@ -1805,7 +1920,7 @@ export default function OtherProfilePage() {
         {hasMultiplePhotos && (
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <h3 className="font-semibold text-[var(--foreground)] mb-3">More Photos</h3>
-            {!isLoggedIn ? (
+            {!canViewSensitiveFields ? (
               <div className="relative">
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                   {allPhotos.slice(0, 4).map((src, i) => (
@@ -1826,13 +1941,22 @@ export default function OtherProfilePage() {
                   ))}
                 </div>
                 <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg backdrop-blur-sm">
-                  <button
-                    type="button"
-                    onClick={() => openAuthModal("login")}
-                    className="px-6 py-3 rounded-xl bg-[var(--primary)] text-white font-semibold hover:bg-[var(--primary-hover)] transition shadow-lg"
-                  >
-                    Login to View Photos
-                  </button>
+                  {!isLoggedIn ? (
+                    <button
+                      type="button"
+                      onClick={() => openAuthModal("login")}
+                      className="px-6 py-3 rounded-xl bg-[var(--primary)] text-white font-semibold hover:bg-[var(--primary-hover)] transition shadow-lg"
+                    >
+                      Login to View Photos
+                    </button>
+                  ) : (
+                    <Link
+                      href="/membership"
+                      className="px-6 py-3 rounded-xl bg-[var(--primary)] text-white font-semibold hover:bg-[var(--primary-hover)] transition shadow-lg"
+                    >
+                      Upgrade to View Photos
+                    </Link>
+                  )}
                 </div>
               </div>
             ) : (
@@ -1982,7 +2106,13 @@ export default function OtherProfilePage() {
                   <ProfileCard
                     key={similar.id}
                     profile={similar}
-                    displayName={isLoggedIn ? similar.fullName : maskString(similar.fullName, 5)}
+                    displayName={
+                      canViewSensitiveFields
+                        ? similar.fullName
+                        : isLoggedIn
+                          ? maskLastName(similar.fullName)
+                          : maskString(similar.fullName, 5)
+                    }
                   />
                 ))}
             </div>
@@ -2048,14 +2178,33 @@ export default function OtherProfilePage() {
       )}
 
       {toast && (
-        <div className="fixed left-1/2 -translate-x-1/2 bottom-24 sm:bottom-8 z-[60] px-4 max-w-[90vw]">
+        <div className="fixed left-1/2 -translate-x-1/2 bottom-[calc(6.25rem+env(safe-area-inset-bottom,0px))] sm:bottom-8 z-[60] px-3 w-full max-w-md">
           <div
             role="status"
-            className={`px-4 py-2.5 rounded-xl shadow-lg text-sm font-medium text-white ${
-              toast.type === "success" ? "bg-green-600" : "bg-red-600"
+            className={`w-full rounded-2xl border shadow-xl backdrop-blur px-3 py-2.5 text-sm ${
+              toast.type === "success"
+                ? "bg-emerald-50/95 border-emerald-200 text-emerald-900"
+                : "bg-rose-50/95 border-rose-200 text-rose-900"
             }`}
           >
-            {toast.msg}
+            <div className="flex items-start gap-2">
+              <span className="mt-0.5">
+                {toast.type === "success" ? (
+                  <Check size={16} className="text-emerald-700" />
+                ) : (
+                  <AlertTriangle size={16} className="text-rose-700" />
+                )}
+              </span>
+              <p className="flex-1 leading-snug font-medium">{toast.msg}</p>
+              <button
+                type="button"
+                onClick={() => setToast(null)}
+                className="p-1 rounded-md hover:bg-black/5 text-current"
+                aria-label="Dismiss notification"
+              >
+                <X size={15} />
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -2065,8 +2214,7 @@ export default function OtherProfilePage() {
           <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
             <h3 className="text-lg font-semibold text-[var(--foreground)]">Create profile to continue</h3>
             <p className="mt-2 text-sm text-gray-600">
-              You can browse profiles, but features like Interest and Save are available after creating at least one
-              profile in your account.
+              You can browse and save profiles, but sending Interest requires at least one profile in your account.
             </p>
             <div className="mt-4 flex gap-2">
               <button

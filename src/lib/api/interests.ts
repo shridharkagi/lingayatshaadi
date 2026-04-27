@@ -1,4 +1,5 @@
 import { createSupabaseClientSafe } from "@/lib/supabase";
+import { adminFetch } from "@/lib/api/adminClient";
 
 async function createNotificationForUser(
   userId: string,
@@ -108,26 +109,15 @@ export async function sendInterest(
   fromName?: string
 ): Promise<{ data: Interest | null; error: string | null }> {
   try {
-    const supabase = createSupabaseClientSafe();
-    if (!supabase) return { data: null, error: "Supabase not configured" };
-
-    const { data, error } = await supabase
-      .from("interests")
-      .insert({
-        from_id: fromProfileId,
-        to_id: toProfileId,
-        message: message?.trim() || null,
-        status: "pending",
-      })
-      .select()
-      .single();
-
-    if (error) return { data: null, error: error.message };
-
-    const who = fromName?.trim() || "Someone";
-    createNotificationForUser(toProfileId, "interest_received", "New Interest", `${who} sent you an interest`);
-
-    return { data: toInterest(data as InterestRow), error: null };
+    const res = await adminFetch("/api/interests/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fromProfileId, toProfileId, message, fromName }),
+    });
+    const json = (await res.json()) as { error?: string; interest?: InterestRow };
+    if (!res.ok) return { data: null, error: json.error || "Failed to send interest" };
+    if (!json.interest) return { data: null, error: "Failed to send interest" };
+    return { data: toInterest(json.interest), error: null };
   } catch (err) {
     return {
       data: null,

@@ -251,6 +251,12 @@ export default function SuperAdminUsersPage() {
                     <button onClick={() => void openActivity(u.id)} className="text-[var(--primary)] text-sm font-medium hover:underline">
                       Activity
                     </button>
+                    <Link
+                      href={`/superadmin/subscriptions?user=${encodeURIComponent(u.accountCode || u.id)}`}
+                      className="text-[var(--primary)] text-sm font-medium hover:underline"
+                    >
+                      Edit Plan
+                    </Link>
                   </td>
                 </tr>
                 {expandedUserId === u.id && (

@@ -27,6 +27,15 @@ function isUserSubscriptionsPlanFkError(message: string | undefined): boolean {
   );
 }
 
+function isUserSubscriptionsUserFkError(message: string | undefined): boolean {
+  if (!message) return false;
+  const m = message.toLowerCase();
+  return (
+    m.includes("user_subscriptions_user_id_fkey") ||
+    (m.includes("foreign key") && m.includes("user_subscriptions") && m.includes("user_id"))
+  );
+}
+
 type SubscriptionPlanRow = {
   id: string;
   code: string;
@@ -158,6 +167,52 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = createSupabaseAdmin();
+  let normalizedUserId = String(body.userId || "").trim();
+  const normalizedProfileId = String(body.profileId || "").trim();
+  const accountCodeCandidate = normalizedUserId.toUpperCase();
+  if (/^U\d{4,}$/.test(accountCodeCandidate)) {
+    const { data: codeRow } = await admin
+      .from("user_account_codes")
+      .select("user_id")
+      .eq("account_code", accountCodeCandidate)
+      .maybeSingle();
+    const mappedUserId = String((codeRow as { user_id?: string } | null)?.user_id || "").trim();
+    if (mappedUserId) normalizedUserId = mappedUserId;
+  }
+  if (normalizedProfileId) {
+    const { data: ownerRow } = await admin
+      .from("profiles")
+      .select("user_id")
+      .eq("id", normalizedProfileId)
+      .maybeSingle();
+    const ownerUserId = String((ownerRow as { user_id?: string } | null)?.user_id || "").trim();
+    if (ownerUserId) normalizedUserId = ownerUserId;
+  } else if (normalizedUserId) {
+    const { data: ownerRow } = await admin
+      .from("profiles")
+      .select("user_id")
+      .eq("id", normalizedUserId)
+      .maybeSingle();
+    const ownerUserId = String((ownerRow as { user_id?: string } | null)?.user_id || "").trim();
+    if (ownerUserId) normalizedUserId = ownerUserId;
+  }
+  if (!normalizedUserId) {
+    return NextResponse.json({ error: "Could not resolve a valid account owner for this assignment." }, { status: 400 });
+  }
+  try {
+    const { data: authLookup, error: authLookupErr } = await admin.auth.admin.getUserById(normalizedUserId);
+    if (authLookupErr || !authLookup?.user?.id) {
+      return NextResponse.json(
+        { error: "Could not map this input to a valid account owner. Please search and select the member again." },
+        { status: 400 }
+      );
+    }
+  } catch {
+    return NextResponse.json(
+      { error: "Could not map this input to a valid account owner. Please search and select the member again." },
+      { status: 400 }
+    );
+  }
   const now = new Date().toISOString();
   const startImmediately = body.startImmediately ?? true;
 
@@ -200,7 +255,7 @@ export async function POST(req: NextRequest) {
 
   const transactionId =
     body.transactionId ||
-    (isFreePlan ? `FREE-${body.userId}-${Date.now().toString(36).toUpperCase()}` : null);
+    (isFreePlan ? `FREE-${normalizedUserId}-${Date.now().toString(36).toUpperCase()}` : null);
   const paymentMadeAt = body.paymentMadeAt || now;
   const totalContactViewsSnapshot =
     body.overrideTotalContactViews != null
@@ -253,7 +308,24 @@ export async function POST(req: NextRequest) {
     return { data: null as Record<string, unknown> | null, error: r.error };
   };
 
-  const subscriptionRowUserId = body.userId;
+  const subscriptionUserIdCandidates: string[] = [];
+  subscriptionUserIdCandidates.push(normalizedUserId);
+  let ownerProfileId = normalizedProfileId;
+  if (!ownerProfileId) {
+    const { data: ownerProfile } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("user_id", normalizedUserId)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    ownerProfileId = String((ownerProfile as { id?: string } | null)?.id || "").trim();
+  }
+  if (ownerProfileId && !subscriptionUserIdCandidates.includes(ownerProfileId)) {
+    subscriptionUserIdCandidates.push(ownerProfileId);
+  }
+
+  let subscriptionRowUserId = subscriptionUserIdCandidates[0];
   let { data: subscription, error: subError } = await insertSubscriptionRow(subscriptionRowUserId, effectivePlanId);
   if (subError && isUserSubscriptionsPlanFkError(subError.message)) {
     const { legacyPlanId, membershipPlansRowCount } = await resolveMembershipPlanIdForFk(admin, planRow);
@@ -271,6 +343,15 @@ export async function POST(req: NextRequest) {
     }
     effectivePlanId = legacyPlanId;
     ({ data: subscription, error: subError } = await insertSubscriptionRow(subscriptionRowUserId, effectivePlanId));
+  }
+  if (subError && isUserSubscriptionsUserFkError(subError.message) && subscriptionUserIdCandidates.length > 1) {
+    const fallbackUserId = subscriptionUserIdCandidates[1];
+    const retry = await insertSubscriptionRow(fallbackUserId, effectivePlanId);
+    if (!retry.error && retry.data) {
+      subscriptionRowUserId = fallbackUserId;
+      subscription = retry.data;
+      subError = null;
+    }
   }
   if (subError || !subscription) {
     return NextResponse.json({ error: subError?.message || "Failed to create subscription" }, { status: 500 });
@@ -346,7 +427,7 @@ export async function POST(req: NextRequest) {
     entityType: "user_subscription",
     entityId: String(subscription.id as string),
     afterJson: {
-      auth_user_id: body.userId,
+      auth_user_id: normalizedUserId,
       subscription_user_id: subscriptionRowUserId,
       subscription_plans_id: planRow.id,
       user_subscriptions_plan_id: effectivePlanId,
@@ -361,7 +442,7 @@ export async function POST(req: NextRequest) {
   });
 
   await admin.from("notifications").insert({
-    user_id: body.userId,
+    user_id: normalizedUserId,
     type: "general",
     title: "Subscription activated",
     message: `Your ${String(planRow.name)} plan is active till ${expiresAt.toLocaleDateString("en-IN")}.`,

@@ -1,6 +1,7 @@
 import { createSupabaseClient, createSupabaseClientSafe } from "@/lib/supabase";
 import { toProfileRow, fromProfileRow, type ProfileRow } from "@/lib/profileMapper";
 import type { Profile } from "@/types";
+import { MAX_ACTIVE_OR_PENDING_PROFILES } from "@/lib/accessPolicy";
 
 /**
  * Cross-device profile autosave (Batch 6).
@@ -96,6 +97,19 @@ export async function createDraft(
 ): Promise<{ data: Profile | null; error: string | null }> {
   try {
     const supabase = createSupabaseClient();
+    const { count: nonDeletedProfileCount, error: countError } = await supabase
+      .from("profiles")
+      .select("id", { head: true, count: "exact" })
+      .eq("user_id", userId)
+      .is("deleted_at", null);
+    if (countError) return { data: null, error: countError.message };
+    if (Number(nonDeletedProfileCount || 0) >= MAX_ACTIVE_OR_PENDING_PROFILES) {
+      return {
+        data: null,
+        error: `You can create up to ${MAX_ACTIVE_OR_PENDING_PROFILES} profiles. Delete one to add a new profile.`,
+      };
+    }
+
     // We intentionally mark as 'draft' so the normal createProfile auto-
     // pending-review logic is bypassed. Going through the mapper keeps
     // field translation consistent with every other write path.
