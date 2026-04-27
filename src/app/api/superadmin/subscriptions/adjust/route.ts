@@ -3,6 +3,15 @@ import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
 import { logAdminAudit } from "@/lib/server/adminAudit";
 
+function isMissingUpdatedAtColumnError(message: string | undefined): boolean {
+  if (!message) return false;
+  const m = message.toLowerCase();
+  return (
+    m.includes("updated_at") &&
+    (m.includes("does not exist") || m.includes("could not find") || m.includes("schema cache"))
+  );
+}
+
 export async function POST(req: NextRequest) {
   const auth = await requireSuperAdmin(req);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
@@ -21,16 +30,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const updates: Record<string, unknown> = {
+  const updatesWithTimestamp: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
   };
-  if (body.expiresAt) updates.expires_at = body.expiresAt;
+  if (body.expiresAt) updatesWithTimestamp.expires_at = body.expiresAt;
   if (body.totalContactViews != null) {
-    updates.total_contact_views_snapshot = Math.max(0, Math.trunc(Number(body.totalContactViews)));
+    updatesWithTimestamp.total_contact_views_snapshot = Math.max(0, Math.trunc(Number(body.totalContactViews)));
   }
   if (body.dailyContactViewLimit != null) {
-    updates.daily_contact_view_limit_snapshot = Math.max(0, Math.trunc(Number(body.dailyContactViewLimit)));
+    updatesWithTimestamp.daily_contact_view_limit_snapshot = Math.max(0, Math.trunc(Number(body.dailyContactViewLimit)));
   }
+  const { updated_at: _ignoredUpdatedAt, ...updatesWithoutTimestamp } = updatesWithTimestamp;
 
   const admin = createSupabaseAdmin();
   const { data: before, error: fetchErr } = await admin
@@ -42,12 +52,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: fetchErr?.message || "Subscription not found" }, { status: 404 });
   }
 
-  const { data: updated, error: updErr } = await admin
+  let { data: updated, error: updErr } = await admin
     .from("user_subscriptions")
-    .update(updates)
+    .update(updatesWithTimestamp)
     .eq("id", body.subscriptionId)
     .select("*")
     .single();
+  if (updErr && isMissingUpdatedAtColumnError(updErr.message)) {
+    const fallback = await admin
+      .from("user_subscriptions")
+      .update(updatesWithoutTimestamp)
+      .eq("id", body.subscriptionId)
+      .select("*")
+      .single();
+    updated = fallback.data;
+    updErr = fallback.error;
+  }
   if (updErr || !updated) {
     return NextResponse.json({ error: updErr?.message || "Failed to update subscription" }, { status: 500 });
   }

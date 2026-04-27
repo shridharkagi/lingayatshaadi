@@ -27,11 +27,26 @@ function isUserSubscriptionsPlanFkError(message: string | undefined): boolean {
   );
 }
 
+function isUserSubscriptionsUserFkError(message: string | undefined): boolean {
+  if (!message) return false;
+  const m = message.toLowerCase();
+  return (
+    m.includes("user_subscriptions_user_id_fkey") ||
+    (m.includes("foreign key") && m.includes("user_subscriptions") && m.includes("user_id"))
+  );
+}
+
 function appendReplacementNote(existing: unknown, addedNote: string): string {
   const prev = String(existing || "").trim();
   if (!prev) return addedNote;
   if (prev.includes(addedNote)) return prev;
   return `${prev}\n${addedNote}`;
+}
+
+function isUserSubscriptionsNotesColumnError(message: string | undefined): boolean {
+  if (!message) return false;
+  const m = message.toLowerCase();
+  return m.includes("column") && m.includes("notes") && m.includes("does not exist");
 }
 
 type SubscriptionPlanRow = {
@@ -318,21 +333,37 @@ export async function POST(req: NextRequest) {
 
   // Enforce account-level single active plan:
   // expire existing active rows for this account before creating a new one.
-  const { data: existingSubs } = await admin
+  const existingSubsRes = await admin
     .from("user_subscriptions")
     .select("id, user_id, status, starts_at, expires_at, notes")
     .in("user_id", legacyLookupUserIds)
     .eq("status", "active")
     .order("created_at", { ascending: false })
     .limit(100);
-  const nowIso = now;
-  const replacementNote = `Expired automatically: replaced by newly assigned plan ${planRow.name} on ${new Date(nowIso).toLocaleString("en-IN")}.`;
-  for (const row of (existingSubs || []) as Array<{
+  let existingSubs: Array<{
     id?: string;
+    user_id?: string;
+    status?: string;
     starts_at?: string | null;
     expires_at?: string | null;
     notes?: string | null;
-  }>) {
+  }> =
+    !existingSubsRes.error && existingSubsRes.data
+      ? existingSubsRes.data
+      : [];
+  if (existingSubsRes.error && isUserSubscriptionsNotesColumnError(existingSubsRes.error.message)) {
+    const fallbackRes = await admin
+      .from("user_subscriptions")
+      .select("id, user_id, status, starts_at, expires_at")
+      .in("user_id", legacyLookupUserIds)
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    existingSubs = fallbackRes.data || [];
+  }
+  const nowIso = now;
+  const replacementNote = `Expired automatically: replaced by newly assigned plan ${planRow.name} on ${new Date(nowIso).toLocaleString("en-IN")}.`;
+  for (const row of existingSubs || []) {
     const sid = String(row.id || "");
     if (!sid) continue;
     const startsAtOld = String(row.starts_at || "");
@@ -347,7 +378,10 @@ export async function POST(req: NextRequest) {
         notes: noteValue,
       })
       .eq("id", sid);
-    if (upd.error && isSchemaMismatchError(upd.error.message)) {
+    if (
+      upd.error &&
+      (isSchemaMismatchError(upd.error.message) || isUserSubscriptionsNotesColumnError(upd.error.message))
+    ) {
       upd = await admin
         .from("user_subscriptions")
         .update({
@@ -358,9 +392,30 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const subscriptionRowUserId = normalizedUserId;
-  let { data: subscription, error: subError } = await insertSubscriptionRow(subscriptionRowUserId, effectivePlanId);
-  if (subError && isUserSubscriptionsPlanFkError(subError.message)) {
+  const subscriptionUserIdCandidates = Array.from(new Set([normalizedUserId, ...ownedProfileIds]));
+  let subscriptionRowUserId = subscriptionUserIdCandidates[0] || normalizedUserId;
+  let subscription: Record<string, unknown> | null = null;
+  let subError: { message: string } | null = null;
+  let sawPlanFkError = false;
+  const tryInsertForPlanId = async (planIdForInsert: string) => {
+    for (const uid of subscriptionUserIdCandidates) {
+      const attempted = await insertSubscriptionRow(uid, planIdForInsert);
+      if (!attempted.error && attempted.data) {
+        subscriptionRowUserId = uid;
+        subscription = attempted.data;
+        subError = null;
+        return true;
+      }
+      subError = attempted.error;
+      if (attempted.error && isUserSubscriptionsPlanFkError(attempted.error.message)) {
+        sawPlanFkError = true;
+      }
+    }
+    return false;
+  };
+
+  let inserted = await tryInsertForPlanId(effectivePlanId);
+  if (!inserted && sawPlanFkError) {
     const { legacyPlanId, membershipPlansRowCount } = await resolveMembershipPlanIdForFk(admin, planRow);
     if (!legacyPlanId) {
       const emptyTable =
@@ -375,58 +430,66 @@ export async function POST(req: NextRequest) {
       );
     }
     effectivePlanId = legacyPlanId;
-    ({ data: subscription, error: subError } = await insertSubscriptionRow(subscriptionRowUserId, effectivePlanId));
+    inserted = await tryInsertForPlanId(effectivePlanId);
   }
-  // No profile-level fallback for new assignments: plans are account-level only.
   if (subError || !subscription) {
-    return NextResponse.json({ error: subError?.message || "Failed to create subscription" }, { status: 500 });
+    return NextResponse.json(
+      { error: String((subError as { message?: string } | null)?.message || "Failed to create subscription") },
+      { status: 500 }
+    );
   }
+  const createdSubscription = subscription as Record<string, unknown>;
+  const createdSubscriptionId = String(createdSubscription.id || "");
 
-  const fullTxnPayload: Record<string, unknown> = {
-    user_id: subscriptionRowUserId,
-    subscription_id: subscription.id,
-    provider: "manual",
-    external_txn_id: transactionId,
-    amount,
-    currency: planRow.currency || "INR",
-    status: "paid",
-    paid_at: paymentMadeAt,
-    received_by: auth.userId,
-    payment_mode: paymentMode,
-    payer_source: body.payerSource || null,
-    payment_made_at: paymentMadeAt,
-    payment_mode_details: body.paymentModeDetails || null,
-    metadata: {
-      note: body.note || null,
-      receipt_ref: body.receiptRef || null,
-    },
-  };
-  const fallbackTxnPayload: Record<string, unknown> = {
-    user_id: subscriptionRowUserId,
-    subscription_id: subscription.id,
-    provider: "manual",
-    external_txn_id: transactionId,
-    amount,
-    currency: planRow.currency || "INR",
-    status: "paid",
-    paid_at: paymentMadeAt,
-  };
-
+  const transactionUserIdCandidates = Array.from(
+    new Set([normalizedUserId, subscriptionRowUserId, ...ownedProfileIds].filter(Boolean))
+  );
   let txn: Record<string, unknown> | null = null;
   let txnError: { message: string } | null = null;
-  {
+  for (const txnUserId of transactionUserIdCandidates) {
+    const fullTxnPayload: Record<string, unknown> = {
+      user_id: txnUserId,
+      subscription_id: createdSubscriptionId,
+      provider: "manual",
+      external_txn_id: transactionId,
+      amount,
+      currency: planRow.currency || "INR",
+      status: "paid",
+      paid_at: paymentMadeAt,
+      received_by: auth.userId,
+      payment_mode: paymentMode,
+      payer_source: body.payerSource || null,
+      payment_made_at: paymentMadeAt,
+      payment_mode_details: body.paymentModeDetails || null,
+      metadata: {
+        note: body.note || null,
+        receipt_ref: body.receiptRef || null,
+      },
+    };
     const firstTry = await admin.from("payment_transactions").insert(fullTxnPayload).select("*").single();
     txn = firstTry.data as Record<string, unknown> | null;
     txnError = firstTry.error;
-  }
-  if (txnError && isSchemaMismatchError(txnError.message)) {
-    const secondTry = await admin
-      .from("payment_transactions")
-      .insert(fallbackTxnPayload)
-      .select("*")
-      .single();
-    txn = secondTry.data as Record<string, unknown> | null;
-    txnError = secondTry.error;
+    if (!txnError && txn) break;
+    if (txnError && isSchemaMismatchError(txnError.message)) {
+      const fallbackTxnPayload: Record<string, unknown> = {
+        user_id: txnUserId,
+        subscription_id: createdSubscriptionId,
+        provider: "manual",
+        external_txn_id: transactionId,
+        amount,
+        currency: planRow.currency || "INR",
+        status: "paid",
+        paid_at: paymentMadeAt,
+      };
+      const secondTry = await admin
+        .from("payment_transactions")
+        .insert(fallbackTxnPayload)
+        .select("*")
+        .single();
+      txn = secondTry.data as Record<string, unknown> | null;
+      txnError = secondTry.error;
+      if (!txnError && txn) break;
+    }
   }
   if (txnError || !txn) return NextResponse.json({ error: txnError?.message || "Failed to create transaction" }, { status: 500 });
 
@@ -450,7 +513,7 @@ export async function POST(req: NextRequest) {
     actorUserId: auth.userId,
     action: "subscription.assign_manual",
     entityType: "user_subscription",
-    entityId: String(subscription.id as string),
+    entityId: createdSubscriptionId,
     afterJson: {
       auth_user_id: normalizedUserId,
       subscription_user_id: subscriptionRowUserId,
@@ -474,5 +537,5 @@ export async function POST(req: NextRequest) {
     read: false,
   });
 
-  return NextResponse.json({ subscription, transaction: txn });
+  return NextResponse.json({ subscription: createdSubscription, transaction: txn });
 }

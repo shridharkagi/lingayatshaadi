@@ -17,10 +17,15 @@ export async function GET(req: NextRequest) {
       .eq("user_id", auth.userId)
       .is("deleted_at", null),
   ]);
+  const ownedProfileIds = (ownedProfiles || [])
+    .map((r) => String((r as { id?: string }).id || ""))
+    .filter(Boolean);
+  const subscriptionLookupIds = Array.from(new Set([auth.userId, ...ownedProfileIds]));
+  const orFilter = subscriptionLookupIds.map((id) => `user_id.eq.${id}`).join(",");
   const { data: activeSubs } = await admin
     .from("user_subscriptions")
     .select("id")
-    .eq("user_id", auth.userId)
+    .or(orFilter)
     .eq("status", "active")
     .lte("starts_at", nowIso)
     .gte("expires_at", nowIso)
