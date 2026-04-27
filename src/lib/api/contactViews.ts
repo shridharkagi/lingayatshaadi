@@ -29,6 +29,13 @@ export interface ContactViewRecord {
   viewedAt: string;
 }
 
+export interface ContactViewsSummary {
+  totalUsed: number;
+  totalLimit: number | null;
+  todayUsed: number;
+  dailyLimit: number | null;
+}
+
 /** Get contacts I've viewed (viewer_id = my profile) */
 export async function getContactViews(myProfileId: string): Promise<{
   data: ContactViewRecord[];
@@ -57,6 +64,30 @@ export async function getContactViews(myProfileId: string): Promise<{
     return {
       data: [],
       error: err instanceof Error ? err.message : "Failed to fetch contact views",
+    };
+  }
+}
+
+/** Get contact usage summary for current viewer profile */
+export async function getContactViewsSummary(
+  viewerProfileId: string
+): Promise<{ data: ContactViewsSummary | null; error: string | null }> {
+  try {
+    const res = await adminFetch("/api/contact-views/summary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ viewerProfileId }),
+    });
+    const json = (await res.json()) as { error?: string; summary?: ContactViewsSummary };
+    if (!res.ok) return { data: null, error: json.error || "Failed to fetch contact summary" };
+    return {
+      data: json.summary || null,
+      error: null,
+    };
+  } catch (err) {
+    return {
+      data: null,
+      error: err instanceof Error ? err.message : "Failed to fetch contact summary",
     };
   }
 }

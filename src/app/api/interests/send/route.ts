@@ -51,6 +51,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Target profile not found" }, { status: 404 });
   }
 
+  const { data: existingActiveInterest } = await admin
+    .from("interests")
+    .select("id")
+    .eq("from_id", body.fromProfileId)
+    .eq("to_id", body.toProfileId)
+    .in("status", ["pending", "accepted"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingActiveInterest) {
+    return NextResponse.json(
+      {
+        error:
+          "Interest already sent. If needed, undo it from Activities > Interests > Sent.",
+      },
+      { status: 409 }
+    );
+  }
+
   const { data, error } = await admin
     .from("interests")
     .insert({

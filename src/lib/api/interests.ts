@@ -227,17 +227,39 @@ export async function hasSentInterest(
       .select("*")
       .eq("from_id", fromProfileId)
       .eq("to_id", toProfileId)
-      .maybeSingle();
+      .in("status", ["pending", "accepted"])
+      .order("created_at", { ascending: false })
+      .limit(1);
 
     if (error) return { data: null, error: error.message };
     return {
-      data: data ? toInterest(data as InterestRow) : null,
+      data: data && data.length > 0 ? toInterest(data[0] as InterestRow) : null,
       error: null,
     };
   } catch (err) {
     return {
       data: null,
       error: err instanceof Error ? err.message : "Failed to check interest",
+    };
+  }
+}
+
+/** Withdraw a pending interest sent by current user */
+export async function withdrawSentInterest(
+  interestId: string
+): Promise<{ error: string | null }> {
+  try {
+    const res = await adminFetch("/api/interests/withdraw", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ interestId }),
+    });
+    const json = (await res.json()) as { error?: string };
+    if (!res.ok) return { error: json.error || "Failed to withdraw interest" };
+    return { error: null };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to withdraw interest",
     };
   }
 }

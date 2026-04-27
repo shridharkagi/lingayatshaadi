@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Heart, Eye, Bookmark, UserX, Phone } from "lucide-react";
@@ -8,12 +8,18 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ProfileAvatar } from "@/components/ui/ProfileAvatar";
 import { useProfiles } from "@/contexts/ProfilesContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { getReceivedInterests, getSentInterests, acceptInterest, declineInterest } from "@/lib/api/interests";
+import {
+  getReceivedInterests,
+  getSentInterests,
+  acceptInterest,
+  declineInterest,
+  withdrawSentInterest,
+} from "@/lib/api/interests";
 import { getProfileById as fetchProfile } from "@/lib/api/profiles";
 import { getProfileViews } from "@/lib/api/profileViews";
 import { getShortlistedIds, removeFromShortlist } from "@/lib/api/shortlist";
 import { getBlockedIds, unblockUser } from "@/lib/api/blocked";
-import { getContactViews } from "@/lib/api/contactViews";
+import { getContactViews, getContactViewsSummary } from "@/lib/api/contactViews";
 import { getAge } from "@/lib/utils";
 import { getProfileSlug } from "@/lib/memberId";
 import { FEATURE_MESSAGING_ENABLED } from "@/lib/featureFlags";
@@ -35,12 +41,50 @@ const tabs: { id: TabId; label: string; icon: typeof Heart }[] = [
   { id: "blocked", label: "Blocked", icon: UserX },
 ];
 
-const RECENT_CONTACTS_LIMIT = 20;
-
 interface CachedContactInfo {
   fullName: string;
   photo: string;
   memberId: string;
+}
+
+function getOrdinalDay(day: number): string {
+  const mod10 = day % 10;
+  const mod100 = day % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${day}st`;
+  if (mod10 === 2 && mod100 !== 12) return `${day}nd`;
+  if (mod10 === 3 && mod100 !== 13) return `${day}rd`;
+  return `${day}th`;
+}
+
+function formatViewedAtLabel(timestamp: string): string {
+  const now = Date.now();
+  const viewedTime = new Date(timestamp).getTime();
+  const diffMs = now - viewedTime;
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  // Keep relative format for first 2 days, then show exact IST timestamp.
+  if (diffDays <= 2) {
+    return `Viewed ${formatTimeAgo(timestamp)}`;
+  }
+
+  const d = new Date(timestamp);
+  const parts = new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).formatToParts(d);
+  const day = Number(parts.find((p) => p.type === "day")?.value || "0");
+  const month = parts.find((p) => p.type === "month")?.value || "";
+  const year = parts.find((p) => p.type === "year")?.value || "";
+  const hour = parts.find((p) => p.type === "hour")?.value || "";
+  const minute = parts.find((p) => p.type === "minute")?.value || "";
+  const dayPeriod = (parts.find((p) => p.type === "dayPeriod")?.value || "").toUpperCase();
+
+  return `Viewed on ${getOrdinalDay(day)} ${month}, ${year} at ${hour}:${minute} ${dayPeriod} IST`;
 }
 
 export default function ActivitiesPage() {
@@ -55,15 +99,21 @@ export default function ActivitiesPage() {
     Array<{ id: string; status: string; toProfileId: string; profile?: Profile }>
   >([]);
   const [profileViews, setProfileViews] = useState<
-    Array<{ viewerId: string; viewedAt: string; profile?: Profile }>
+    Array<{ viewerId: string; viewedAt: string; viewCount: number; profile?: Profile }>
   >([]);
+  const [totalProfileViews, setTotalProfileViews] = useState(0);
   const [shortlistedProfiles, setShortlistedProfiles] = useState<Profile[]>([]);
   const [blockedProfiles, setBlockedProfiles] = useState<Profile[]>([]);
   const [contactViews, setContactViews] = useState<
     Array<{ profileId: string; viewedAt: string; profile?: Profile; cached?: CachedContactInfo }>
   >([]);
   const [contactsTotal, setContactsTotal] = useState(0);
+  const [contactsDailyUsed, setContactsDailyUsed] = useState(0);
+  const [contactsTotalLimit, setContactsTotalLimit] = useState<number | null>(null);
+  const [contactsDailyLimit, setContactsDailyLimit] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [tabsPinned, setTabsPinned] = useState(false);
+  const tabsAnchorRef = useRef<HTMLDivElement | null>(null);
   const [accessState, setAccessState] = useState<AccountAccessState | null>(null);
   const shortlistOwnerId = user?.id || "";
   const canViewSensitiveFields = !!accessState?.hasValidSubscription;
@@ -116,10 +166,25 @@ export default function ActivitiesPage() {
     if (recv.error || !recv.data.length) {
       setReceivedInterests([]);
     } else {
+      const uniquePendingBySender = new Map<
+        string,
+        { id: string; message?: string; fromProfileId: string; createdAt: string }
+      >();
+      recv.data
+        .filter((i) => i.status === "pending")
+        .forEach((i) => {
+          const existing = uniquePendingBySender.get(i.fromProfileId);
+          if (!existing || existing.createdAt < i.createdAt) {
+            uniquePendingBySender.set(i.fromProfileId, {
+              id: i.id,
+              message: i.message,
+              fromProfileId: i.fromProfileId,
+              createdAt: i.createdAt,
+            });
+          }
+        });
       const withProfiles = await Promise.all(
-        recv.data
-          .filter((i) => i.status === "pending")
-          .map(async (i) => ({
+        Array.from(uniquePendingBySender.values()).map(async (i) => ({
             id: i.id,
             message: i.message,
             fromProfileId: i.fromProfileId,
@@ -132,8 +197,23 @@ export default function ActivitiesPage() {
     if (sent.error || !sent.data.length) {
       setSentInterests([]);
     } else {
+      const uniqueByReceiver = new Map<
+        string,
+        { id: string; status: string; toProfileId: string; createdAt: string }
+      >();
+      sent.data.forEach((i) => {
+        const existing = uniqueByReceiver.get(i.toProfileId);
+        if (!existing || existing.createdAt < i.createdAt) {
+          uniqueByReceiver.set(i.toProfileId, {
+            id: i.id,
+            status: i.status,
+            toProfileId: i.toProfileId,
+            createdAt: i.createdAt,
+          });
+        }
+      });
       const withProfiles = await Promise.all(
-        sent.data.map(async (i) => ({
+        Array.from(uniqueByReceiver.values()).map(async (i) => ({
           id: i.id,
           status: i.status,
           toProfileId: i.toProfileId,
@@ -162,7 +242,10 @@ export default function ActivitiesPage() {
 
     let merged: Array<{ profileId: string; viewedAt: string }> = [];
     if (user?.id) {
-      const { data } = await getContactViews(user.id);
+      const [{ data }, { data: summary }] = await Promise.all([
+        getContactViews(user.id),
+        getContactViewsSummary(user.id),
+      ]);
       const dbList = (data || []).map((v) => ({ profileId: v.viewedId, viewedAt: v.viewedAt }));
       // Merge DB + localStorage by profileId, keeping the most recent viewedAt.
       const byId = new Map<string, { profileId: string; viewedAt: string }>();
@@ -171,15 +254,19 @@ export default function ActivitiesPage() {
         if (!existing || v.viewedAt > existing.viewedAt) byId.set(v.profileId, v);
       });
       merged = Array.from(byId.values()).sort((a, b) => (a.viewedAt < b.viewedAt ? 1 : -1));
+      setContactsDailyUsed(summary?.todayUsed || 0);
+      setContactsTotalLimit(summary?.totalLimit ?? null);
+      setContactsDailyLimit(summary?.dailyLimit ?? null);
     } else {
       merged = fromStorage.map((c) => ({ profileId: c.profileId, viewedAt: c.viewedAt }));
+      setContactsDailyUsed(0);
+      setContactsTotalLimit(null);
+      setContactsDailyLimit(null);
     }
 
     setContactsTotal(merged.length);
-    const recent = merged.slice(0, RECENT_CONTACTS_LIMIT);
-
     const enriched = await Promise.all(
-      recent.map(async (v) => {
+      merged.map(async (v) => {
         const cached = cache.get(v.profileId);
         let profile = getProfileById(v.profileId) || profiles.find((p) => p.id === v.profileId);
         if (!profile) {
@@ -196,13 +283,36 @@ export default function ActivitiesPage() {
   const loadProfileViews = useCallback(async () => {
     if (!user?.id) {
       setProfileViews([]);
+      setTotalProfileViews(0);
       setLoading(false);
       return;
     }
     setLoading(true);
     const { data } = await getProfileViews(user.id);
+    const allViews = data || [];
+    setTotalProfileViews(allViews.length);
+    const groupedByViewer = new Map<string, { viewerId: string; viewedAt: string; viewCount: number }>();
+    allViews.forEach((view) => {
+      const existing = groupedByViewer.get(view.viewerId);
+      if (!existing) {
+        groupedByViewer.set(view.viewerId, {
+          viewerId: view.viewerId,
+          viewedAt: view.viewedAt,
+          viewCount: 1,
+        });
+        return;
+      }
+      groupedByViewer.set(view.viewerId, {
+        viewerId: view.viewerId,
+        viewedAt: existing.viewedAt > view.viewedAt ? existing.viewedAt : view.viewedAt,
+        viewCount: existing.viewCount + 1,
+      });
+    });
+    const groupedViews = Array.from(groupedByViewer.values()).sort((a, b) =>
+      a.viewedAt < b.viewedAt ? 1 : -1
+    );
     const withProfiles = await Promise.all(
-      (data || []).map(async (v) => {
+      groupedViews.map(async (v) => {
         let profile = getProfileById(v.viewerId) || profiles.find((p) => p.id === v.viewerId);
         if (!profile) {
           const { data: p } = await fetchProfile(v.viewerId);
@@ -292,58 +402,94 @@ export default function ActivitiesPage() {
     else if (activeTab === "blocked") loadBlocked();
   }, [activeTab, loadInterests, loadProfileViews, loadContacted, loadShortlist, loadBlocked]);
 
+  useEffect(() => {
+    const onScroll = () => {
+      const anchor = tabsAnchorRef.current;
+      if (!anchor) return;
+      const { top } = anchor.getBoundingClientRect();
+      setTabsPinned(top <= 0);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, []);
+
   const tabCounts = useMemo<Record<TabId, number>>(
     () => ({
       interests: receivedInterests.length + sentInterests.length,
-      views: profileViews.length,
+      views: totalProfileViews,
       contacted: contactsTotal,
       shortlist: shortlistedProfiles.length,
       blocked: blockedProfiles.length,
     }),
-    [receivedInterests.length, sentInterests.length, profileViews.length, contactsTotal, shortlistedProfiles.length, blockedProfiles.length]
+    [receivedInterests.length, sentInterests.length, totalProfileViews, contactsTotal, shortlistedProfiles.length, blockedProfiles.length]
   );
 
   return (
     <div className="max-w-2xl mx-auto pb-6">
-      <header className="bg-white border-b border-[var(--border)] px-4 py-4 sticky top-0 z-10">
-        <h1 className="text-xl font-bold text-[var(--foreground)] mb-3">Activities</h1>
-        <div role="tablist" aria-label="Activity sections" className="grid grid-cols-5 gap-1">
-          {tabs.map(({ id, label, icon: Icon }) => {
-            const isActive = activeTab === id;
-            const count = tabCounts[id];
-            return (
-              <button
-                key={id}
-                role="tab"
-                aria-selected={isActive}
-                onClick={() => setActiveTab(id)}
-                className={`relative flex flex-col items-center justify-center gap-1 py-2 rounded-xl transition-colors ${
-                  isActive
-                    ? "bg-[var(--primary)] text-white shadow-sm"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                <Icon size={20} />
-                <span className="text-[11px] font-medium leading-tight">{label}</span>
-                {count > 0 && (
-                  <span
-                    className={`absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-semibold flex items-center justify-center ${
-                      isActive ? "bg-white text-[var(--primary)]" : "bg-[var(--primary)] text-white"
-                    }`}
-                  >
-                    {count > 99 ? "99+" : count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+      <header className="bg-white border-b border-[var(--border)] px-3 sm:px-4 py-4">
+        <h1 className="text-xl font-bold text-[var(--foreground)]">Activities</h1>
       </header>
 
-      <div className="p-4">
+      <div ref={tabsAnchorRef} />
+      {tabsPinned && <div className="h-[72px]" />}
+      <div
+        className={`${tabsPinned ? "fixed top-0 left-0 right-0 z-30" : "relative"} bg-white border-b border-[var(--border)] transition-shadow ${
+          tabsPinned ? "shadow-sm" : ""
+        }`}
+      >
+        <div className="max-w-2xl mx-auto px-3 sm:px-4 py-2">
+          <div
+            role="tablist"
+            aria-label="Activity sections"
+            className="grid grid-cols-5 gap-1"
+          >
+            {tabs.map(({ id, label, icon: Icon }) => {
+              const isActive = activeTab === id;
+              const count = tabCounts[id];
+              return (
+                <button
+                  key={id}
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => setActiveTab(id)}
+                  className={`relative min-w-0 flex flex-col items-center justify-center gap-1 py-2 rounded-xl transition-colors ${
+                    isActive
+                      ? "bg-[var(--primary)] text-white shadow-sm"
+                      : "text-gray-600 hover:bg-gray-100"
+                  }`}
+                >
+                  <Icon size={18} />
+                  <span className="text-[10px] sm:text-[11px] font-medium leading-tight">{label}</span>
+                  {count > 0 && (
+                    <span
+                      className={`absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full text-[9px] sm:text-[10px] font-semibold flex items-center justify-center ${
+                        isActive ? "bg-white text-[var(--primary)]" : "bg-[var(--primary)] text-white"
+                      }`}
+                    >
+                      {count > 99 ? "99+" : count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="px-2 sm:px-4 py-4">
         {activeTab === "interests" && (
           <div className="space-y-4">
-            <h3 className="font-semibold text-[var(--foreground)]">Received</h3>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="font-semibold text-[var(--foreground)]">Received</h3>
+              <span className="text-xs px-2 py-1 rounded-full bg-[var(--primary)]/10 text-[var(--primary)] font-medium">
+                {receivedInterests.length}
+              </span>
+            </div>
             {loading ? (
               <div className="py-8 text-center text-gray-500">Loading...</div>
             ) : receivedInterests.length === 0 ? (
@@ -351,10 +497,11 @@ export default function ActivitiesPage() {
                 icon={Heart}
                 title="No interests received yet"
                 description="When someone sends you an interest, it will appear here"
+                compact
               />
             ) : (
               receivedInterests.map(({ id, profile, message }) => (
-                <div key={id} className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm">
+                <div key={id} className="flex gap-3 sm:gap-4 p-3 sm:p-4 bg-white rounded-2xl shadow-sm">
                   <Link href={`/profile/${getProfileSlug(profile!)}`}>
                     <ProfileAvatar
                       src={profile!.profilePhoto}
@@ -399,7 +546,12 @@ export default function ActivitiesPage() {
                 </div>
               ))
             )}
-            <h3 className="font-semibold text-[var(--foreground)] mt-8">Sent</h3>
+            <div className="flex items-center justify-between gap-3 mt-6">
+              <h3 className="font-semibold text-[var(--foreground)]">Sent</h3>
+              <span className="text-xs px-2 py-1 rounded-full bg-[var(--primary)]/10 text-[var(--primary)] font-medium">
+                {sentInterests.length}
+              </span>
+            </div>
             {loading ? (
               <div className="py-8 text-center text-gray-500">Loading...</div>
             ) : sentInterests.length === 0 ? (
@@ -407,6 +559,7 @@ export default function ActivitiesPage() {
                 icon={Heart}
                 title="No interests sent yet"
                 description="Start connecting with profiles you like"
+                compact
                 action={{ label: "Browse Profiles", href: "/search" }}
               />
             ) : (
@@ -428,7 +581,7 @@ export default function ActivitiesPage() {
                     <Link
                       key={id}
                       href={`/profile/${getProfileSlug(profile!)}`}
-                      className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition"
+                      className="flex gap-3 sm:gap-4 p-3 sm:p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition"
                     >
                       <ProfileAvatar
                         src={profile!.profilePhoto}
@@ -451,6 +604,20 @@ export default function ActivitiesPage() {
                           {profile!.profession ? ` • ${profile!.profession}` : ""}
                           {!profile!.profession && profile!.city ? ` • ${profile!.city}` : ""}
                         </p>
+                        {status === "pending" && (
+                          <div className="mt-2">
+                            <button
+                              onClick={async (e) => {
+                                e.preventDefault();
+                                await withdrawSentInterest(id);
+                                await loadInterests();
+                              }}
+                              className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-medium text-gray-700 hover:bg-gray-50"
+                            >
+                              Undo interest
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </Link>
                   );
@@ -462,7 +629,13 @@ export default function ActivitiesPage() {
 
         {activeTab === "views" && (
           <div className="space-y-4">
-            <h3 className="font-semibold text-[var(--foreground)]">Who viewed your profile</h3>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="font-semibold text-[var(--foreground)]">Who viewed your profile</h3>
+              <span className="text-xs px-2 py-1 rounded-full bg-[var(--primary)]/10 text-[var(--primary)] font-medium">
+                <span className="sm:hidden">Unique: {profileViews.length}</span>
+                <span className="hidden sm:inline">Unique viewers: {profileViews.length}</span>
+              </span>
+            </div>
             {loading ? (
               <div className="py-8 text-center text-gray-500">Loading...</div>
             ) : profileViews.length === 0 ? (
@@ -477,7 +650,7 @@ export default function ActivitiesPage() {
                   <Link
                     key={`${v.viewerId}-${v.viewedAt}-${idx}`}
                     href={`/profile/${getProfileSlug(v.profile!)}`}
-                    className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition"
+                    className="flex gap-3 sm:gap-4 p-3 sm:p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition"
                   >
                     <ProfileAvatar
                       src={v.profile!.profilePhoto}
@@ -491,7 +664,10 @@ export default function ActivitiesPage() {
                       <p className="text-sm text-gray-500">
                         {getAge(v.profile!.dateOfBirth)} yrs • {v.profile!.profession}
                       </p>
-                      <p className="text-xs text-gray-400 mt-1">Viewed {formatTimeAgo(v.viewedAt)}</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Viewed {formatTimeAgo(v.viewedAt)}
+                        {v.viewCount > 1 ? ` (${v.viewCount} views)` : ""}
+                      </p>
                     </div>
                   </Link>
                 ))}
@@ -503,23 +679,45 @@ export default function ActivitiesPage() {
         {activeTab === "contacted" && (
           <div className="space-y-4">
             {/* Total counter card on top */}
-            <div className="bg-gradient-to-r from-[var(--primary)] to-[var(--primary)]/80 text-white rounded-2xl px-5 py-4 flex items-center justify-between shadow-sm">
-              <div>
-                <p className="text-xs uppercase tracking-wide opacity-90">Total Contacts Viewed</p>
-                <p className="text-3xl font-bold leading-tight">{contactsTotal}</p>
+            <div className="relative overflow-hidden bg-gradient-to-r from-[var(--primary)] to-[#f19a4b] text-white rounded-2xl px-4 sm:px-5 py-3.5 sm:py-4 shadow-sm">
+              <div className="absolute -right-8 -top-10 w-20 h-20 rounded-full bg-white/8" />
+              <div className="absolute -right-4 -bottom-10 w-16 h-16 rounded-full bg-white/8" />
+
+              <div className="relative z-[1]">
+                <span className="absolute right-0 top-0 inline-flex items-center justify-center w-8 h-8 rounded-full bg-white/25 backdrop-blur-[1px] border border-white/35 shadow-sm">
+                  <Phone size={16} className="text-white" />
+                </span>
+                <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.14em] text-white/85 font-semibold">
+                  Contacts Viewed
+                </p>
+
+                <div className="mt-2.5 space-y-2">
+                  <div className="rounded-xl bg-white/14 border border-white/20 px-3 py-1.5">
+                    <p className="text-[10px] sm:text-[11px] text-white/85 uppercase tracking-wide">Total</p>
+                    <p className="text-sm sm:text-base font-semibold leading-tight mt-0.5">
+                      {contactsTotalLimit && contactsTotalLimit > 0
+                        ? `${contactsTotal} of ${contactsTotalLimit} contacts viewed`
+                        : `${contactsTotal} contacts viewed`}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-white/14 border border-white/20 px-3 py-1.5">
+                    <p className="text-[10px] sm:text-[11px] text-white/85 uppercase tracking-wide">Today</p>
+                    <p className="text-sm sm:text-base font-semibold leading-tight mt-0.5">
+                      {contactsDailyLimit && contactsDailyLimit > 0
+                        ? `${contactsDailyUsed} of ${contactsDailyLimit} contacts viewed`
+                        : `${contactsDailyUsed} contacts viewed today`}
+                    </p>
+                  </div>
+                </div>
+
               </div>
-              <Phone size={36} className="opacity-80" />
             </div>
 
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-[var(--foreground)]">
-                Recent {Math.min(contactsTotal, RECENT_CONTACTS_LIMIT) > 0 && `(${Math.min(contactsTotal, RECENT_CONTACTS_LIMIT)})`}
+                Contacted profiles {contactsTotal > 0 ? `(${contactsTotal})` : ""}
               </h3>
-              {contactsTotal > RECENT_CONTACTS_LIMIT && (
-                <span className="text-xs text-gray-500">
-                  Showing latest {RECENT_CONTACTS_LIMIT} of {contactsTotal}
-                </span>
-              )}
             </div>
 
             {loading ? (
@@ -546,7 +744,7 @@ export default function ActivitiesPage() {
                     <Link
                       key={`${c.profileId}-${c.viewedAt}`}
                       href={`/profile/${slug}`}
-                      className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition"
+                      className="flex flex-wrap gap-x-3 gap-y-1 sm:gap-x-4 sm:gap-y-2 p-3 sm:p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition"
                     >
                       <ProfileAvatar src={photo} alt={name} size={64} />
                       <div className="flex-1 min-w-0">
@@ -555,12 +753,15 @@ export default function ActivitiesPage() {
                           <p className="text-xs text-gray-400 mt-0.5 truncate">{memberId}</p>
                         )}
                         {meta.length > 0 && (
-                          <p className="text-sm text-gray-500 mt-1">{meta.join(" • ")}</p>
+                          <p className="text-[13px] sm:text-sm text-gray-500 mt-0.5 leading-snug truncate">
+                            {meta.join(" • ")}
+                          </p>
                         )}
-                        <p className="text-xs text-gray-400 mt-1">
-                          Viewed {formatTimeAgo(c.viewedAt)}
-                        </p>
                       </div>
+                      <div className="basis-full" />
+                      <p className="w-full text-xs text-gray-400 leading-tight">
+                        {formatViewedAtLabel(c.viewedAt)}
+                      </p>
                     </Link>
                   );
                 })}
@@ -584,7 +785,7 @@ export default function ActivitiesPage() {
             ) : (
               <div className="space-y-3">
                 {shortlistedProfiles.map((profile) => (
-                  <div key={profile.id} className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm">
+                  <div key={profile.id} className="flex gap-3 sm:gap-4 p-3 sm:p-4 bg-white rounded-2xl shadow-sm">
                     <Link href={`/profile/${getProfileSlug(profile)}`}>
                       <ProfileAvatar src={profile.profilePhoto} alt={profile.fullName} size={64} />
                     </Link>
@@ -651,7 +852,7 @@ export default function ActivitiesPage() {
             ) : (
               <div className="space-y-3">
                 {blockedProfiles.map((profile) => (
-                  <div key={profile.id} className="flex gap-4 p-4 bg-white rounded-2xl shadow-sm">
+                  <div key={profile.id} className="flex gap-3 sm:gap-4 p-3 sm:p-4 bg-white rounded-2xl shadow-sm">
                     <ProfileAvatar src={profile.profilePhoto} alt={profile.fullName} size={64} />
                     <div className="flex-1 min-w-0">
                       <h4 className="font-semibold text-[var(--foreground)]">{profile.fullName}</h4>

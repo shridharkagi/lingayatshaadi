@@ -39,6 +39,7 @@ import {
   BadgeCheck,
   Clock,
   AlertTriangle,
+  Headset,
 } from "lucide-react";
 import { useProfiles } from "@/contexts/ProfilesContext";
 import { hasAcceptedInterest, hasSentInterest, sendInterest } from "@/lib/api/interests";
@@ -125,6 +126,74 @@ function ShareProfileButton({ profile }: { profile: Profile }) {
     >
       <Share2 size={20} />
     </button>
+  );
+}
+
+function PartnerPreferenceTiles({ profile }: { profile: Profile }) {
+  const firstName = (profile.fullName || "Member").trim().split(/\s+/)[0] || "Member";
+  const location = [profile.partnerPreference?.city, profile.partnerPreference?.state]
+    .filter(Boolean)
+    .join(", ");
+
+  const primaryItems = [
+    profile.partnerPreference?.ageMin != null && profile.partnerPreference?.ageMax != null
+      ? { label: "Age", value: `${profile.partnerPreference.ageMin} - ${profile.partnerPreference.ageMax} yrs` }
+      : null,
+    profile.partnerPreference?.heightMin && profile.partnerPreference?.heightMax
+      ? { label: "Height", value: `${profile.partnerPreference.heightMin} - ${profile.partnerPreference.heightMax}` }
+      : null,
+    profile.partnerPreference?.maritalStatus
+      ? { label: "Marital status", value: profile.partnerPreference.maritalStatus }
+      : null,
+    location ? { label: "Location", value: location } : null,
+  ].filter(Boolean) as Array<{ label: string; value: string }>;
+
+  const secondaryItems = [
+    profile.partnerPreference?.education
+      ? { label: "Education", value: profile.partnerPreference.education }
+      : null,
+    profile.partnerPreference?.profession
+      ? { label: "Profession", value: profile.partnerPreference.profession }
+      : null,
+    profile.partnerPreference?.foodHabits
+      ? { label: "Food", value: profile.partnerPreference.foodHabits }
+      : null,
+  ].filter(Boolean) as Array<{ label: string; value: string }>;
+
+  const compactItems = [
+    ...primaryItems.map((item) => ({
+      ...item,
+      span: "col-span-1",
+    })),
+    ...secondaryItems.map((item) => ({
+      ...item,
+      span: "col-span-1",
+    })),
+  ];
+
+  return (
+    <div>
+      <p className="mb-2.5 text-sm text-gray-500">What {firstName} is looking for</p>
+      {compactItems.length > 0 && (
+        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+          {compactItems.map((item) => (
+            <div
+              key={item.label}
+              className={`${item.span} rounded-xl border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 sm:px-3 sm:py-2 min-h-[50px] sm:min-h-[50px] flex flex-col justify-center`}
+            >
+              <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                {item.label}
+              </p>
+              <p
+                className="mt-0.5 break-words leading-snug text-[#2d241d] text-[0.82rem] sm:text-[0.9rem] font-semibold"
+              >
+                {item.value}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -812,6 +881,42 @@ export default function OtherProfilePage() {
     }
   };
 
+  const shareCurrentProfile = async () => {
+    if (!profile) return;
+    const url =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/profile/${getProfileSlug(profile)}`
+        : "";
+    const title = buildProfileSeoTitle(profile);
+    const text = url ? `${title}\n${url}` : title;
+
+    const copyToClipboard = async (value: string) => {
+      if (!value) return;
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+        return;
+      }
+      const ta = document.createElement("textarea");
+      ta.value = value;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    };
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ title, text, url });
+        return;
+      } catch (err) {
+        if ((err as Error).name === "AbortError") return;
+      }
+    }
+
+    await copyToClipboard(url);
+    showToast("Profile link copied");
+  };
+
   const handleCopyMemberId = async () => {
     if (!profile) return;
     const memberId = getMemberIdDisplay(profile);
@@ -879,12 +984,17 @@ export default function OtherProfilePage() {
       ? maskLastName(profile.fullName)
       : maskString(profile.fullName, 5);
   const displaySubCaste = canViewSensitiveFields ? profile.subCaste : maskString(profile.subCaste, 3);
-  const displayFatherName = canViewSensitiveFields ? profile.fatherName : MASKED_VALUE;
-  const displayMotherName = canViewSensitiveFields ? profile.motherName : MASKED_VALUE;
+  const displayFatherName = canViewSensitiveFields ? profile.fatherName : maskString(profile.fatherName, 4);
+  const displayMotherName = canViewSensitiveFields ? profile.motherName : maskString(profile.motherName, 4);
   const displaySibling = canViewSensitiveFields ? profile.siblingDetails : maskString(profile.siblingDetails, 2);
   const displayDateOfBirth = canViewSensitiveFields
     ? formatDateDDMMYYYY(profile.dateOfBirth)
     : maskBirthDateKeepYear(profile.dateOfBirth);
+  const displayTimeOfBirth = profile.timeOfBirth
+    ? canViewSensitiveFields
+      ? profile.timeOfBirth
+      : "****"
+    : "";
 
   const aboutMeTruncated = truncateToWords(profile.aboutMe, 100);
   const aboutMeWords = wordCount(profile.aboutMe);
@@ -1296,7 +1406,7 @@ export default function OtherProfilePage() {
 
       {/* Action buttons - mobile-first, large tap targets */}
       <div className="px-2 sm:px-3 py-2.5 rounded-b-2xl rounded-t-none bg-gradient-to-b from-white to-gray-50 border border-gray-100 border-t-gray-200/70">
-        <div className={`grid ${FEATURE_MESSAGING_ENABLED ? "grid-cols-5" : "grid-cols-4"} gap-2`}>
+        <div className={`grid ${FEATURE_MESSAGING_ENABLED ? "grid-cols-6" : "grid-cols-5"} gap-2`}>
           <button
             onClick={async () => {
               if (!isLoggedIn) {
@@ -1432,8 +1542,19 @@ export default function OtherProfilePage() {
             className="flex flex-col items-center justify-center gap-1 px-1.5 py-2 rounded-xl transition min-h-[56px] border bg-white hover:bg-gray-100 active:bg-gray-200 border-gray-200/80"
             aria-label="Contact support"
           >
-            <Phone size={18} className="flex-shrink-0" />
+            <Headset size={18} className="flex-shrink-0" />
             <span className="text-[11px] sm:text-xs font-semibold truncate">Support</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              void shareCurrentProfile();
+            }}
+            className="flex flex-col items-center justify-center gap-1 px-1.5 py-2 rounded-xl transition min-h-[56px] border bg-white hover:bg-gray-100 active:bg-gray-200 border-gray-200/80"
+            aria-label="Share profile"
+          >
+            <Share2 size={18} className="flex-shrink-0" />
+            <span className="text-[11px] sm:text-xs font-semibold truncate">Share</span>
           </button>
         </div>
         
@@ -1541,65 +1662,120 @@ export default function OtherProfilePage() {
             </div>
           )}
           <div className="divide-y divide-gray-100">
-            <DetailSection icon={User} heading="Basic Info">
-              {(() => {
-                const mb = profile.managedBy;
-                // Use explicit managedBy from profile row to avoid accidental
-                // misclassification based on account holder naming patterns.
-                const isAdmin = mb === "admin";
-                const isSelf = mb === "self";
-                const isParentGuardian = mb === "parent" || mb === "guardian";
-                if (!isAdmin && !isSelf && !isParentGuardian) return null;
+            <div className="py-4 border-b border-gray-100">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <User size={18} className="text-gray-400 flex-shrink-0" />
+                    <p className="text-xs sm:text-sm text-gray-500">Basic Info</p>
+                  </div>
+                  <div className="mt-1">
+                    {(() => {
+                      const mb = profile.managedBy;
+                      // Use explicit managedBy from profile row to avoid accidental
+                      // misclassification based on account holder naming patterns.
+                      const isAdmin = mb === "admin";
+                      const isSelf = mb === "self";
+                      const isParentGuardian = mb === "parent" || mb === "guardian";
+                      if (!isAdmin && !isSelf && !isParentGuardian) return null;
 
-                let label = "";
-                let Icon = UserCheck;
-                let tone = "";
-                if (isSelf) {
-                  label = "Managed by Self";
-                  Icon = UserCheck;
-                  tone = "text-emerald-700 bg-emerald-50 border-emerald-200";
-                } else if (isAdmin) {
-                  label = "Managed by Admin";
-                  Icon = ShieldCheck;
-                  tone = "text-amber-700 bg-amber-50 border-amber-200";
-                } else {
-                  label = "Managed by Parent";
-                  Icon = HeartHandshake;
-                  tone = "text-[var(--primary)] bg-[var(--primary)]/10 border-[var(--primary)]/20";
-                }
+                      let label = "";
+                      let Icon = UserCheck;
+                      let tone = "";
+                      if (isSelf) {
+                        label = "Managed by Self";
+                        Icon = UserCheck;
+                        tone = "text-emerald-700 bg-emerald-50 border-emerald-200";
+                      } else if (isAdmin) {
+                        label = "Managed by Admin";
+                        Icon = ShieldCheck;
+                        tone = "text-amber-700 bg-amber-50 border-amber-200";
+                      } else {
+                        label = "Managed by Parent";
+                        Icon = HeartHandshake;
+                        tone = "text-[var(--primary)] bg-[var(--primary)]/10 border-[var(--primary)]/20";
+                      }
 
-                return (
-                  <span
-                    className={`mb-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] font-medium leading-none align-middle ${tone}`}
-                    title={label}
+                      return (
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] font-medium leading-none align-middle ${tone}`}
+                          title={label}
+                        >
+                          <Icon size={12} className="flex-shrink-0" />
+                          <span className="truncate max-w-[200px]">{label}</span>
+                        </span>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 min-w-[170px] sm:min-w-[200px]">
+                  <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                    Member ID
+                  </p>
+                  <button
+                    onClick={handleCopyMemberId}
+                    className="mt-0.5 inline-flex items-center gap-1.5 px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded transition-colors cursor-pointer font-semibold text-[0.88rem] text-[#2d241d]"
+                    title="Click to copy"
                   >
-                    <Icon size={12} className="flex-shrink-0" />
-                    <span className="truncate max-w-[200px]">{label}</span>
-                  </span>
-                );
-              })()}
-              <p className="flex items-center gap-2">
-                <span>Member ID:</span>
-                <button
-                  onClick={handleCopyMemberId}
-                  className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gray-100 hover:bg-gray-200 rounded transition-colors cursor-pointer font-medium"
-                  title="Click to copy"
-                >
-                  <span>{getMemberIdDisplay(profile)}</span>
-                  {copiedMemberId ? (
-                    <Check size={14} className="text-green-600" />
-                  ) : (
-                    <Copy size={14} className="text-gray-500" />
-                  )}
-                </button>
-              </p>
-              <p>Full Name: {displayName}</p>
-              <p>Birth Date: {displayDateOfBirth}</p>
-              <p>Marital Status: {profile.maritalStatus}</p>
-              <p>Caste: {profile.caste}</p>
-              <p>Sub-Caste: {displaySubCaste || "—"}</p>
-              <p>Height: {profile.height}&quot;</p>
-            </DetailSection>
+                    <span>{getMemberIdDisplay(profile)}</span>
+                    {copiedMemberId ? (
+                      <Check size={14} className="text-green-600" />
+                    ) : (
+                      <Copy size={14} className="text-gray-500" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-2.5 space-y-2">
+                <div className="grid grid-cols-3 md:grid-cols-6 gap-2 auto-rows-[56px] sm:auto-rows-[60px]">
+                  <div className="col-span-2 md:col-span-4 rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                    <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                      Full Name
+                    </p>
+                    <p className="mt-0.5 text-[0.88rem] font-semibold text-[#2d241d] break-words">{displayName}</p>
+                  </div>
+
+                  <div className="col-span-1 md:col-span-2 rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                    <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                      Height
+                    </p>
+                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d]">{profile.height}&quot;</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 auto-rows-[56px] sm:auto-rows-[60px]">
+                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                    <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                      Birth Date
+                    </p>
+                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d]">{displayDateOfBirth}</p>
+                  </div>
+
+                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                    <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                      Marital Status
+                    </p>
+                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d]">{profile.maritalStatus}</p>
+                  </div>
+
+                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                    <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                      Caste
+                    </p>
+                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d]">{profile.caste}</p>
+                  </div>
+
+                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                    <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                      Sub-Caste
+                    </p>
+                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">{displaySubCaste || "—"}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
             <DetailSection icon={MapPin} heading="Location">
               <p>{profile.city}, {profile.district}, {profile.state}</p>
             </DetailSection>
@@ -1616,27 +1792,118 @@ export default function OtherProfilePage() {
                   non-logged-in viewers to discourage scraping. */}
               {canViewSensitiveFields && profile.annualIncome && <p>{profile.annualIncome}</p>}
             </DetailSection>
-            <DetailSection icon={Users} heading="Family">
-              <p>Father: {displayFatherName || "—"} ({profile.fatherOccupation || "—"})</p>
-              <p>Mother: {displayMotherName || "—"} ({profile.motherOccupation || "—"})</p>
-              <p>Food: {profile.foodHabits || "—"}</p>
-              {displaySibling && <p>Sibling: {displaySibling}</p>}
-            </DetailSection>
+            <div className="py-4">
+              <div className="flex items-center gap-2">
+                <Users size={18} className="text-gray-400 flex-shrink-0" />
+                <p className="text-xs sm:text-sm text-gray-500">Family</p>
+              </div>
+              <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 auto-rows-[56px] sm:auto-rows-[60px]">
+                <div className="col-span-2 rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                  <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                    Father
+                  </p>
+                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">
+                    {displayFatherName || "—"}
+                    {profile.fatherOccupation ? ` (${profile.fatherOccupation})` : ""}
+                  </p>
+                </div>
+
+                <div className="col-span-2 rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                  <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                    Mother
+                  </p>
+                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">
+                    {displayMotherName || "—"}
+                    {profile.motherOccupation ? ` (${profile.motherOccupation})` : ""}
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                  <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                    Food
+                  </p>
+                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">
+                    {profile.foodHabits || "—"}
+                  </p>
+                </div>
+
+                {displaySibling && (
+                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                    <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                      Sibling
+                    </p>
+                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">
+                      {displaySibling}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Horoscope block: Time of Birth is considered sensitive and is
             hidden for non-logged-in viewers. We still show the card if any
             of the remaining astrology fields are present. */}
-        {(profile.rashi || profile.nakshatra || (canViewSensitiveFields && profile.timeOfBirth) || profile.placeOfBirth) && (
+        {(profile.rashi || profile.nakshatra || profile.timeOfBirth || profile.placeOfBirth || profile.horoscopeOtherDetails) && (
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <h3 className="font-semibold text-[var(--foreground)] mb-1">Horoscope Details</h3>
-            <DetailSection icon={Calendar} heading="Birth & Astrology">
-              {canViewSensitiveFields && profile.timeOfBirth && <p>Time of Birth: {profile.timeOfBirth}</p>}
-              {profile.placeOfBirth && <p>Place of Birth: {profile.placeOfBirth}</p>}
-              {profile.rashi && <p>Zodiac Sign: {profile.rashi}</p>}
-              {profile.nakshatra && <p>Nakshatra: {profile.nakshatra}</p>}
-            </DetailSection>
+            <div className="flex items-center gap-2 mb-2">
+              <Calendar size={18} className="text-gray-400 flex-shrink-0" />
+              <p className="text-xs sm:text-sm text-gray-500">Birth & Astrology</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 auto-rows-[56px] sm:auto-rows-[60px]">
+              {displayTimeOfBirth && (
+                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                  <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                    Time of Birth
+                  </p>
+                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">
+                    {displayTimeOfBirth}
+                  </p>
+                </div>
+              )}
+              {profile.placeOfBirth && (
+                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                  <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                    Place of Birth
+                  </p>
+                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">
+                    {profile.placeOfBirth}
+                  </p>
+                </div>
+              )}
+              {profile.rashi && (
+                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                  <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                    Zodiac Sign
+                  </p>
+                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">
+                    {profile.rashi}
+                  </p>
+                </div>
+              )}
+              {profile.nakshatra && (
+                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                  <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                    Nakshatra
+                  </p>
+                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">
+                    {profile.nakshatra}
+                  </p>
+                </div>
+              )}
+              {profile.horoscopeOtherDetails && (
+                <div className="col-span-2 rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                  <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                    Other Details
+                  </p>
+                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words line-clamp-2">
+                    {profile.horoscopeOtherDetails}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1680,12 +1947,38 @@ export default function OtherProfilePage() {
 
         <div className="bg-white rounded-2xl p-4 shadow-sm">
           <h3 className="font-semibold text-[var(--foreground)] mb-3">Contact Information</h3>
-          <DetailSection icon={MapPin} heading="Address">
-            <p>City: {profile.city || "—"}</p>
-            <p>District: {profile.district || "—"}</p>
-            <p>State: {profile.state || "—"}</p>
-            <p>Country: {profile.country || "—"}</p>
-          </DetailSection>
+          <div className="py-4 border-b border-gray-100">
+            <div className="flex items-center gap-2">
+              <MapPin size={18} className="text-gray-400 flex-shrink-0" />
+              <p className="text-xs sm:text-sm text-gray-500">Address</p>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2 auto-rows-[56px] sm:auto-rows-[60px]">
+              <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                  City
+                </p>
+                <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">{profile.city || "—"}</p>
+              </div>
+              <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                  District
+                </p>
+                <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">{profile.district || "—"}</p>
+              </div>
+              <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                  State
+                </p>
+                <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">{profile.state || "—"}</p>
+              </div>
+              <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                  Country
+                </p>
+                <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">{profile.country || "—"}</p>
+              </div>
+            </div>
+          </div>
           <DetailSection icon={Phone} heading="Contact">
             {!isLoggedIn ? (
               <div className="space-y-3">
@@ -1787,33 +2080,7 @@ export default function OtherProfilePage() {
                       </span>
                     )}
                   </div>
-                  <DetailSection icon={Heart} heading="Preferred">
-                    {profile.partnerPreference?.ageMin != null && profile.partnerPreference?.ageMax != null && (
-                      <p>Age: {profile.partnerPreference.ageMin}–{profile.partnerPreference.ageMax} yrs</p>
-                    )}
-                    {profile.partnerPreference?.heightMin && profile.partnerPreference?.heightMax && (
-                      <p>Height: {profile.partnerPreference.heightMin} – {profile.partnerPreference.heightMax}</p>
-                    )}
-                    {profile.partnerPreference?.maritalStatus && (
-                      <p>Marital status: {profile.partnerPreference.maritalStatus}</p>
-                    )}
-                    {profile.partnerPreference?.education && (
-                      <p>Education: {profile.partnerPreference.education}</p>
-                    )}
-                    {profile.partnerPreference?.profession && (
-                      <p>Profession: {profile.partnerPreference.profession}</p>
-                    )}
-                    {(profile.partnerPreference?.city || profile.partnerPreference?.state) && (
-                      <p>
-                        Location: {[profile.partnerPreference.city, profile.partnerPreference.state]
-                          .filter(Boolean)
-                          .join(", ")}
-                      </p>
-                    )}
-                    {profile.partnerPreference?.foodHabits && (
-                      <p>Food: {profile.partnerPreference.foodHabits}</p>
-                    )}
-                  </DetailSection>
+                  <PartnerPreferenceTiles profile={profile} />
                   <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between gap-3">
                     <p className="text-xs text-gray-500">
                       {isPublic
@@ -1884,33 +2151,7 @@ export default function OtherProfilePage() {
           return (
             <div className="bg-white rounded-2xl p-4 shadow-sm">
               <h3 className="font-semibold text-[var(--foreground)] mb-1">Partner Preferences</h3>
-              <DetailSection icon={Heart} heading="Preferred">
-                {profile.partnerPreference?.ageMin != null && profile.partnerPreference?.ageMax != null && (
-                  <p>Age: {profile.partnerPreference.ageMin}–{profile.partnerPreference.ageMax} yrs</p>
-                )}
-                {profile.partnerPreference?.heightMin && profile.partnerPreference?.heightMax && (
-                  <p>Height: {profile.partnerPreference.heightMin} – {profile.partnerPreference.heightMax}</p>
-                )}
-                {profile.partnerPreference?.maritalStatus && (
-                  <p>Marital status: {profile.partnerPreference.maritalStatus}</p>
-                )}
-                {profile.partnerPreference?.education && (
-                  <p>Education: {profile.partnerPreference.education}</p>
-                )}
-                {profile.partnerPreference?.profession && (
-                  <p>Profession: {profile.partnerPreference.profession}</p>
-                )}
-                {(profile.partnerPreference?.city || profile.partnerPreference?.state) && (
-                  <p>
-                    Location: {[profile.partnerPreference.city, profile.partnerPreference.state]
-                      .filter(Boolean)
-                      .join(", ")}
-                  </p>
-                )}
-                {profile.partnerPreference?.foodHabits && (
-                  <p>Food: {profile.partnerPreference.foodHabits}</p>
-                )}
-              </DetailSection>
+              <PartnerPreferenceTiles profile={profile} />
             </div>
           );
         })()}
