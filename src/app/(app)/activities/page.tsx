@@ -739,30 +739,61 @@ export default function ActivitiesPage() {
                   if (c.profile?.dateOfBirth) meta.push(`${getAge(c.profile.dateOfBirth)} yrs`);
                   if (c.profile?.profession) meta.push(c.profile.profession);
                   else if (c.profile?.city) meta.push(c.profile.city);
-                  const slug = c.profile ? getProfileSlug(c.profile) : c.profileId;
+                  const profileHref = c.profile
+                    ? `/profile/${getProfileSlug(c.profile)}`
+                    : c.cached?.memberId
+                      ? `/profile/${c.cached.memberId}`
+                      : null;
+                  const cardClassName =
+                    "flex flex-wrap gap-x-3 gap-y-1 sm:gap-x-4 sm:gap-y-2 p-3 sm:p-4 bg-white rounded-2xl shadow-sm transition";
                   return (
-                    <Link
-                      key={`${c.profileId}-${c.viewedAt}`}
-                      href={`/profile/${slug}`}
-                      className="flex flex-wrap gap-x-3 gap-y-1 sm:gap-x-4 sm:gap-y-2 p-3 sm:p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition"
-                    >
-                      <ProfileAvatar src={photo} alt={name} size={64} />
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-[var(--foreground)] truncate">{name}</h4>
-                        {memberId && (
-                          <p className="text-xs text-gray-400 mt-0.5 truncate">{memberId}</p>
-                        )}
-                        {meta.length > 0 && (
-                          <p className="text-[13px] sm:text-sm text-gray-500 mt-0.5 leading-snug truncate">
-                            {meta.join(" • ")}
-                          </p>
-                        )}
+                    profileHref ? (
+                      <Link
+                        key={`${c.profileId}-${c.viewedAt}`}
+                        href={profileHref}
+                        className={`${cardClassName} hover:shadow-md`}
+                      >
+                        <ProfileAvatar src={photo} alt={name} size={64} />
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-[var(--foreground)] truncate">{name}</h4>
+                          {memberId && (
+                            <p className="text-xs text-gray-400 mt-0.5 truncate">{memberId}</p>
+                          )}
+                          {meta.length > 0 && (
+                            <p className="text-[13px] sm:text-sm text-gray-500 mt-0.5 leading-snug truncate">
+                              {meta.join(" • ")}
+                            </p>
+                          )}
+                        </div>
+                        <div className="basis-full" />
+                        <p className="w-full text-xs text-gray-400 leading-tight">
+                          {formatViewedAtLabel(c.viewedAt)}
+                        </p>
+                      </Link>
+                    ) : (
+                      <div
+                        key={`${c.profileId}-${c.viewedAt}`}
+                        className={`${cardClassName} opacity-90`}
+                        title="Profile link unavailable"
+                      >
+                        <ProfileAvatar src={photo} alt={name} size={64} />
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-[var(--foreground)] truncate">{name}</h4>
+                          {memberId && (
+                            <p className="text-xs text-gray-400 mt-0.5 truncate">{memberId}</p>
+                          )}
+                          {meta.length > 0 && (
+                            <p className="text-[13px] sm:text-sm text-gray-500 mt-0.5 leading-snug truncate">
+                              {meta.join(" • ")}
+                            </p>
+                          )}
+                        </div>
+                        <div className="basis-full" />
+                        <p className="w-full text-xs text-gray-400 leading-tight">
+                          {formatViewedAtLabel(c.viewedAt)}
+                        </p>
                       </div>
-                      <div className="basis-full" />
-                      <p className="w-full text-xs text-gray-400 leading-tight">
-                        {formatViewedAtLabel(c.viewedAt)}
-                      </p>
-                    </Link>
+                    )
                   );
                 })}
               </div>
