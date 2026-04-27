@@ -2166,11 +2166,11 @@ export default function OtherProfilePage() {
             <h3 className="font-semibold text-[var(--foreground)] mb-3">More Photos</h3>
             {!canViewSensitiveFields ? (
               <div className="relative">
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                <div className="flex flex-wrap justify-center gap-2">
                   {allPhotos.slice(0, 4).map((src, i) => (
                     <div
                       key={i}
-                      className="relative aspect-square rounded-lg overflow-hidden bg-gray-200"
+                      className="relative w-[calc((100%-1.5rem)/4)] max-w-[160px] aspect-square rounded-lg overflow-hidden bg-gray-200"
                     >
                       <Image
                         src={src}
@@ -2204,7 +2204,7 @@ export default function OtherProfilePage() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              <div className="flex flex-wrap justify-center gap-2">
                 {allPhotos.map((src, i) => (
                   <button
                     key={i}
@@ -2212,7 +2212,7 @@ export default function OtherProfilePage() {
                       setCurrentImageIndex(i);
                       setShowGallery(true);
                     }}
-                    className="relative aspect-square rounded-lg overflow-hidden bg-gray-200 hover:opacity-90 transition"
+                    className="relative w-[calc((100%-1.5rem)/4)] max-w-[160px] aspect-square rounded-lg overflow-hidden bg-gray-200 hover:opacity-90 transition"
                   >
                     <Image
                       src={src}

@@ -9,7 +9,8 @@ export function buildProfileSeoTitle(profile: Pick<Profile, "fullName" | "dateOf
   const first = (profile.fullName || "").trim().split(/\s+/)[0] || "Member";
   const age = profile.dateOfBirth ? getAge(profile.dateOfBirth) : "—";
   const city = (profile.city || "").trim() || "India";
-  return `${first}, ${age} - ${city} | LingayatShaadi.in`;
+  const ageLabel = typeof age === "number" ? `${age} yrs` : age;
+  return `${first}, ${ageLabel} - ${city} | LingayatShaadi.in`;
 }
 
 export function buildProfileSeoDescription(
