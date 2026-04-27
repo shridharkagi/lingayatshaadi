@@ -75,6 +75,7 @@ import { trackContactView } from "@/lib/contactViewHistory";
 import { hasMeaningfulPreferences } from "@/lib/partnerPreferenceDefaults";
 import { computeProfileCompletion } from "@/lib/profileCompletion";
 import { buildProfileSeoTitle } from "@/lib/profileSeo";
+import { buildProfileShareText, getShortProfilePath } from "@/lib/profileShare";
 import { adminFetch } from "@/lib/api/adminClient";
 import { maskBirthDateKeepYear, maskLastName, MASKED_VALUE, type AccountAccessState } from "@/lib/accessPolicy";
 
@@ -85,10 +86,11 @@ function ShareProfileButton({ profile }: { profile: Profile }) {
   const handleShare = async () => {
     const url =
       typeof window !== "undefined"
-        ? `${window.location.origin}/profile/${getProfileSlug(profile)}`
+        ? `${window.location.origin}${getShortProfilePath(profile)}`
         : "";
     const title = buildProfileSeoTitle(profile);
-    const text = url ? `${title}\n${url}` : title;
+    const text = buildProfileShareText(profile);
+    const shareMessage = url ? `${text}\n${url}` : text;
 
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
@@ -98,10 +100,10 @@ function ShareProfileButton({ profile }: { profile: Profile }) {
           url,
         });
       } catch (err) {
-        if ((err as Error).name !== "AbortError") copyToClipboard(url);
+        if ((err as Error).name !== "AbortError") copyToClipboard(shareMessage);
       }
     } else {
-      copyToClipboard(url);
+      copyToClipboard(shareMessage);
     }
   };
 
@@ -885,10 +887,11 @@ export default function OtherProfilePage() {
     if (!profile) return;
     const url =
       typeof window !== "undefined"
-        ? `${window.location.origin}/profile/${getProfileSlug(profile)}`
+        ? `${window.location.origin}${getShortProfilePath(profile)}`
         : "";
     const title = buildProfileSeoTitle(profile);
-    const text = url ? `${title}\n${url}` : title;
+    const text = buildProfileShareText(profile);
+    const shareMessage = url ? `${text}\n${url}` : text;
 
     const copyToClipboard = async (value: string) => {
       if (!value) return;
@@ -913,7 +916,7 @@ export default function OtherProfilePage() {
       }
     }
 
-    await copyToClipboard(url);
+    await copyToClipboard(shareMessage);
     showToast("Profile link copied");
   };
 

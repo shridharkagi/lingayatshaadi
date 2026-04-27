@@ -9,22 +9,24 @@ import { Edit2, Shield, Heart, Settings, ChevronRight, Camera, Images, Briefcase
 import { getAge } from "@/lib/utils";
 import { HobbyTag } from "@/components/ui/HobbyTag";
 import { LanguageTag } from "@/components/ui/LanguageTag";
-import { getMemberIdDisplay, getProfileSlug } from "@/lib/memberId";
+import { getMemberIdDisplay } from "@/lib/memberId";
 import { Profile } from "@/types";
+import { buildProfileShareText, getShortProfilePath } from "@/lib/profileShare";
 
 async function handleShareProfile(user: Profile) {
-  const url = typeof window !== "undefined" ? `${window.location.origin}/profile/${getProfileSlug(user)}` : "";
+  const url = typeof window !== "undefined" ? `${window.location.origin}${getShortProfilePath(user)}` : "";
   const title = `${user.fullName} - LingayatShaadi Profile`;
-  const text = `Check out my profile on LingayatShaadi`;
+  const text = buildProfileShareText(user);
+  const shareMessage = url ? `${text}\n${url}` : text;
 
   if (typeof navigator !== "undefined" && navigator.share) {
     try {
       await navigator.share({ title, text, url });
     } catch (err) {
-      if ((err as Error).name !== "AbortError") copyToClipboard(url);
+      if ((err as Error).name !== "AbortError") copyToClipboard(shareMessage);
     }
   } else {
-    copyToClipboard(url);
+    copyToClipboard(shareMessage);
   }
 }
 
