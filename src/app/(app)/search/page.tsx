@@ -1,20 +1,26 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Search, SlidersHorizontal, LayoutGrid, List, ChevronDown, ChevronUp } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { useProfiles } from "@/contexts/ProfilesContext";
 import { ProfileCard } from "@/components/ui/ProfileCard";
 import { SearchFilters, defaultFilters, type SearchFiltersState } from "@/components/SearchFilters";
-import { useFilteredProfiles } from "@/hooks/useFilteredProfiles";
 import { debounce } from "@/lib/security";
 import { useAuth } from "@/contexts/AuthContext";
 import { ViewerForensicWatermark } from "@/components/ViewerForensicWatermark";
-import { adminFetch } from "@/lib/api/adminClient";
-import { maskLastName, type AccountAccessState } from "@/lib/accessPolicy";
+import { getAccountAccessState } from "@/lib/api/accessState";
+import { maskLastName, maskPublicName, type AccountAccessState } from "@/lib/accessPolicy";
+import { WhatsAppGroupCta } from "@/components/whatsapp/WhatsAppGroupCta";
+import { searchProfilesCursor } from "@/lib/api/profiles";
+import type { Profile } from "@/types";
+
+function getPageSizeForViewport(width: number): number {
+  if (width < 640) return 12;
+  if (width < 1024) return 18;
+  return 24;
+}
 
 export default function SearchPage() {
-  const { profiles } = useProfiles();
   const { isLoggedIn } = useAuth();
   const [accessState, setAccessState] = useState<AccountAccessState | null>(null);
   const [query, setQuery] = useState("");
@@ -22,7 +28,13 @@ export default function SearchPage() {
   const [view, setView] = useState<"list" | "grid">("grid");
   const [showFilters, setShowFilters] = useState(false); // Default to collapsed on mobile
   const [filters, setFilters] = useState<SearchFiltersState>(defaultFilters);
-  const [isDesktop, setIsDesktop] = useState(false);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [cursor, setCursor] = useState<number | null>(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [pageSize, setPageSize] = useState(24);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   // Debounced search query
   const debouncedSetQuery = useMemo(
@@ -36,8 +48,16 @@ export default function SearchPage() {
 
   // Check if desktop on mount
   useEffect(() => {
+    const syncPageSize = () => {
+      setPageSize(getPageSizeForViewport(window.innerWidth));
+    };
+    syncPageSize();
+    window.addEventListener("resize", syncPageSize);
+    return () => window.removeEventListener("resize", syncPageSize);
+  }, []);
+
+  useEffect(() => {
     const checkDesktop = () => {
-      setIsDesktop(window.innerWidth >= 1024);
       setShowFilters(window.innerWidth >= 1024); // Show filters by default on desktop
     };
     checkDesktop();
@@ -52,17 +72,77 @@ export default function SearchPage() {
       return;
     }
     void (async () => {
-      const res = await adminFetch("/api/account/access-state");
-      const json = (await res.json()) as { access?: AccountAccessState };
-      if (!cancelled && res.ok && json.access) setAccessState(json.access);
+      const access = await getAccountAccessState();
+      if (!cancelled) setAccessState(access);
     })();
     return () => {
       cancelled = true;
     };
   }, [isLoggedIn]);
 
-  // Memoized filtered profiles
-  const filteredProfiles = useFilteredProfiles(profiles, filters, debouncedQuery);
+  const fetchProfiles = useCallback(async () => {
+    setLoading(true);
+    const res = await searchProfilesCursor(
+      {
+        profileType: filters.profileType,
+        ageRange: filters.ageRange,
+        maritalStatuses: filters.maritalStatuses,
+        professionTypes: filters.professionTypes,
+        query: debouncedQuery,
+      },
+      { cursor: 0, pageSize }
+    );
+    if (!res.error) {
+      setProfiles(res.data);
+      setCursor(res.nextCursor);
+      setHasMore(res.hasMore);
+    } else {
+      setProfiles([]);
+      setCursor(null);
+      setHasMore(false);
+    }
+    setLoading(false);
+  }, [debouncedQuery, filters, pageSize]);
+
+  const loadMoreProfiles = useCallback(async () => {
+    if (cursor == null || loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const res = await searchProfilesCursor(
+      {
+        profileType: filters.profileType,
+        ageRange: filters.ageRange,
+        maritalStatuses: filters.maritalStatuses,
+        professionTypes: filters.professionTypes,
+        query: debouncedQuery,
+      },
+      { cursor, pageSize }
+    );
+    if (!res.error) {
+      setProfiles((prev) => [...prev, ...res.data]);
+      setCursor(res.nextCursor);
+      setHasMore(res.hasMore);
+    }
+    setLoadingMore(false);
+  }, [cursor, debouncedQuery, filters, hasMore, loadingMore, pageSize]);
+
+  useEffect(() => {
+    void fetchProfiles();
+  }, [fetchProfiles]);
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target || loading || loadingMore || !hasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          void loadMoreProfiles();
+        }
+      },
+      { rootMargin: "240px 0px" }
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasMore, loadMoreProfiles, loading, loadingMore]);
 
   // Count active filters - memoized
   const activeFiltersCount = useMemo(() => {
@@ -137,11 +217,14 @@ export default function SearchPage() {
       </header>
 
       <div className="p-4">
+        <div className="mb-4">
+          <WhatsAppGroupCta sourcePage="search" />
+        </div>
         <p className="text-sm sm:text-base text-[var(--color-text-muted)] mb-4">
-          {filteredProfiles.length} profile{filteredProfiles.length !== 1 ? "s" : ""} found
+          {profiles.length} profile{profiles.length !== 1 ? "s" : ""} found
         </p>
 
-        {filteredProfiles.length === 0 ? (
+        {!loading && profiles.length === 0 ? (
           <EmptyState
             icon={Search}
             title="No profiles found"
@@ -151,9 +234,11 @@ export default function SearchPage() {
               onClick: handleClearFilters,
             }}
           />
+        ) : loading ? (
+          <div className="py-8 text-center text-gray-500">Loading profiles...</div>
         ) : view === "list" ? (
           <div className="space-y-4">
-            {filteredProfiles.map((profile) => (
+            {profiles.map((profile) => (
               <ProfileCard
                 key={profile.id}
                 profile={profile}
@@ -161,6 +246,8 @@ export default function SearchPage() {
                 displayName={
                   canViewSensitiveFields
                     ? profile.fullName
+                    : !isLoggedIn
+                      ? maskPublicName(profile.fullName)
                     : isLoggedIn
                       ? maskLastName(profile.fullName)
                       : undefined
@@ -170,18 +257,53 @@ export default function SearchPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
-            {filteredProfiles.map((profile) => (
+            {profiles.map((profile) => (
               <ProfileCard
                 key={profile.id}
                 profile={profile}
                 displayName={
                   canViewSensitiveFields
                     ? profile.fullName
+                    : !isLoggedIn
+                      ? maskPublicName(profile.fullName)
                     : isLoggedIn
                       ? maskLastName(profile.fullName)
                       : undefined
                 }
               />
+            ))}
+          </div>
+        )}
+
+        {!loading && hasMore && (
+          <div className="mt-6 flex justify-center">
+            <button
+              type="button"
+              onClick={() => {
+                void loadMoreProfiles();
+              }}
+              disabled={loadingMore}
+              className="rounded-xl border border-[var(--border)] bg-white px-5 py-2.5 text-sm font-medium text-[var(--foreground)] hover:bg-gray-50 disabled:opacity-60"
+            >
+              {loadingMore ? "Loading..." : "Load More Profiles"}
+            </button>
+          </div>
+        )}
+        {!loading && hasMore && <div ref={loadMoreRef} className="h-1 w-full" aria-hidden />}
+        {loadingMore && (
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
+            {Array.from({ length: 4 }).map((_, idx) => (
+              <div
+                key={idx}
+                className="rounded-2xl bg-white border border-[var(--color-border)] overflow-hidden animate-pulse"
+              >
+                <div className="aspect-[4/5] bg-gray-200" />
+                <div className="p-4 space-y-2">
+                  <div className="h-3.5 bg-gray-200 rounded w-3/4" />
+                  <div className="h-2.5 bg-gray-100 rounded w-1/2" />
+                  <div className="h-2.5 bg-gray-100 rounded w-2/3" />
+                </div>
+              </div>
             ))}
           </div>
         )}

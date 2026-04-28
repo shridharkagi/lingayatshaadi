@@ -3,6 +3,7 @@ import { toProfileRow, fromProfileRow, type ProfileRow } from "@/lib/profileMapp
 import { generatePublicIdFromExistingIds, genderFlag } from "@/lib/memberId";
 import type { Profile } from "@/types";
 import { MAX_ACTIVE_OR_PENDING_PROFILES } from "@/lib/accessPolicy";
+import { profileMatchesProfessionFilter } from "@/lib/professionFilter";
 
 /**
  * For public-facing surfaces (search, home cards, other-member profile
@@ -434,6 +435,14 @@ export interface SearchFilters {
   subCaste?: string;
 }
 
+export interface SearchCursorFilters {
+  profileType?: "bride" | "groom" | "";
+  ageRange?: [number, number];
+  maritalStatuses?: string[];
+  professionTypes?: string[];
+  query?: string;
+}
+
 /** Search profiles with optional filters */
 export async function searchProfiles(
   filters: SearchFilters = {},
@@ -481,5 +490,99 @@ export async function searchProfiles(
     };
   } catch (err) {
     return { data: [], error: err instanceof Error ? err.message : "Failed to search profiles" };
+  }
+}
+
+export async function searchProfilesCursor(
+  filters: SearchCursorFilters,
+  options?: { cursor?: number; pageSize?: number; chunkSize?: number }
+): Promise<{
+  data: Profile[];
+  error: string | null;
+  nextCursor: number | null;
+  hasMore: boolean;
+}> {
+  try {
+    const supabase = createSupabaseClientSafe();
+    if (!supabase) {
+      return { data: [], error: "Supabase not configured", nextCursor: null, hasMore: false };
+    }
+
+    const pageSize = Math.max(1, Math.min(50, options?.pageSize ?? 24));
+    const chunkSize = Math.max(pageSize, Math.min(120, options?.chunkSize ?? 72));
+    let cursor = Math.max(0, options?.cursor ?? 0);
+    let reachedEnd = false;
+    const collected: Profile[] = [];
+
+    const queryText = (filters.query || "").trim().toLowerCase();
+    const selectedProfessionTypes = filters.professionTypes || [];
+
+    while (collected.length < pageSize && !reachedEnd) {
+      let query = supabase.from("profiles").select("*");
+      query = query.is("deleted_at", null);
+      query = query.or("moderation_status.eq.approved,approved_snapshot.not.is.null");
+
+      const profileType = filters.profileType || "";
+      if (profileType === "bride") query = query.eq("gender", "female");
+      if (profileType === "groom") query = query.eq("gender", "male");
+
+      const ageRange = filters.ageRange || [18, 60];
+      if (Number.isFinite(ageRange[0])) {
+        const maxDob = new Date();
+        maxDob.setFullYear(maxDob.getFullYear() - ageRange[0]);
+        query = query.lte("date_of_birth", maxDob.toISOString().slice(0, 10));
+      }
+      if (Number.isFinite(ageRange[1])) {
+        const minDob = new Date();
+        minDob.setFullYear(minDob.getFullYear() - ageRange[1] - 1);
+        query = query.gte("date_of_birth", minDob.toISOString().slice(0, 10));
+      }
+
+      if ((filters.maritalStatuses || []).length > 0) {
+        query = query.in("marital_status", filters.maritalStatuses || []);
+      }
+
+      const rangeFrom = cursor;
+      const rangeTo = cursor + chunkSize - 1;
+      const { data, error } = await query
+        .order("created_at", { ascending: false })
+        .range(rangeFrom, rangeTo);
+      if (error) {
+        return { data: [], error: error.message, nextCursor: null, hasMore: false };
+      }
+
+      const rows = (data || []) as ProfileRow[];
+      cursor += rows.length;
+      if (rows.length < chunkSize) reachedEnd = true;
+
+      for (const row of rows) {
+        const profile = profileForPublic(row);
+
+        if (selectedProfessionTypes.length > 0 && !profileMatchesProfessionFilter(profile, selectedProfessionTypes)) {
+          continue;
+        }
+        if (queryText) {
+          const searchable =
+            `${profile.fullName} ${profile.profession} ${profile.professionType} ${profile.city} ${profile.state}`.toLowerCase();
+          if (!searchable.includes(queryText)) continue;
+        }
+        collected.push(profile);
+        if (collected.length >= pageSize) break;
+      }
+    }
+
+    return {
+      data: collected,
+      error: null,
+      nextCursor: reachedEnd ? null : cursor,
+      hasMore: !reachedEnd,
+    };
+  } catch (err) {
+    return {
+      data: [],
+      error: err instanceof Error ? err.message : "Failed to search profiles",
+      nextCursor: null,
+      hasMore: false,
+    };
   }
 }

@@ -11,13 +11,14 @@ import { HobbyTag } from "@/components/ui/HobbyTag";
 import { LanguageTag } from "@/components/ui/LanguageTag";
 import { getMemberIdDisplay } from "@/lib/memberId";
 import { Profile } from "@/types";
-import { buildProfileShareText, getShortProfilePath } from "@/lib/profileShare";
+import { buildProfileShareFooter, buildProfileShareText, getShortProfilePath } from "@/lib/profileShare";
 
 async function handleShareProfile(user: Profile) {
   const url = typeof window !== "undefined" ? `${window.location.origin}${getShortProfilePath(user)}` : "";
   const title = `${user.fullName} - LingayatShaadi Profile`;
   const text = buildProfileShareText(user);
-  const shareMessage = url ? `${text}\n${url}` : text;
+  const footer = buildProfileShareFooter();
+  const shareMessage = url ? `${text}\n${url}\n\n${footer}` : `${text}\n\n${footer}`;
 
   if (typeof navigator !== "undefined" && navigator.share) {
     try {

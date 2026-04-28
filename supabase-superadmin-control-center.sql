@@ -217,6 +217,36 @@ alter table subscription_upgrade_requests
 alter table subscription_upgrade_requests
   add column if not exists whatsapp_notification_error text;
 
+create table if not exists whatsapp_leads (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid references auth.users(id) on delete set null,
+  name text not null,
+  contact_no text not null,
+  city text not null,
+  source_page text not null check (source_page in ('home', 'search', 'profile')),
+  status text not null default 'submitted' check (status in ('submitted', 'duplicate', 'blocked')),
+  date_of_joining date not null default (now() at time zone 'Asia/Kolkata')::date,
+  metadata jsonb,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_whatsapp_leads_account_created
+  on whatsapp_leads(account_id, created_at desc);
+create index if not exists idx_whatsapp_leads_contact_created
+  on whatsapp_leads(contact_no, created_at desc);
+create index if not exists idx_whatsapp_leads_source_created
+  on whatsapp_leads(source_page, created_at desc);
+
+create table if not exists whatsapp_lead_events (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid references auth.users(id) on delete set null,
+  source_page text not null check (source_page in ('home', 'search', 'profile')),
+  event_name text not null check (event_name in ('cta_impression', 'form_opened', 'submit_success')),
+  metadata jsonb,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_whatsapp_lead_events_source_created
+  on whatsapp_lead_events(source_page, created_at desc);
+
 create or replace function send_subscription_expiry_reminders()
 returns void
 language plpgsql

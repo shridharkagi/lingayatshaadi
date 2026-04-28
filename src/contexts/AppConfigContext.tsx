@@ -24,6 +24,10 @@ export interface AppConfig {
   seoDescription: string;
   /** SEO meta keywords */
   seoKeywords: string;
+  /** Hero image URL for Brides listing page */
+  bridesHeroImageUrl: string;
+  /** Hero image URL for Grooms listing page */
+  groomsHeroImageUrl: string;
 }
 
 const defaultConfig: AppConfig = {
@@ -38,6 +42,10 @@ const defaultConfig: AppConfig = {
   robotsTxt: "User-agent: *\nAllow: /",
   seoDescription: "Premium matrimonial platform for the Lingayat community",
   seoKeywords: "Lingayat matrimony, Lingayat shaadi, Lingayat marriage",
+  bridesHeroImageUrl:
+    "https://images.unsplash.com/photo-1519741497674-611481863552?w=1600&q=75&fit=crop",
+  groomsHeroImageUrl:
+    "https://images.unsplash.com/photo-1606800052052-a08af7148866?w=1600&q=70&fit=crop",
 };
 
 const AppConfigContext = createContext<{
@@ -64,6 +72,14 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
           robotsTxt: typeof parsed.robotsTxt === "string" ? parsed.robotsTxt : defaultConfig.robotsTxt,
           seoDescription: typeof parsed.seoDescription === "string" ? parsed.seoDescription : defaultConfig.seoDescription,
           seoKeywords: typeof parsed.seoKeywords === "string" ? parsed.seoKeywords : defaultConfig.seoKeywords,
+          bridesHeroImageUrl:
+            typeof parsed.bridesHeroImageUrl === "string"
+              ? parsed.bridesHeroImageUrl
+              : defaultConfig.bridesHeroImageUrl,
+          groomsHeroImageUrl:
+            typeof parsed.groomsHeroImageUrl === "string"
+              ? parsed.groomsHeroImageUrl
+              : defaultConfig.groomsHeroImageUrl,
         }));
       }
     } catch {

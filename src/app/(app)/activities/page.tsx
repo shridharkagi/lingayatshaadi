@@ -24,7 +24,7 @@ import { getAge } from "@/lib/utils";
 import { getProfileSlug } from "@/lib/memberId";
 import { FEATURE_MESSAGING_ENABLED } from "@/lib/featureFlags";
 import type { Profile } from "@/types";
-import { adminFetch } from "@/lib/api/adminClient";
+import { getAccountAccessState } from "@/lib/api/accessState";
 import { maskLastName, type AccountAccessState } from "@/lib/accessPolicy";
 import {
   loadContactViewHistory,
@@ -118,6 +118,26 @@ export default function ActivitiesPage() {
   const shortlistOwnerId = user?.id || "";
   const canViewSensitiveFields = !!accessState?.hasValidSubscription;
 
+  const isValidTabId = useCallback(
+    (value: string | null): value is TabId => !!value && tabs.some((t) => t.id === value),
+    []
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const tabFromUrl = new URLSearchParams(window.location.search).get("tab");
+    if (!isValidTabId(tabFromUrl)) return;
+    if (tabFromUrl !== activeTab) setActiveTab(tabFromUrl);
+  }, [isValidTabId, activeTab]);
+
+  const setTab = useCallback((tab: TabId) => {
+    setActiveTab(tab);
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    params.set("tab", tab);
+    router.replace(`/activities?${params.toString()}`, { scroll: false });
+  }, [router]);
+
   useEffect(() => {
     let cancelled = false;
     if (!user?.id) {
@@ -126,10 +146,8 @@ export default function ActivitiesPage() {
     }
     void (async () => {
       try {
-        const res = await adminFetch("/api/account/access-state");
-        if (!res.ok) return;
-        const json = (await res.json()) as { access?: AccountAccessState };
-        if (!cancelled) setAccessState(json.access || null);
+        const access = await getAccountAccessState();
+        if (!cancelled) setAccessState(access);
       } catch {
         if (!cancelled) setAccessState(null);
       }
@@ -456,7 +474,7 @@ export default function ActivitiesPage() {
                   key={id}
                   role="tab"
                   aria-selected={isActive}
-                  onClick={() => setActiveTab(id)}
+                  onClick={() => setTab(id)}
                   className={`relative min-w-0 flex flex-col items-center justify-center gap-1 py-2 rounded-xl transition-colors ${
                     isActive
                       ? "bg-[var(--primary)] text-white shadow-sm"
@@ -731,7 +749,7 @@ export default function ActivitiesPage() {
               />
             ) : (
               <div className="space-y-3">
-                {contactViews.map((c) => {
+                {contactViews.map((c, idx) => {
                   const name = c.profile?.fullName || c.cached?.fullName || "Profile";
                   const photo = c.profile?.profilePhoto || c.cached?.photo;
                   const memberId = c.profile?.publicId || c.profile?.memberId || c.cached?.memberId;
@@ -749,7 +767,7 @@ export default function ActivitiesPage() {
                   return (
                     profileHref ? (
                       <Link
-                        key={`${c.profileId}-${c.viewedAt}`}
+                        key={`${c.profileId}-${c.viewedAt}-${idx}`}
                         href={profileHref}
                         className={`${cardClassName} hover:shadow-md`}
                       >
@@ -772,7 +790,7 @@ export default function ActivitiesPage() {
                       </Link>
                     ) : (
                       <div
-                        key={`${c.profileId}-${c.viewedAt}`}
+                        key={`${c.profileId}-${c.viewedAt}-${idx}`}
                         className={`${cardClassName} opacity-90`}
                         title="Profile link unavailable"
                       >

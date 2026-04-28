@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Heart, Menu, X } from "lucide-react";
+import { Heart, Menu, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAuthModal } from "@/contexts/AuthModalContext";
@@ -72,16 +72,25 @@ export function ProfilesPageHeader() {
             </>
           )}
         </nav>
-        <button
-          type="button"
-          id="profiles-menu-btn"
-          onClick={() => setMobileMenuOpen((prev) => !prev)}
-          className="md:hidden p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center -mr-1 rounded-lg hover:bg-[var(--color-border)]/50 active:bg-[var(--color-border)] transition-colors touch-manipulation"
-          aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-          aria-expanded={mobileMenuOpen}
-        >
-          {mobileMenuOpen ? <X size={24} strokeWidth={2} aria-hidden /> : <Menu size={24} strokeWidth={2} aria-hidden />}
-        </button>
+        <div className="md:hidden flex items-center gap-1 -mr-1">
+          <Link
+            href="/search"
+            className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-[var(--color-border)]/50 active:bg-[var(--color-border)] transition-colors touch-manipulation"
+            aria-label="Open search"
+          >
+            <Search size={22} strokeWidth={2} aria-hidden />
+          </Link>
+          <button
+            type="button"
+            id="profiles-menu-btn"
+            onClick={() => setMobileMenuOpen((prev) => !prev)}
+            className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-[var(--color-border)]/50 active:bg-[var(--color-border)] transition-colors touch-manipulation"
+            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileMenuOpen}
+          >
+            {mobileMenuOpen ? <X size={24} strokeWidth={2} aria-hidden /> : <Menu size={24} strokeWidth={2} aria-hidden />}
+          </button>
+        </div>
       </div>
       <div
         id="profiles-menu-panel"
@@ -94,6 +103,9 @@ export function ProfilesPageHeader() {
         <div className={`overflow-hidden flex flex-col gap-2 ${mobileMenuOpen ? "p-4" : "p-0"}`}>
           <Link href="/profiles" onClick={() => setMobileMenuOpen(false)}>
             Profiles
+          </Link>
+          <Link href="/search" onClick={() => setMobileMenuOpen(false)}>
+            Search
           </Link>
           <Link href="/contact" onClick={() => setMobileMenuOpen(false)}>
             Help

@@ -9,12 +9,16 @@ import { useAuth } from "@/contexts/AuthContext";
 type SubscriptionRow = {
   id: string;
   status: string;
+  user_id?: string;
   starts_at: string;
   expires_at: string;
   created_at: string;
   plan_name_snapshot?: string;
   price_snapshot?: number;
   currency_snapshot?: string;
+  total_contact_views_snapshot?: number;
+  daily_contact_view_limit_snapshot?: number;
+  contacts_used_count?: number;
   notes?: string | null;
 };
 
@@ -199,6 +203,18 @@ export default function AccountSubscriptionsTimelinePage() {
               </p>
               <p>
                 Payment date: <span className="font-medium text-[var(--foreground)]">{formatDate(r.txn?.paid_at || r.txn?.created_at)}</span>
+              </p>
+              <p>
+                Contact usage:{" "}
+                <span className="font-medium text-[var(--foreground)]">
+                  {Number(r.contacts_used_count || 0)} / {Number(r.total_contact_views_snapshot || 0)}
+                </span>
+              </p>
+              <p>
+                Daily cap:{" "}
+                <span className="font-medium text-[var(--foreground)]">
+                  {Number(r.daily_contact_view_limit_snapshot || 0)}/day
+                </span>
               </p>
               <p className="sm:col-span-2">
                 Payer source: <span className="font-medium text-[var(--foreground)]">{r.txn?.payer_source || "—"}</span>

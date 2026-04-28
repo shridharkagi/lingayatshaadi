@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { SlidersHorizontal, X, Search } from "lucide-react";
@@ -11,15 +11,15 @@ import {
   defaultFilters,
   type SearchFiltersState,
 } from "@/components/SearchFilters";
-import { useProfiles } from "@/contexts/ProfilesContext";
-import { useFilteredProfiles } from "@/hooks/useFilteredProfiles";
 import { useAuth } from "@/contexts/AuthContext";
 import { BottomNav } from "@/components/ui/BottomNav";
 import { useAuthModal } from "@/contexts/AuthModalContext";
 import { ViewerForensicWatermark } from "@/components/ViewerForensicWatermark";
 import { SiteFooter } from "@/components/SiteFooter";
-import { adminFetch } from "@/lib/api/adminClient";
-import { maskLastName, type AccountAccessState } from "@/lib/accessPolicy";
+import { getAccountAccessState } from "@/lib/api/accessState";
+import { maskLastName, maskPublicName, type AccountAccessState } from "@/lib/accessPolicy";
+import { searchProfilesCursor } from "@/lib/api/profiles";
+import type { Profile } from "@/types";
 
 const AGE_MIN = 18;
 const AGE_MAX = 60;
@@ -39,6 +39,13 @@ export interface ProfilesViewProps {
 
 const DEFAULT_HERO_IMAGE =
   "https://images.unsplash.com/photo-1605649487212-47bdab064df7?w=1600&q=70";
+const QUERY_DEBOUNCE_MS = 250;
+
+function getPageSizeForViewport(width: number): number {
+  if (width < 640) return 12;
+  if (width < 1024) return 18;
+  return 24;
+}
 
 function countActiveFilters(
   f: SearchFiltersState,
@@ -62,7 +69,6 @@ export function ProfilesView({
   heroImage = DEFAULT_HERO_IMAGE,
   itemNoun = "profiles",
 }: ProfilesViewProps) {
-  const { profiles, profilesLoading } = useProfiles();
   const { isLoggedIn } = useAuth();
   const [accessState, setAccessState] = useState<AccountAccessState | null>(null);
   const { openAuthModal } = useAuthModal();
@@ -78,9 +84,15 @@ export function ProfilesView({
     profileType: lockedProfileType ?? "",
   }));
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
-
-  const filteredProfiles = useFilteredProfiles(profiles, filters, query, lockedGender);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [cursor, setCursor] = useState<number | null>(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [profilesLoading, setProfilesLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [pageSize, setPageSize] = useState(24);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const activeCount = useMemo(
     () => countActiveFilters(filters, lockedGender),
     [filters, lockedGender]
@@ -93,9 +105,8 @@ export function ProfilesView({
       return;
     }
     void (async () => {
-      const res = await adminFetch("/api/account/access-state");
-      const json = (await res.json()) as { access?: AccountAccessState };
-      if (!cancelled && res.ok && json.access) setAccessState(json.access);
+      const access = await getAccountAccessState();
+      if (!cancelled) setAccessState(access);
     })();
     return () => {
       cancelled = true;
@@ -112,16 +123,85 @@ export function ProfilesView({
     }
   }, [filterOpen]);
 
-  // Total count reflects only the route's eligible profiles (e.g. only
-  // brides on /brides), not the global profile count.
-  const totalCount = useMemo(
-    () =>
-      lockedGender
-        ? profiles.filter((p) => p.gender?.toLowerCase() === lockedGender).length
-        : profiles.length,
-    [profiles, lockedGender]
-  );
-  const showingFiltered = activeCount > 0 || query.trim().length > 0;
+  useEffect(() => {
+    const syncPageSize = () => {
+      setPageSize(getPageSizeForViewport(window.innerWidth));
+    };
+    syncPageSize();
+    window.addEventListener("resize", syncPageSize);
+    return () => window.removeEventListener("resize", syncPageSize);
+  }, []);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebouncedQuery(query), QUERY_DEBOUNCE_MS);
+    return () => window.clearTimeout(id);
+  }, [query]);
+
+  const fetchProfiles = useCallback(async () => {
+    setProfilesLoading(true);
+    const res = await searchProfilesCursor(
+      {
+        profileType: filters.profileType,
+        ageRange: filters.ageRange,
+        maritalStatuses: filters.maritalStatuses,
+        professionTypes: filters.professionTypes,
+        query: debouncedQuery,
+      },
+      { cursor: 0, pageSize }
+    );
+    if (!res.error) {
+      setProfiles(res.data);
+      setCursor(res.nextCursor);
+      setHasMore(res.hasMore);
+    } else {
+      setProfiles([]);
+      setCursor(null);
+      setHasMore(false);
+    }
+    setProfilesLoading(false);
+  }, [debouncedQuery, filters, pageSize]);
+
+  const loadMoreProfiles = useCallback(async () => {
+    if (cursor == null || !hasMore || loadingMore) return;
+    setLoadingMore(true);
+    const res = await searchProfilesCursor(
+      {
+        profileType: filters.profileType,
+        ageRange: filters.ageRange,
+        maritalStatuses: filters.maritalStatuses,
+        professionTypes: filters.professionTypes,
+        query: debouncedQuery,
+      },
+      { cursor, pageSize }
+    );
+    if (!res.error) {
+      setProfiles((prev) => [...prev, ...res.data]);
+      setCursor(res.nextCursor);
+      setHasMore(res.hasMore);
+    }
+    setLoadingMore(false);
+  }, [cursor, debouncedQuery, filters, hasMore, loadingMore, pageSize]);
+
+  useEffect(() => {
+    void fetchProfiles();
+  }, [fetchProfiles]);
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target || profilesLoading || loadingMore || !hasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          void loadMoreProfiles();
+        }
+      },
+      { rootMargin: "240px 0px" }
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasMore, loadMoreProfiles, loadingMore, profilesLoading]);
+
+  const showingFiltered = activeCount > 0 || debouncedQuery.trim().length > 0;
 
   const resetFilters = () =>
     setFilters({ ...defaultFilters, profileType: lockedProfileType ?? "" });
@@ -229,8 +309,8 @@ export function ProfilesView({
               {profilesLoading
                 ? `Loading ${itemNoun}…`
                 : showingFiltered
-                ? `${filteredProfiles.length} of ${totalCount} ${itemNoun}`
-                : `${totalCount} ${itemNoun}`}
+                ? `${profiles.length}${hasMore ? "+" : ""} ${itemNoun}`
+                : `${profiles.length}${hasMore ? "+" : ""} ${itemNoun}`}
             </h2>
             {!profilesLoading && (
               <span className="text-xs px-2 py-1 rounded-full bg-[var(--primary)]/10 text-[var(--primary)] font-medium">
@@ -250,11 +330,11 @@ export function ProfilesView({
 
           {profilesLoading ? (
             <ProfilesGridSkeleton />
-          ) : filteredProfiles.length === 0 ? (
+          ) : profiles.length === 0 ? (
             <EmptyResults onReset={resetFilters} />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
-              {filteredProfiles.map((profile) => (
+              {profiles.map((profile) => (
                 <ProfileCard
                   key={profile.id}
                   profile={profile}
@@ -263,9 +343,41 @@ export function ProfilesView({
                       ? profile.fullName
                       : isLoggedIn
                         ? maskLastName(profile.fullName)
-                        : maskName(profile.fullName)
+                        : maskPublicName(profile.fullName)
                   }
                 />
+              ))}
+            </div>
+          )}
+          {!profilesLoading && hasMore && profiles.length > 0 && (
+            <div className="mt-6 flex justify-center">
+              <button
+                type="button"
+                onClick={() => {
+                  void loadMoreProfiles();
+                }}
+                disabled={loadingMore}
+                className="rounded-xl border border-[var(--color-border)] bg-white px-5 py-2.5 text-sm font-medium text-[var(--color-text-primary)] hover:bg-gray-50 disabled:opacity-60"
+              >
+                {loadingMore ? "Loading..." : `Load More ${itemNoun}`}
+              </button>
+            </div>
+          )}
+          {!profilesLoading && hasMore && <div ref={loadMoreRef} className="h-1 w-full" aria-hidden />}
+          {loadingMore && (
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="rounded-2xl bg-white border border-[var(--color-border)] overflow-hidden animate-pulse"
+                >
+                  <div className="aspect-[4/5] bg-gray-200" />
+                  <div className="p-4 space-y-2">
+                    <div className="h-3.5 bg-gray-200 rounded w-3/4" />
+                    <div className="h-2.5 bg-gray-100 rounded w-1/2" />
+                    <div className="h-2.5 bg-gray-100 rounded w-2/3" />
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -323,7 +435,7 @@ export function ProfilesView({
                 onClick={() => setFilterOpen(false)}
                 className="flex-1 py-3 rounded-xl bg-[var(--primary)] text-white text-sm font-semibold hover:bg-[var(--primary-hover)] transition"
               >
-                Show {filteredProfiles.length} result{filteredProfiles.length === 1 ? "" : "s"}
+                Show {profiles.length} result{profiles.length === 1 ? "" : "s"}
               </button>
             </div>
           </div>
@@ -336,14 +448,6 @@ export function ProfilesView({
       {isLoggedIn ? <BottomNav /> : <SiteFooter />}
     </div>
   );
-}
-
-function maskName(name: string): string {
-  if (!name || name.length <= 2) return name || "";
-  const parts = name.trim().split(/\s+/);
-  return parts
-    .map((p) => p.slice(0, 2) + "*".repeat(Math.max(0, p.length - 2)))
-    .join(" ");
 }
 
 function ProfilesGridSkeleton() {

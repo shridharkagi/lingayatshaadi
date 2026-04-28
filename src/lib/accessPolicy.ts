@@ -56,3 +56,12 @@ export function maskBirthDateKeepYear(isoDate?: string): string {
   if (!/^\d{4}$/.test(year)) return `${MASKED_VALUE}/${MASKED_VALUE}/${MASKED_VALUE}`;
   return `${MASKED_VALUE}/${MASKED_VALUE}/${year}`;
 }
+
+export function maskPublicName(fullName: string): string {
+  const clean = (fullName || "").trim();
+  if (!clean) return "";
+  const parts = clean.split(/\s+/);
+  return parts
+    .map((p) => p.slice(0, 2) + "*".repeat(Math.max(0, p.length - 2)))
+    .join(" ");
+}

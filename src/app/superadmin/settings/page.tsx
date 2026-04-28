@@ -15,6 +15,8 @@ export default function SuperAdminSettingsPage() {
   const [robotsTxt, setRobotsTxt] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
   const [seoKeywords, setSeoKeywords] = useState("");
+  const [bridesHeroImageUrl, setBridesHeroImageUrl] = useState("");
+  const [groomsHeroImageUrl, setGroomsHeroImageUrl] = useState("");
   const [savingSeo, setSavingSeo] = useState(false);
 
   useEffect(() => {
@@ -42,6 +44,14 @@ export default function SuperAdminSettingsPage() {
   }, [config.externalScripts]);
 
   useEffect(() => {
+    setBridesHeroImageUrl(config.bridesHeroImageUrl || "");
+  }, [config.bridesHeroImageUrl]);
+
+  useEffect(() => {
+    setGroomsHeroImageUrl(config.groomsHeroImageUrl || "");
+  }, [config.groomsHeroImageUrl]);
+
+  useEffect(() => {
     adminFetch("/api/site-config")
       .then((r) => r.json())
       .then((data) => {
@@ -60,6 +70,8 @@ export default function SuperAdminSettingsPage() {
       whatsappDefaultMessage: whatsappMessage,
       faviconUrl,
       externalScripts,
+      bridesHeroImageUrl,
+      groomsHeroImageUrl,
     });
     alert("Settings saved!");
   };
@@ -185,6 +197,36 @@ export default function SuperAdminSettingsPage() {
             placeholder={'<script src="https://..."></script>\n<!-- or paste script URL -->'}
             rows={6}
             className="mt-1 w-full px-4 py-2 border rounded-lg font-mono text-sm"
+          />
+        </div>
+
+        <hr className="my-6 border-gray-200" />
+
+        <h3 className="text-lg font-semibold text-gray-900">Listing Hero Images</h3>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Brides Page Hero Image URL</label>
+          <p className="text-xs text-gray-500 mt-0.5 mb-1">
+            South Indian traditional wedding image for /brides page.
+          </p>
+          <input
+            type="url"
+            value={bridesHeroImageUrl}
+            onChange={(e) => setBridesHeroImageUrl(e.target.value)}
+            placeholder="https://..."
+            className="mt-1 w-full px-4 py-2 border rounded-lg"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Grooms Page Hero Image URL</label>
+          <p className="text-xs text-gray-500 mt-0.5 mb-1">
+            South Indian traditional wedding image for /grooms page.
+          </p>
+          <input
+            type="url"
+            value={groomsHeroImageUrl}
+            onChange={(e) => setGroomsHeroImageUrl(e.target.value)}
+            placeholder="https://..."
+            className="mt-1 w-full px-4 py-2 border rounded-lg"
           />
         </div>
 

@@ -1,6 +1,7 @@
 import type { Profile } from "@/types";
 import { getAge } from "@/lib/utils";
 import { getShortProfileSlug } from "@/lib/memberId";
+import { SUPPORT_PHONE_DISPLAY } from "@/lib/support";
 
 function getFirstName(fullName?: string | null): string {
   return (fullName || "").trim().split(/\s+/)[0] || "Member";
@@ -21,6 +22,10 @@ export function buildProfileShareText(
   const line = [firstName, age, profession, city].filter(Boolean).join(", ");
 
   return `Found a genuine Lingayat profile:\n${line}\n\nView Profile:`;
+}
+
+export function buildProfileShareFooter(): string {
+  return `Need help? Call/WhatsApp ${SUPPORT_PHONE_DISPLAY}\n-Team LingayatShaadi.in`;
 }
 
 export function getShortProfilePath(profile: Profile): string {

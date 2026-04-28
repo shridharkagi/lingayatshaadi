@@ -526,9 +526,9 @@ export default function AccountPage() {
 
               {!hasRealVerifiedEmail && (
                 <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
-                  <p className="text-sm font-medium text-gray-900">Add email (optional)</p>
+                  <p className="text-sm font-medium text-gray-900">Add email (Disabled)</p>
                   <p className="text-xs text-gray-500">
-                    We only use this for login and account recovery. Your signup mobile OTP flow stays the same.
+                    Temporarily disabled. We will re-enable this soon.
                   </p>
                   <Input
                     label="Email address"
@@ -537,7 +537,7 @@ export default function AccountPage() {
                     value={contactEmailInput}
                     onChange={(e) => setContactEmailInput(e.target.value)}
                     placeholder="you@example.com"
-                    disabled={contactEmailBusy}
+                    disabled
                   />
                   {contactEmailStep === "sent" && (
                     <Input
@@ -546,6 +546,7 @@ export default function AccountPage() {
                       value={contactEmailOtp}
                       onChange={(e) => setContactEmailOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
                       placeholder="Enter code"
+                      disabled
                     />
                   )}
                   {contactEmailErr && <p className="text-sm text-red-600">{contactEmailErr}</p>}
@@ -554,34 +555,26 @@ export default function AccountPage() {
                     {contactEmailStep !== "sent" ? (
                       <button
                         type="button"
-                        disabled={
-                          contactEmailBusy ||
-                          !contactEmailInput.trim() ||
-                          contactEmailCooldown > 0
-                        }
+                        disabled
                         onClick={sendContactEmailCode}
                         className="px-4 py-2 rounded-xl text-sm font-medium bg-[var(--primary)] text-white disabled:opacity-50"
                       >
-                        {contactEmailBusy
-                          ? "Sending…"
-                          : contactEmailCooldown > 0
-                            ? `Wait ${contactEmailCooldown}s to retry`
-                            : "Send verification code"}
+                        Send verification code
                       </button>
                     ) : (
                       <button
                         type="button"
-                        disabled={contactEmailBusy || contactEmailOtp.length !== 6}
+                        disabled
                         onClick={confirmContactEmail}
                         className="px-4 py-2 rounded-xl text-sm font-medium bg-[var(--primary)] text-white disabled:opacity-50"
                       >
-                        {contactEmailBusy ? "Verifying…" : "Verify email"}
+                        Verify email
                       </button>
                     )}
                     {contactEmailStep === "sent" && (
                       <button
                         type="button"
-                        disabled={contactEmailBusy}
+                        disabled
                         onClick={() => {
                           setContactEmailStep("idle");
                           setContactEmailOtp("");
@@ -664,10 +657,9 @@ export default function AccountPage() {
                 </p>
               ) : (
                 <div className="space-y-3 pt-2 border-t border-gray-100">
-                  <p className="text-sm font-medium text-gray-900">Email (optional)</p>
+                  <p className="text-sm font-medium text-gray-900">Email (Disabled)</p>
                   <p className="text-xs text-gray-500">
-                    Add a login email and verify it with the code we send you. Same as the section below when
-                    not editing.
+                    Temporarily disabled. We will re-enable this soon.
                   </p>
                   <Input
                     label="Email address"
@@ -676,7 +668,7 @@ export default function AccountPage() {
                     value={contactEmailInput}
                     onChange={(e) => setContactEmailInput(e.target.value)}
                     placeholder="you@example.com"
-                    disabled={contactEmailBusy}
+                    disabled
                   />
                   {contactEmailStep === "sent" && (
                     <Input
@@ -685,6 +677,7 @@ export default function AccountPage() {
                       value={contactEmailOtp}
                       onChange={(e) => setContactEmailOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
                       placeholder="Enter code"
+                      disabled
                     />
                   )}
                   {contactEmailErr && <p className="text-sm text-red-600">{contactEmailErr}</p>}
@@ -693,34 +686,26 @@ export default function AccountPage() {
                     {contactEmailStep !== "sent" ? (
                       <button
                         type="button"
-                        disabled={
-                          contactEmailBusy ||
-                          !contactEmailInput.trim() ||
-                          contactEmailCooldown > 0
-                        }
+                        disabled
                         onClick={sendContactEmailCode}
                         className="px-4 py-2 rounded-xl text-sm font-medium bg-[var(--primary)] text-white disabled:opacity-50"
                       >
-                        {contactEmailBusy
-                          ? "Sending…"
-                          : contactEmailCooldown > 0
-                            ? `Wait ${contactEmailCooldown}s to retry`
-                            : "Send verification code"}
+                        Send verification code
                       </button>
                     ) : (
                       <button
                         type="button"
-                        disabled={contactEmailBusy || contactEmailOtp.length !== 6}
+                        disabled
                         onClick={confirmContactEmail}
                         className="px-4 py-2 rounded-xl text-sm font-medium bg-[var(--primary)] text-white disabled:opacity-50"
                       >
-                        {contactEmailBusy ? "Verifying…" : "Verify email"}
+                        Verify email
                       </button>
                     )}
                     {contactEmailStep === "sent" && (
                       <button
                         type="button"
-                        disabled={contactEmailBusy}
+                        disabled
                         onClick={() => {
                           setContactEmailStep("idle");
                           setContactEmailOtp("");
@@ -861,16 +846,23 @@ export default function AccountPage() {
             <Bell size={14} />
             Upgrade or manage membership
           </Link>
-          {membershipHistory.subscriptions.length === 0 ? (
+          {(() => {
+            const now = Date.now();
+            const activeSubscriptions = membershipHistory.subscriptions.filter((s) => {
+              const status = String((s as { status?: string }).status || "").toLowerCase();
+              const expiry = new Date(String((s as { expires_at?: string }).expires_at || "")).getTime();
+              return status === "active" && Number.isFinite(expiry) && expiry >= now;
+            });
+            return activeSubscriptions.length === 0 ? (
             <div className="rounded-xl bg-gray-50/80 border border-dashed border-gray-200 px-4 py-6 text-center">
-              <p className="text-sm font-medium text-[var(--foreground)]">No membership records yet</p>
+              <p className="text-sm font-medium text-[var(--foreground)]">No active membership plan</p>
               <p className="text-xs text-gray-500 mt-1.5 max-w-sm mx-auto">
-                When you subscribe or renew, entries will show here. Open the timeline for the full list.
+                Upgrade or renew to activate a plan. Open the timeline for full history.
               </p>
             </div>
           ) : (
             <div className="space-y-2.5">
-              {membershipHistory.subscriptions.slice(0, 10).map((s) => {
+              {activeSubscriptions.map((s) => {
                 const txn = membershipHistory.transactions.find(
                   (t) => String(t.subscription_id || "") === String(s.id || "")
                 );
@@ -888,11 +880,21 @@ export default function AccountPage() {
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600 sm:text-right sm:justify-end">
-                      <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-700">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2.5 py-1 font-semibold text-green-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                        <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
                         {String(s.status || "active")}
                       </span>
                       <span className="font-semibold text-[var(--foreground)]">
                         ₹{Number(txn?.amount || s.price_snapshot || 0).toLocaleString("en-IN")}
+                      </span>
+                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 font-medium text-blue-700">
+                        Allowed: {Number((s as { total_contact_views_snapshot?: number }).total_contact_views_snapshot || 0)}
+                      </span>
+                      <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">
+                        Contacted: {Number((s as { contacts_used_count?: number }).contacts_used_count || 0)}
+                      </span>
+                      <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-700">
+                        Daily: {Number((s as { daily_contact_view_limit_snapshot?: number }).daily_contact_view_limit_snapshot || 0)}/day
                       </span>
                       {txn && (
                         <span className="text-gray-500 w-full sm:w-auto sm:max-w-[200px] truncate">
@@ -912,7 +914,8 @@ export default function AccountPage() {
                 );
               })}
             </div>
-          )}
+          );
+          })()}
         </section>
 
         <div className="bg-white rounded-2xl shadow-sm p-3">

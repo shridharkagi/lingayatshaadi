@@ -17,6 +17,14 @@ const PROFESSION_CATEGORY_KEYWORDS: Record<string, string[]> = {
   "Not Working": ["not working", "homemaker", "home maker"],
 };
 
+export function getProfessionKeywords(selectedProfessions: string[]): string[] {
+  const keywords = new Set<string>();
+  selectedProfessions.forEach((selected) => {
+    (PROFESSION_CATEGORY_KEYWORDS[selected] || []).forEach((kw) => keywords.add(kw));
+  });
+  return Array.from(keywords);
+}
+
 /**
  * Check if a profile's profession matches any of the selected filter categories.
  */

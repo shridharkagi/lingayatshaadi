@@ -21,10 +21,11 @@ import type { Profile } from "@/types";
 import { useAuthModal } from "@/contexts/AuthModalContext";
 import { SiteFooter } from "@/components/SiteFooter";
 import { getProfileSlug } from "@/lib/memberId";
+import { WhatsAppGroupCta } from "@/components/whatsapp/WhatsAppGroupCta";
 
 // Indian traditional couple and matrimony images
 const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1587271407850-8d438ca9fdf2?w=1920&q=80&fit=crop";
+  "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?w=1920&q=80&fit=crop";
 const CEO_IMAGE =
   "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?w=600&q=80&fit=crop";
 const COUPLE_1 =
@@ -406,6 +407,12 @@ export default function LandingPage() {
         </div>
         <div className="absolute bottom-4 left-0 right-0 text-center text-white/80 text-xs sm:text-sm px-4">
           Built for Lingayat families • Verified profiles • Community-first matchmaking
+        </div>
+      </section>
+
+      <section className="px-4 py-5">
+        <div className="max-w-6xl mx-auto">
+          <WhatsAppGroupCta sourcePage="home" />
         </div>
       </section>
 
