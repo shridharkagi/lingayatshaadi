@@ -20,7 +20,7 @@ function ProfileCardComponent({ profile, displayName, variant = "card" }: Profil
   const name = displayName ?? profile.fullName;
 
   return (
-    <div className="bg-white rounded-lg overflow-hidden shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-card)] transition-shadow border border-[var(--color-border)]">
+    <div className="bg-white rounded-lg overflow-hidden shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-card)] transition-shadow border border-[var(--color-border)] h-full">
       {/* Mobile / List: horizontal layout - image left, details right */}
       <div className={`flex flex-row ${variant === "list" ? "" : "lg:hidden"}`}>
         <div className="relative w-28 min-w-[9rem] aspect-[3/4] bg-gray-200 flex-shrink-0 overflow-hidden">
@@ -74,13 +74,13 @@ function ProfileCardComponent({ profile, displayName, variant = "card" }: Profil
 
       {/* Desktop card: vertical - image top, details below */}
       <div className={variant === "list" ? "hidden" : "hidden lg:block"}>
-        <div className="relative aspect-[3/4] bg-gray-200">
+        <div className="relative aspect-[4/5] bg-gray-200">
           <Image
             src={profile.profilePhoto || "/placeholder.svg"}
             alt={`Profile photo of ${name || "member"}`}
             fill
             className="object-cover"
-            sizes="(max-width: 1024px) 50vw, 20vw"
+            sizes="(max-width: 1024px) 50vw, (max-width: 1280px) 25vw, 18vw"
             loading="lazy"
             unoptimized
           />
@@ -90,21 +90,21 @@ function ProfileCardComponent({ profile, displayName, variant = "card" }: Profil
             </div>
           )}
         </div>
-        <div className="p-4">
+        <div className="p-4 flex flex-col min-h-[168px]">
           <h3 className="font-semibold text-[var(--color-secondary-dark)] truncate">{name}</h3>
           <p className="text-sm text-[var(--color-text-muted)] mt-0.5">
             {getAge(profile.dateOfBirth)} yrs • {profile.height}"
           </p>
           {(profile.profession || profile.city) && (
-            <div className="mt-1 space-y-0.5">
+            <div className="mt-1 space-y-0.5 flex-1">
               {profile.profession && (
-                <p className="text-sm text-[var(--color-text-muted)] flex items-center gap-1">
+                <p className="text-sm text-[var(--color-text-muted)] flex items-center gap-1 truncate">
                   <Briefcase size={12} className="flex-shrink-0" />
                   {profile.profession}
                 </p>
               )}
               {profile.city && (
-                <p className="text-sm text-[var(--color-text-muted)] flex items-center gap-1">
+                <p className="text-sm text-[var(--color-text-muted)] flex items-center gap-1 truncate">
                   <MapPin size={12} className="flex-shrink-0" />
                   {profile.city}
                   {profile.state && `, ${profile.state}`}
@@ -114,7 +114,7 @@ function ProfileCardComponent({ profile, displayName, variant = "card" }: Profil
           )}
           <Link
             href={`/profile/${getProfileSlug(profile)}`}
-            className="mt-4 inline-flex w-fit py-2.5 px-4 rounded-md font-medium text-sm bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] transition-colors"
+            className="mt-3 inline-flex w-fit py-2 px-4 rounded-md font-medium text-sm bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] transition-colors"
           >
             View Profile
           </Link>

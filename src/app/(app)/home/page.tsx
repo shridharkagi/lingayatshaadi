@@ -117,7 +117,7 @@ export default function HomePage() {
               View all
             </Link>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
             {matches.map((profile) => (
               <ProfileCard key={profile.id} profile={profile} />
             ))}
