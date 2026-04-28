@@ -11,6 +11,32 @@ import { issueMagicLinkSession } from "@/lib/server/issueMagicLinkSession";
 
 export const runtime = "nodejs";
 
+function nowMs(): number {
+  return Date.now();
+}
+
+function maskPhone(phone: string): string {
+  const clean = String(phone || "").replace(/\D/g, "");
+  if (clean.length <= 4) return clean;
+  return `${clean.slice(0, 2)}******${clean.slice(-2)}`;
+}
+
+function logTiming(
+  reqId: string,
+  stage: string,
+  startedAt: number,
+  extra?: Record<string, string | number | boolean | null>
+): void {
+  const payload = {
+    req_id: reqId,
+    route: "phone/verify",
+    stage,
+    elapsed_ms: nowMs() - startedAt,
+    ...(extra || {}),
+  };
+  console.info("[auth-timing]", JSON.stringify(payload));
+}
+
 interface AccountMeta {
   first_name?: string;
   last_name?: string;
@@ -73,9 +99,12 @@ function resolveVerifyPurpose(rawPurpose: unknown, hasPassword: boolean): OtpPur
 }
 
 export async function POST(request: NextRequest) {
+  const reqId = Math.random().toString(36).slice(2, 10);
+  const routeStart = nowMs();
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   if (!supabaseUrl || !serviceKey) {
+    logTiming(reqId, "missing_supabase_config", routeStart);
     return NextResponse.json({ error: "Supabase is not configured" }, { status: 500 });
   }
 
@@ -83,22 +112,26 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
+    logTiming(reqId, "invalid_json", routeStart);
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
   const rawPassword = typeof body.password === "string" ? body.password : "";
   const hasPassword = rawPassword.length > 0;
   if (hasPassword && rawPassword.length < 8) {
+    logTiming(reqId, "invalid_password", routeStart);
     return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
   }
 
   const parsed = normalizeIndianPhone(body.phone ?? "");
   if (!parsed) {
+    logTiming(reqId, "invalid_phone", routeStart);
     return NextResponse.json({ error: "Invalid phone number" }, { status: 400 });
   }
 
   const otpRaw = (body.otp ?? "").replace(/\D/g, "");
   if (otpRaw.length !== 6) {
+    logTiming(reqId, "invalid_otp", routeStart, { phone: maskPhone(body.phone ?? "") });
     return NextResponse.json({ error: "Enter the 6-digit OTP" }, { status: 400 });
   }
 
@@ -106,7 +139,12 @@ export async function POST(request: NextRequest) {
   const channel = resolveOtpChannel();
 
   if (channel === "fast2sms") {
+    const otpVerifyStart = nowMs();
     const verifyErr = await verifyPhoneOtpChallenge(parsed.e164, otpRaw, supabaseUrl, serviceKey);
+    logTiming(reqId, "otp_challenge_verify", otpVerifyStart, {
+      purpose,
+      phone: maskPhone(parsed.e164),
+    });
     if (verifyErr) return NextResponse.json({ error: verifyErr }, { status: 400 });
   } else if (channel === "bypass") {
     // Accept any 6-digit code. No-op.
@@ -121,22 +159,35 @@ export async function POST(request: NextRequest) {
   // duplicate.
   let admin;
   try {
+    const adminCreateStart = nowMs();
     admin = createSupabaseAdmin();
+    logTiming(reqId, "admin_client_create", adminCreateStart);
   } catch (e) {
     console.error("[phone/verify] createSupabaseAdmin failed:", e);
+    logTiming(reqId, "response_error", routeStart, { status: 503 });
     return NextResponse.json({ error: "Auth service is temporarily unavailable" }, { status: 503 });
   }
 
   let existing;
   try {
+    const lookupStart = nowMs();
     existing = await findAuthUserByPhone(admin, parsed.e164, parsed.digits10);
+    logTiming(reqId, "find_auth_user_by_phone", lookupStart, {
+      purpose,
+      phone: maskPhone(parsed.e164),
+      found: !!existing,
+    });
   } catch (e) {
     console.error("[phone/verify] findAuthUserByPhone threw:", e);
+    logTiming(reqId, "find_auth_user_by_phone_error", routeStart, {
+      purpose,
+      phone: maskPhone(parsed.e164),
+    });
     existing = null;
   }
 
   if (purpose === "signup") {
-    return handleSignup({
+    const res = await handleSignup({
       supabaseUrl,
       serviceKey,
       parsed,
@@ -145,17 +196,23 @@ export async function POST(request: NextRequest) {
       meta: sanitizeMeta(body.meta),
       existing,
       admin,
+      reqId,
+      routeStart,
     });
+    return res;
   }
 
   // login / password_reset — never create a user.
-  return handleLoginOrReset({
+  const res = await handleLoginOrReset({
     supabaseUrl,
     serviceKey,
     parsed,
     existing,
     admin,
+    reqId,
+    routeStart,
   });
+  return res;
 }
 
 async function handleLoginOrReset({
@@ -164,14 +221,19 @@ async function handleLoginOrReset({
   parsed,
   existing,
   admin,
+  reqId,
+  routeStart,
 }: {
   supabaseUrl: string;
   serviceKey: string;
   parsed: { e164: string; digits10: string };
   existing: Awaited<ReturnType<typeof findAuthUserByPhone>>;
   admin: ReturnType<typeof createSupabaseAdmin>;
+  reqId: string;
+  routeStart: number;
 }) {
   if (!existing) {
+    logTiming(reqId, "response_error", routeStart, { status: 404, reason: "account_not_found" });
     return NextResponse.json(
       {
         error:
@@ -196,6 +258,7 @@ async function handleLoginOrReset({
         phone_e164: parsed.e164,
       }
     );
+    logTiming(reqId, "response_error", routeStart, { status: 500, reason: "missing_session_email" });
     return NextResponse.json(
       {
         error:
@@ -207,17 +270,25 @@ async function handleLoginOrReset({
     );
   }
 
+  const issueSessionStart = nowMs();
   const session = await issueMagicLinkSession(supabaseUrl, serviceKey, sessionEmail);
+  logTiming(reqId, "issue_session", issueSessionStart, {
+    phone: maskPhone(parsed.e164),
+  });
   if (!session.ok) {
+    logTiming(reqId, "response_error", routeStart, { status: session.status || 500 });
     return NextResponse.json({ error: session.error }, { status: session.status || 500 });
   }
 
   try {
+    const accountCodeStart = nowMs();
     await ensureAccountCodeForUser(admin, existing.id);
+    logTiming(reqId, "ensure_account_code", accountCodeStart);
   } catch (e) {
     console.warn("[phone/verify] ensureAccountCodeForUser failed:", e);
   }
 
+  logTiming(reqId, "response_ok", routeStart, { purpose: "login_or_reset" });
   return NextResponse.json({
     access_token: session.access_token,
     refresh_token: session.refresh_token,
@@ -236,6 +307,8 @@ async function handleSignup({
   meta,
   existing,
   admin,
+  reqId,
+  routeStart,
 }: {
   supabaseUrl: string;
   serviceKey: string;
@@ -245,8 +318,11 @@ async function handleSignup({
   meta: AccountMeta;
   existing: Awaited<ReturnType<typeof findAuthUserByPhone>>;
   admin: ReturnType<typeof createSupabaseAdmin>;
+  reqId: string;
+  routeStart: number;
 }) {
   if (existing) {
+    logTiming(reqId, "response_error", routeStart, { status: 409, reason: "account_exists" });
     return NextResponse.json(
       {
         error:
@@ -288,7 +364,12 @@ async function handleSignup({
   };
   if (Object.keys(userMetadata).length > 0) createPayload.user_metadata = userMetadata;
 
+  const createUserStart = nowMs();
   const createRes = await authServiceRolePost(supabaseUrl, serviceKey, "/auth/v1/admin/users", createPayload);
+  logTiming(reqId, "create_auth_user", createUserStart, {
+    phone: maskPhone(parsed.e164),
+    status: createRes.statusCode,
+  });
   let createdUserId: string | null = null;
   try {
     const createJson = JSON.parse(createRes.body) as { id?: string; user?: { id?: string } };
@@ -303,6 +384,7 @@ async function handleSignup({
       // findAuthUserByPhone missed it (e.g. listUsers fallback failed) but
       // Supabase saw a collision — surface the same friendly 409 instead of
       // silently signing into the existing account.
+      logTiming(reqId, "response_error", routeStart, { status: 409, reason: "duplicate_user" });
       return NextResponse.json(
         {
           error:
@@ -312,22 +394,31 @@ async function handleSignup({
       );
     }
     console.error("createUser:", createRes.statusCode, createRes.body);
+    logTiming(reqId, "response_error", routeStart, { status: 500, reason: "create_user_failed" });
     return NextResponse.json({ error: msg || "Could not create account" }, { status: 500 });
   }
 
+  const issueSessionStart = nowMs();
   const session = await issueMagicLinkSession(supabaseUrl, serviceKey, email);
+  logTiming(reqId, "issue_session", issueSessionStart, {
+    phone: maskPhone(parsed.e164),
+  });
   if (!session.ok) {
+    logTiming(reqId, "response_error", routeStart, { status: session.status || 500 });
     return NextResponse.json({ error: session.error }, { status: session.status || 500 });
   }
 
   if (createdUserId) {
     try {
+      const accountCodeStart = nowMs();
       await ensureAccountCodeForUser(admin, createdUserId);
+      logTiming(reqId, "ensure_account_code", accountCodeStart);
     } catch (e) {
       console.warn("[phone/verify] ensureAccountCodeForUser failed:", e);
     }
   }
 
+  logTiming(reqId, "response_ok", routeStart, { purpose: "signup" });
   return NextResponse.json({
     access_token: session.access_token,
     refresh_token: session.refresh_token,

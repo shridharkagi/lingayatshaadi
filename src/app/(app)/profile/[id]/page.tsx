@@ -1255,7 +1255,7 @@ export default function OtherProfilePage() {
         <ShareProfileButton profile={profile} />
       </header>
 
-      <div className="lg:grid lg:grid-cols-[minmax(340px,40%)_minmax(0,60%)] lg:gap-3 xl:gap-4 lg:items-start">
+      <div className="mt-2 lg:grid lg:grid-cols-[minmax(340px,40%)_minmax(0,60%)] lg:gap-3 xl:gap-4 lg:items-start">
       <div className="space-y-3 lg:sticky lg:top-[84px]">
       <div
         className="relative w-full isolate contain-layout overflow-hidden rounded-2xl"

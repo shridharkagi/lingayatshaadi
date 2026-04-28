@@ -88,7 +88,10 @@ interface TurnstileContextValue {
 
 const TurnstileContext = createContext<TurnstileContextValue | null>(null);
 
-const TOKEN_WAIT_MS = 12000;
+// Keep submit latency tight: wait briefly for widget bootstrap, then proceed.
+// (Challenge execution timeout remains higher below.)
+const WIDGET_READY_WAIT_MS = 3500;
+const CHALLENGE_WAIT_MS = 12000;
 // Cloudflare tokens are valid ~5 min. Keep our cache shorter so a primed
 // token never arrives at Supabase already-expired.
 const PRIMED_TOKEN_TTL_MS = 4 * 60 * 1000;
@@ -171,7 +174,7 @@ export function TurnstileProvider({ children }: { children: ReactNode }) {
       if (window.turnstile) {
         tryInitWidget();
         window.clearInterval(id);
-      } else if (Date.now() - start > TOKEN_WAIT_MS) {
+      } else if (Date.now() - start > WIDGET_READY_WAIT_MS) {
         window.clearInterval(id);
       }
     }, 200);
@@ -186,7 +189,7 @@ export function TurnstileProvider({ children }: { children: ReactNode }) {
     // Wait for the widget to mount in case getToken is called before the
     // script loaded (slow phone network, immediate form submit, etc.).
     const start = Date.now();
-    while (!widgetIdRef.current && Date.now() - start < TOKEN_WAIT_MS) {
+    while (!widgetIdRef.current && Date.now() - start < WIDGET_READY_WAIT_MS) {
       tryInitWidget();
       await new Promise((r) => setTimeout(r, 150));
     }
@@ -229,7 +232,7 @@ export function TurnstileProvider({ children }: { children: ReactNode }) {
 
       window.setTimeout(() => {
         finish(() => reject(new Error("turnstile timeout")));
-      }, TOKEN_WAIT_MS);
+      }, CHALLENGE_WAIT_MS);
     });
   }, [enabled, tryInitWidget]);
 

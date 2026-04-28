@@ -156,6 +156,45 @@ async function listUsersFromAuthTableFallback(admin: SupabaseClient): Promise<Au
   return users;
 }
 
+async function findUsersFromProfilesContact(
+  admin: SupabaseClient,
+  phoneVariants: string[]
+): Promise<AuthUserLite[]> {
+  const variants = phoneVariants.map((v) => String(v || "").trim()).filter(Boolean);
+  if (variants.length === 0) return [];
+
+  type ProfileLite = {
+    user_id?: string | null;
+    created_at?: string | null;
+    account_holder_name?: string | null;
+    contact?: string | null;
+  };
+
+  const { data, error } = await admin
+    .from("profiles")
+    .select("user_id, created_at, account_holder_name, contact")
+    .in("contact", variants)
+    .order("created_at", { ascending: true })
+    .limit(20);
+  if (error) throw new Error(error.message);
+
+  const rows = (data || []) as ProfileLite[];
+  const out: AuthUserLite[] = [];
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const id = String(row.user_id || "").trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push({
+      id,
+      phone: row.contact || null,
+      created_at: row.created_at || null,
+      user_metadata: row.account_holder_name ? { full_name: row.account_holder_name } : null,
+    });
+  }
+  return out;
+}
+
 /**
  * Locate the Supabase Auth user matching a phone number.
  *
@@ -189,7 +228,9 @@ export async function findAuthUserByPhone(
   digits10: string
 ): Promise<AuthUserLite | null> {
   const phoneStripped = phoneE164.startsWith("+") ? phoneE164.slice(1) : phoneE164;
+  const localPhone = `0${digits10}`;
   const emails = syntheticEmailCandidatesForPhone(digits10).map((e) => e.toLowerCase());
+  const phoneVariants = [phoneE164, phoneStripped, digits10, localPhone];
 
   const matches: AuthUserLite[] = [];
 
@@ -277,7 +318,24 @@ export async function findAuthUserByPhone(
     }
   }
 
-  // 3. listUsers paginated fallback.
+  // 3. Targeted profiles-contact lookup fallback (much faster than listUsers scan).
+  // This avoids a slow full auth-user pagination on projects where RPC and
+  // auth-schema access are unavailable.
+  if (matches.length === 0) {
+    try {
+      const fromProfiles = await findUsersFromProfilesContact(admin, phoneVariants);
+      if (fromProfiles.length > 0) {
+        matches.push(...fromProfiles);
+      }
+    } catch (e) {
+      console.warn(
+        "[findAuthUserByPhone] profiles contact lookup failed:",
+        e instanceof Error ? e.message : String(e)
+      );
+    }
+  }
+
+  // 4. listUsers paginated fallback.
   if (matches.length === 0) {
     try {
       const perPage = 200;

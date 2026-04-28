@@ -28,6 +28,33 @@ const NO_ACCOUNT_MESSAGE =
 const ACCOUNT_EXISTS_MESSAGE =
   "An account with this mobile number already exists. Please sign in instead.";
 
+function nowMs(): number {
+  return Date.now();
+}
+
+function maskPhone(phone: string): string {
+  const clean = String(phone || "").replace(/\D/g, "");
+  if (clean.length <= 4) return clean;
+  return `${clean.slice(0, 2)}******${clean.slice(-2)}`;
+}
+
+function logTiming(
+  reqId: string,
+  stage: string,
+  startedAt: number,
+  extra?: Record<string, string | number | boolean | null>
+): void {
+  const elapsedMs = nowMs() - startedAt;
+  const payload = {
+    req_id: reqId,
+    route: "phone/send",
+    stage,
+    elapsed_ms: elapsedMs,
+    ...(extra || {}),
+  };
+  console.info("[auth-timing]", JSON.stringify(payload));
+}
+
 /**
  * Enforce the right account-state for each OTP purpose so we never:
  *  - send an OTP to a non-existent number on login / password_reset, or
@@ -92,23 +119,29 @@ function explainSupabaseNetworkError(message: string): string | null {
 }
 
 export async function POST(request: NextRequest) {
+  const reqId = Math.random().toString(36).slice(2, 10);
+  const routeStart = nowMs();
   let body: { phone?: string; purpose?: unknown; turnstileToken?: unknown };
   try {
     body = await request.json();
   } catch {
+    logTiming(reqId, "invalid_json", routeStart);
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
   // Cloudflare Turnstile gate runs FIRST — before any phone parsing, account
   // lookup, or SMS spend. A bot probing this endpoint should never reach the
   // Supabase RPC or Fast2SMS request paths.
+  const captchaStart = nowMs();
   const captchaError = await requireTurnstileForRequest(request, body, {
     route: "phone/send",
   });
+  logTiming(reqId, "captcha_verify", captchaStart);
   if (captchaError) return captchaError;
 
   const parsed = normalizeIndianPhone(body.phone ?? "");
   if (!parsed) {
+    logTiming(reqId, "invalid_phone", routeStart);
     return NextResponse.json({ error: "Enter a valid 10-digit Indian mobile number" }, { status: 400 });
   }
 
@@ -120,19 +153,31 @@ export async function POST(request: NextRequest) {
   //   - login OTPs to be sent to phone numbers that have no account, and
   //   - signup flows to silently log into a freshly-created auth row when an
   //     account already existed under a legacy synthetic-email format.
+  const accountCheckStart = nowMs();
   const existenceError = await assertAccountExistenceForPurpose(parsed, purpose);
+  logTiming(reqId, "account_existence_check", accountCheckStart, {
+    purpose,
+    phone: maskPhone(parsed.e164),
+  });
   if (existenceError) {
+    logTiming(reqId, "response_error", routeStart, { status: existenceError.status });
     return NextResponse.json({ error: existenceError.error }, { status: existenceError.status });
   }
 
   if (channel === "bypass") {
+    logTiming(reqId, "response_ok_bypass", routeStart, {
+      purpose,
+      phone: maskPhone(parsed.e164),
+    });
     return NextResponse.json({ ok: true, channel: "bypass" });
   }
 
   if (channel === "fast2sms") {
-    return sendViaFast2Sms(parsed, purpose);
+    const res = await sendViaFast2Sms(parsed, purpose, reqId, routeStart);
+    return res;
   }
 
+  logTiming(reqId, "response_error", routeStart, { status: 500 });
   return NextResponse.json(
     {
       error:
@@ -144,7 +189,9 @@ export async function POST(request: NextRequest) {
 
 async function sendViaFast2Sms(
   parsed: { e164: string; digits10: string },
-  purpose: ReturnType<typeof normalizePurpose>
+  purpose: ReturnType<typeof normalizePurpose>,
+  reqId: string,
+  routeStart: number
 ) {
   const secret = process.env.PHONE_OTP_SECRET;
   if (!secret || secret.length < 16) {
@@ -186,6 +233,7 @@ async function sendViaFast2Sms(
   }
 
   // 30-second resend cooldown.
+  const readChallengeStart = nowMs();
   const { row: existing, error: existingErr } = await postgrestSelectMaybeOne(
     supabaseUrl,
     serviceKey,
@@ -194,6 +242,10 @@ async function sendViaFast2Sms(
     parsed.e164,
     "created_at"
   );
+  logTiming(reqId, "challenge_read", readChallengeStart, {
+    purpose,
+    phone: maskPhone(parsed.e164),
+  });
 
   if (existingErr) {
     const hint =
@@ -231,6 +283,7 @@ async function sendViaFast2Sms(
   const expiresAt = new Date(Date.now() + OTP_TTL_MS).toISOString();
   const createdAt = new Date().toISOString();
 
+  const upsertStart = nowMs();
   const { error: dbError } = await postgrestUpsert(
     supabaseUrl,
     serviceKey,
@@ -243,6 +296,10 @@ async function sendViaFast2Sms(
       created_at: createdAt,
     }
   );
+  logTiming(reqId, "challenge_upsert", upsertStart, {
+    purpose,
+    phone: maskPhone(parsed.e164),
+  });
 
   if (dbError) {
     console.error("phone_otp_challenges upsert:", dbError);
@@ -263,12 +320,19 @@ async function sendViaFast2Sms(
   }
 
   const messageText = fast2smsMessageFor(purpose, otp);
+  const smsStart = nowMs();
   const sendRes = await fast2smsSendDltOtp({
     apiKey,
     senderId,
     templateId,
     messageText,
     numbers: parsed.digits10,
+  });
+  logTiming(reqId, "sms_send", smsStart, {
+    purpose,
+    phone: maskPhone(parsed.e164),
+    sms_ok: sendRes.ok,
+    sms_http: sendRes.httpStatus ?? null,
   });
 
   // Always log the outcome so delivery issues are easy to investigate.
@@ -282,12 +346,21 @@ async function sendViaFast2Sms(
     );
     // Roll back so the next attempt is not rate-limited by our own cooldown.
     await postgrestDeleteEq(supabaseUrl, serviceKey, "phone_otp_challenges", "phone", parsed.e164);
+    logTiming(reqId, "response_error", routeStart, {
+      purpose,
+      phone: maskPhone(parsed.e164),
+      status: 502,
+    });
     return NextResponse.json(
       { error: sendRes.error || "SMS gateway returned an error. Try again later." },
       { status: 502 }
     );
   }
 
+  logTiming(reqId, "response_ok", routeStart, {
+    purpose,
+    phone: maskPhone(parsed.e164),
+  });
   return NextResponse.json({
     ok: true,
     channel: "fast2sms",
