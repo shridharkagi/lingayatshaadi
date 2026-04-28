@@ -1,9 +1,9 @@
 export function ProfileCardSkeleton({ variant = "card" }: { variant?: "card" | "list" }) {
   return (
-    <div className="bg-white rounded-[10px] overflow-hidden shadow-[var(--shadow-soft)] border border-[var(--color-border)] animate-pulse">
+    <div className="bg-white rounded-xl overflow-hidden shadow-[var(--shadow-soft)] border border-[var(--color-border)] animate-pulse">
       {/* Mobile / List: horizontal layout */}
       <div className={`flex flex-row ${variant === "list" ? "" : "lg:hidden"}`}>
-        <div className="relative w-28 min-w-[9rem] aspect-[3/4] bg-gray-200 flex-shrink-0" />
+        <div className="relative w-[35%] min-w-[35%] max-w-[180px] aspect-[3/4] bg-gray-200 flex-shrink-0" />
         <div className="flex-1 min-w-0 p-4 flex flex-col justify-between">
           <div>
             <div className="h-5 bg-gray-200 rounded w-3/4 mb-2" />

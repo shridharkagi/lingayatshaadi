@@ -2218,19 +2218,19 @@ export default function OtherProfilePage() {
                     </div>
                   ))}
                 </div>
-                <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg backdrop-blur-sm">
+                <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/25 backdrop-blur-[2px]">
                   {!isLoggedIn ? (
                     <button
                       type="button"
                       onClick={() => openAuthModal("login")}
-                      className="px-6 py-3 rounded-xl bg-[var(--primary)] text-white font-semibold hover:bg-[var(--primary-hover)] transition shadow-lg"
+                      className="px-6 py-3 rounded-xl border border-white/35 bg-white/20 text-white font-semibold backdrop-blur-md hover:bg-white/26 transition shadow-[0_10px_30px_rgba(0,0,0,0.28)]"
                     >
                       Login to View Photos
                     </button>
                   ) : (
                     <Link
                       href="/membership"
-                      className="px-6 py-3 rounded-xl bg-[var(--primary)] text-white font-semibold hover:bg-[var(--primary-hover)] transition shadow-lg"
+                      className="px-6 py-3 rounded-xl border border-white/35 bg-white/20 text-white font-semibold backdrop-blur-md hover:bg-white/26 transition shadow-[0_10px_30px_rgba(0,0,0,0.28)]"
                     >
                       Upgrade to View Photos
                     </Link>
