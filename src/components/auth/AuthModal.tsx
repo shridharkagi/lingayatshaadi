@@ -175,14 +175,13 @@ export function AuthModal({ open, initialMode, onClose }: AuthModalProps) {
     setError("");
     setInfo("");
     const id = loginPasswordId.trim();
-    if (!id) return setError("Enter mobile number or email");
-    if (!id.includes("@")) {
-      const d = id.replace(/\D/g, "");
-      if (d.length !== 10) return setError("Enter a valid 10-digit mobile or email");
-    }
+    if (!id) return setError("Enter mobile number");
+    if (id.includes("@")) return setError("Enter mobile number");
+    const d = id.replace(/\D/g, "");
+    if (d.length !== 10) return setError("Enter a valid 10-digit mobile number");
     if (!loginPassword) return setError("Enter your password");
     setLoading(true);
-    const identifier = id.includes("@") ? id : normalizePhone(id.replace(/\D/g, "").slice(-10));
+    const identifier = normalizePhone(id.replace(/\D/g, "").slice(-10));
     const result = await signInWithPassword(identifier, loginPassword);
     setLoading(false);
     if (result.error) {
@@ -447,12 +446,13 @@ export function AuthModal({ open, initialMode, onClose }: AuthModalProps) {
                     ) : (
                       <Input
                         compact
-                        label="Mobile number or email"
-                        type="text"
-                        autoComplete="username"
+                        label="Enter Mobile Number"
+                        type="tel"
+                        inputMode="numeric"
+                        autoComplete="tel-national"
                         value={loginPasswordId}
-                        onChange={(e) => setLoginPasswordId(e.target.value)}
-                        placeholder="10-digit mobile or your email"
+                        onChange={(e) => setLoginPasswordId(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                        placeholder="10-digit mobile number"
                       />
                     )}
 

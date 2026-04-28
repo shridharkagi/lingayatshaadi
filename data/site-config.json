@@ -1,5 +1,13 @@
 {
   "robotsTxt": "User-agent: *\nAllow: /",
   "seoDescription": "Premium matrimonial platform for the Lingayat community",
-  "seoKeywords": "Lingayat matrimony, Lingayat shaadi, Lingayat marriage"
+  "seoKeywords": "Lingayat matrimony, Lingayat shaadi, Lingayat marriage",
+  "whatsappGroupUrl": "https://chat.whatsapp.com/GhnPy1hb3YB1KmuNAmLAfO",
+  "whatsappContactNumber": "6360130905",
+  "callContactNumber": "6360130905",
+  "whatsappDefaultMessage": "I need assistance, my name: ",
+  "faviconUrl": "",
+  "externalScripts": "",
+  "bridesHeroImageUrl": "https://images.unsplash.com/photo-1519741497674-611481863552?w=1600&q=75&fit=crop",
+  "groomsHeroImageUrl": "https://images.unsplash.com/photo-1606800052052-a08af7148866?w=1600&q=70&fit=crop"
 }

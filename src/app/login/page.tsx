@@ -174,22 +174,24 @@ export default function LoginPage() {
     setError("");
     const id = passwordId.trim();
     if (!id) {
-      setError("Enter mobile number or email");
+      setError("Enter mobile number");
       return;
     }
-    if (!id.includes("@")) {
-      const d = id.replace(/\D/g, "");
-      if (d.length !== 10) {
-        setError("Enter a valid 10-digit mobile or email");
-        return;
-      }
+    if (id.includes("@")) {
+      setError("Enter mobile number");
+      return;
+    }
+    const d = id.replace(/\D/g, "");
+    if (d.length !== 10) {
+      setError("Enter a valid 10-digit mobile number");
+      return;
     }
     if (!password) {
       setError("Please enter your password");
       return;
     }
     setLoading(true);
-    const identifier = id.includes("@") ? id : `+91${id.replace(/\D/g, "").slice(-10)}`;
+    const identifier = `+91${id.replace(/\D/g, "").slice(-10)}`;
     const result = await signInWithPassword(identifier, password);
     setLoading(false);
 
@@ -553,12 +555,13 @@ export default function LoginPage() {
             ) : (
               <form onSubmit={handlePasswordSignIn} className="space-y-4" aria-label="Password sign in">
                 <Input
-                  label="Mobile number or email"
-                  type="text"
-                  placeholder="10-digit mobile or your email"
+                  label="Enter Mobile Number"
+                  type="tel"
+                  inputMode="numeric"
+                  placeholder="10-digit mobile number"
                   value={passwordId}
-                  onChange={(e) => setPasswordId(e.target.value)}
-                  autoComplete="username"
+                  onChange={(e) => setPasswordId(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  autoComplete="tel-national"
                 />
                 <Input
                   label="Password"

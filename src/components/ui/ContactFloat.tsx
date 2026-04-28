@@ -85,10 +85,10 @@ export function ContactFloat() {
         >
           <div
             data-contact-popup-content
-            className="w-full max-w-sm bg-white rounded-2xl shadow-xl overflow-hidden mb-[max(1rem,env(safe-area-inset-bottom,0px))] sm:mb-0"
+            className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden mb-[max(1rem,env(safe-area-inset-bottom,0px))] sm:mb-0"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between p-4 border-b border-[var(--color-border)]">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)]">
               <h2 id="contact-popup-title" className="text-lg font-semibold text-[var(--color-text-primary)]">
                 Contact Us
               </h2>
@@ -102,22 +102,26 @@ export function ContactFloat() {
                 <X size={20} />
               </button>
             </div>
-            <p className="px-4 pt-3 pb-1 text-sm text-[var(--color-text-muted)] leading-snug">
+            <p className="px-4 pt-2.5 pb-0.5 text-[13px] text-[var(--color-text-muted)] leading-snug">
               Need help with matches, memberships, or profile support? Contact our team now.
             </p>
-            <div className="p-4 pt-2 flex flex-col gap-3">
+            <div className="p-4 pt-2.5 flex flex-col gap-2.5">
               {hasCall && (
                 <Link
                   href={`tel:${config.callContactNumber}`}
                   onClick={() => setPopupOpen(false)}
-                  className="flex items-center gap-3 p-4 rounded-xl bg-[var(--color-bg)] hover:bg-[var(--color-border)]/50 transition-colors border border-[var(--color-border)]/50"
+                  className="flex items-center gap-3 p-3 rounded-xl bg-[var(--color-bg)] hover:bg-[var(--color-border)]/50 transition-colors border border-[var(--color-border)]/60"
                 >
-                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-[var(--primary)] text-white flex-shrink-0">
-                    <Phone size={22} />
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--primary)] text-white flex-shrink-0">
+                    <Phone size={19} />
                   </div>
                   <div className="flex-1 text-left">
-                    <span className="font-medium text-[var(--color-text-primary)]">Call Us</span>
-                    <p className="text-sm text-[var(--color-text-muted)] mt-0.5">{config.callContactNumber}</p>
+                    <span className="font-semibold text-[17px] leading-tight text-[var(--color-text-primary)]">
+                      Call Us
+                    </span>
+                    <p className="text-[13px] text-[var(--color-text-muted)] mt-0.5 leading-tight">
+                      {config.callContactNumber}
+                    </p>
                   </div>
                 </Link>
               )}
@@ -127,14 +131,18 @@ export function ContactFloat() {
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => setPopupOpen(false)}
-                  className="flex items-center gap-3 p-4 rounded-xl bg-[var(--color-bg)] hover:bg-[var(--color-border)]/50 transition-colors border border-[var(--color-border)]/50"
+                  className="flex items-center gap-3 p-3 rounded-xl bg-[var(--color-bg)] hover:bg-[var(--color-border)]/50 transition-colors border border-[var(--color-border)]/60"
                 >
-                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-[#25D366] text-white flex-shrink-0">
-                    <WhatsAppBrandIcon className="w-7 h-7" />
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[#25D366] text-white flex-shrink-0">
+                    <WhatsAppBrandIcon className="w-6 h-6" />
                   </div>
                   <div className="flex-1 text-left">
-                    <span className="font-medium text-[var(--color-text-primary)]">WhatsApp Us</span>
-                    <p className="text-sm text-[var(--color-text-muted)] mt-0.5">{config.whatsappContactNumber}</p>
+                    <span className="font-semibold text-[17px] leading-tight text-[var(--color-text-primary)]">
+                      WhatsApp Us
+                    </span>
+                    <p className="text-[13px] text-[var(--color-text-muted)] mt-0.5 leading-tight">
+                      {config.whatsappContactNumber}
+                    </p>
                   </div>
                 </Link>
               )}
@@ -144,14 +152,18 @@ export function ContactFloat() {
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => setPopupOpen(false)}
-                  className="flex items-center gap-3 p-4 rounded-xl bg-[var(--color-bg)] hover:bg-[var(--color-border)]/50 transition-colors border border-[var(--color-border)]/50"
+                  className="flex items-center gap-3 p-3 rounded-xl bg-[var(--color-bg)] hover:bg-[var(--color-border)]/50 transition-colors border border-[var(--color-border)]/60"
                 >
-                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-[#25D366] text-white flex-shrink-0">
-                    <Users2 size={22} />
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[#25D366] text-white flex-shrink-0">
+                    <Users2 size={19} />
                   </div>
                   <div className="flex-1 text-left">
-                    <span className="font-medium text-[var(--color-text-primary)]">Join WhatsApp Group</span>
-                    <p className="text-sm text-[var(--color-text-muted)] mt-0.5 truncate">Join our community (No spam)</p>
+                    <span className="font-semibold text-[17px] leading-tight text-[var(--color-text-primary)]">
+                      Join WhatsApp Group
+                    </span>
+                    <p className="text-[13px] text-[var(--color-text-muted)] mt-0.5 leading-tight truncate">
+                      Join our community (No spam)
+                    </p>
                   </div>
                 </Link>
               )}

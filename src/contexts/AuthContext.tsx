@@ -482,7 +482,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: "Supabase is not configured" };
     }
     const id = identifier.trim();
-    if (!id) return { error: "Enter mobile number or email" };
+    if (!id) return { error: "Enter mobile number" };
     if (id.includes("@")) {
       try {
         const cap = await acquireCaptchaToken();

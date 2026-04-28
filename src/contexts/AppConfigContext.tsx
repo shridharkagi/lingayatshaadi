@@ -87,6 +87,28 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/public-config", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((serverConfig: Partial<AppConfig> | null) => {
+        if (cancelled || !serverConfig) return;
+        setConfig((prev) => {
+          const next = { ...prev, ...serverConfig };
+          try {
+            localStorage.setItem(CONFIG_KEY, JSON.stringify(next));
+          } catch {
+            // ignore
+          }
+          return next;
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const updateConfig = (updates: Partial<AppConfig>) => {
     setConfig((prev) => {
       const next = { ...prev, ...updates };

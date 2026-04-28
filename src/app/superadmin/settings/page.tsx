@@ -18,6 +18,7 @@ export default function SuperAdminSettingsPage() {
   const [bridesHeroImageUrl, setBridesHeroImageUrl] = useState("");
   const [groomsHeroImageUrl, setGroomsHeroImageUrl] = useState("");
   const [savingSeo, setSavingSeo] = useState(false);
+  const [savingConfig, setSavingConfig] = useState(false);
 
   useEffect(() => {
     setWhatsappUrl(config.whatsappGroupUrl || "");
@@ -62,18 +63,35 @@ export default function SuperAdminSettingsPage() {
       .catch(() => {});
   }, []);
 
-  const handleSave = () => {
-    updateConfig({
-      whatsappGroupUrl: whatsappUrl,
-      whatsappContactNumber: whatsappContact,
-      callContactNumber: callContact,
-      whatsappDefaultMessage: whatsappMessage,
-      faviconUrl,
-      externalScripts,
-      bridesHeroImageUrl,
-      groomsHeroImageUrl,
-    });
-    alert("Settings saved!");
+  const handleSave = async () => {
+    setSavingConfig(true);
+    try {
+      const payload = {
+        whatsappGroupUrl: whatsappUrl,
+        whatsappContactNumber: whatsappContact,
+        callContactNumber: callContact,
+        whatsappDefaultMessage: whatsappMessage,
+        faviconUrl,
+        externalScripts,
+        bridesHeroImageUrl,
+        groomsHeroImageUrl,
+      };
+      const res = await adminFetch("/api/site-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        alert("Failed to save. Check server logs.");
+        return;
+      }
+      updateConfig(payload);
+      alert("Settings saved!");
+    } catch {
+      alert("Failed to save.");
+    } finally {
+      setSavingConfig(false);
+    }
   };
 
   const handleSaveSeo = async () => {
@@ -232,9 +250,10 @@ export default function SuperAdminSettingsPage() {
 
         <button
           onClick={handleSave}
-          className="px-6 py-2 bg-[var(--primary)] text-white rounded-lg hover:bg-[var(--primary-light)] transition"
+          disabled={savingConfig}
+          className="px-6 py-2 bg-[var(--primary)] text-white rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50"
         >
-          Save Contact & Favicon & Scripts
+          {savingConfig ? "Saving..." : "Save Contact & Favicon & Scripts"}
         </button>
       </div>
 
