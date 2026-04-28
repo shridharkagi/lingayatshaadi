@@ -26,8 +26,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             isDate ? "text-sm [color-scheme:light]" : ""
           } ${
             compact
-              ? "px-3 py-2 text-sm sm:px-4 sm:py-2.5 sm:text-base"
-              : "px-4 py-3"
+              ? "px-3 py-2 text-[16px] sm:px-4 sm:py-2.5 sm:text-base"
+              : "px-4 py-3 text-[16px] sm:text-base"
           } ${error ? "border-red-500" : ""} ${className}`}
           {...props}
         />
