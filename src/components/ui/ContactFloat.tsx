@@ -151,7 +151,7 @@ export function ContactFloat() {
                   </div>
                   <div className="flex-1 text-left">
                     <span className="font-medium text-[var(--color-text-primary)]">Join WhatsApp Group</span>
-                    <p className="text-sm text-[var(--color-text-muted)] mt-0.5 truncate">Join our community</p>
+                    <p className="text-sm text-[var(--color-text-muted)] mt-0.5 truncate">Join our community (No spam)</p>
                   </div>
                 </Link>
               )}

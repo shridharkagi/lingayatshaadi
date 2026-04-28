@@ -15,6 +15,13 @@ import { WhatsAppBrandIcon } from "@/components/icons/WhatsAppBrandIcon";
 
 const LOCAL_JOINED_KEY = "wa_group_joined_v1";
 
+function normalizeGroupUrl(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
 export function WhatsAppGroupCta({ sourcePage }: { sourcePage: WhatsAppLeadSourcePage }) {
   const { isLoggedIn, accountMeta, user } = useAuth();
   const { config } = useAppConfig();
@@ -108,9 +115,13 @@ export function WhatsAppGroupCta({ sourcePage }: { sourcePage: WhatsAppLeadSourc
       setModalOpen(false);
       void trackWhatsAppLeadEvent(sourcePage, "submit_success");
 
-      if (config.whatsappGroupUrl?.trim()) {
-        window.open(config.whatsappGroupUrl, "_blank", "noopener,noreferrer");
+      const groupUrl = normalizeGroupUrl(config.whatsappGroupUrl || "");
+      if (!groupUrl) {
+        setError("WhatsApp group link is not configured. Please contact support.");
+        return;
       }
+      // Use same-tab navigation after successful submit to avoid popup blockers.
+      window.location.assign(groupUrl);
     } finally {
       setSubmitting(false);
     }
