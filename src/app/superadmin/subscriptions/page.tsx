@@ -678,8 +678,7 @@ export default function SuperAdminSubscriptionsPage() {
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b text-left text-gray-500">
-                <th className="py-2 pr-3">Account ID</th>
-                <th className="py-2 pr-3">Member</th>
+                <th className="py-2 pr-3">Account</th>
                 <th className="py-2 pr-3">Current plan</th>
                 <th className="py-2 pr-3">Expires</th>
                 <th className="py-2 pr-3">Previous plans</th>
@@ -691,15 +690,17 @@ export default function SuperAdminSubscriptionsPage() {
             <tbody>
               {filteredMemberSummaries.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-4 text-gray-500">
+                  <td colSpan={7} className="py-4 text-gray-500">
                     No subscribed member summary available yet.
                   </td>
                 </tr>
               ) : (
                 filteredMemberSummaries.map((m) => (
                   <tr key={m.ownerAuthUserId} className="border-b border-gray-100">
-                    <td className="py-2 pr-3 font-medium text-gray-900">{m.ownerAccountCode || "—"}</td>
-                    <td className="py-2 pr-3 font-medium text-gray-900">{m.ownerLabel}</td>
+                    <td className="py-2 pr-3">
+                      <div className="font-medium text-gray-900">{m.ownerAccountCode || "—"}</div>
+                      <div className="text-[11px] text-gray-500">{m.ownerLabel}</div>
+                    </td>
                     <td className="py-2 pr-3">{m.activePlanName}</td>
                     <td className="py-2 pr-3 whitespace-nowrap">{fmtIn(m.activePlanEndsAt)}</td>
                     <td className="py-2 pr-3">{m.previousPlansCount}</td>

@@ -218,10 +218,10 @@ export async function updateProfileById(
     // Decide whether this edit counts as "content change" (= requires
     // re-approval) or is a pure admin field update (= leave status alone).
     //
-    // If the caller has explicitly set `moderation_status` (e.g. the
-    // autosave flow saving as 'draft'), that value is respected as-is —
-    // we never override an explicit intent. Pure admin-field updates
-    // (verification toggles etc.) also skip the flip.
+    // `moderation_status` can leak into payloads when callers pass a
+    // hydrated profile object (`approved`/`rejected` from DB). For owner
+    // edits we still must re-enter moderation; only explicit draft/pending
+    // intents should be treated as authoritative.
     const touchesOwnerFields = Object.keys(row).some(
       (k) => !ADMIN_ONLY_ROW_KEYS.has(k)
     );
@@ -230,13 +230,16 @@ export async function updateProfileById(
     //   - explicit "draft" (autosave) → respect, no pending flip
     //   - explicit "pending_review" (submit-from-draft) → treat as submission:
     //     stamp last_submitted_at, clear rejection_reason, drop draft step
+    //   - explicit "approved"/"rejected" + owner field changed → treat like
+    //     normal owner edit and auto-flip to pending_review
     //   - no explicit status + owner field changed → auto-flip to
     //     pending_review (normal edit-after-approval)
     //   - options.skipModeration (admin tools) → never change status
+    const explicitOwnerDraft = explicitStatus === "draft";
+    const explicitOwnerSubmission = explicitStatus === "pending_review";
     const isSubmission =
       !options.skipModeration &&
-      (explicitStatus === "pending_review" ||
-        (explicitStatus == null && touchesOwnerFields));
+      (explicitOwnerSubmission || (!explicitOwnerDraft && touchesOwnerFields));
 
     // Draft-created profiles may not have a public_id yet. When they are
     // first submitted, assign one so all UI links can use canonical lb/lg slugs.

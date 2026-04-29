@@ -3,6 +3,7 @@ import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
 import { generatePublicIdFromExistingIds } from "@/lib/memberId";
 import { listAllAuthUsers } from "@/lib/server/authUsers";
+import { resolveAccountCodeMap } from "@/lib/server/accountCodes";
 
 type ReviewTab =
   | "published"
@@ -176,11 +177,18 @@ export async function GET(req: NextRequest) {
 
   const ownerNameByUserId = new Map<string, string>();
   const ownerPhoneByUserId = new Map<string, string>();
+  const ownerCodeByUserId = new Map<string, string>();
   if (ownerUserIds.length > 0) {
     try {
       const authUsers = await listAllAuthUsers(admin);
+      const codeMap = await resolveAccountCodeMap(
+        admin,
+        authUsers.map((u) => ({ id: u.id, created_at: u.created_at }))
+      );
       for (const u of authUsers) {
         if (!ownerUserIds.includes(u.id)) continue;
+        const code = String(codeMap.get(u.id) || "").trim();
+        if (code) ownerCodeByUserId.set(u.id, code);
         const fullName = String((u.user_metadata?.full_name as string) || "").trim();
         if (fullName) ownerNameByUserId.set(u.id, fullName);
         const phone = String(u.phone || "").trim();
@@ -258,6 +266,7 @@ export async function GET(req: NextRequest) {
     };
     return {
       ...r,
+      account_owner_code: ownerCodeByUserId.get(ownerUserId) || "",
       account_owner_name:
         ownerNameByUserId.get(ownerUserId) ||
         String(r.account_holder_name || r.full_name || "-"),

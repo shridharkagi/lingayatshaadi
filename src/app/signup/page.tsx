@@ -60,11 +60,11 @@ export default function SignupPage() {
   const phoneE164 = () => `+91${form.mobile.replace(/\D/g, "")}`;
 
   const redirectAfterSignup = () => {
-    router.replace("/account");
+    router.replace("/account?createProfile=1");
     // Fallback for dev-mode HMR compile stalls during navigation.
     window.setTimeout(() => {
       if (window.location.pathname === "/signup") {
-        window.location.assign("/account");
+        window.location.assign("/account?createProfile=1");
       }
     }, 1200);
   };

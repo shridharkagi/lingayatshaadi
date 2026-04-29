@@ -39,10 +39,13 @@ import { Profile, ProfileContact } from "@/types";
 import {
   PROFESSION_TYPES,
   FOOD_HABITS_OPTIONS,
+  EDUCATION_SUGGESTIONS,
+  INDIAN_STATES,
 } from "@/data/constants";
+import { getIndiaDistrictsForState } from "@/data/indiaDistricts";
 import { SubCasteSelector } from "@/components/ui/SubCasteSelector";
-import { StateSelect } from "@/components/ui/StateSelect";
 import { ContactsEditor } from "@/components/ui/ContactsEditor";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { PartnerPreferencesForm } from "@/components/PartnerPreferencesForm";
 import {
   DualRangeSlider,
@@ -106,16 +109,63 @@ function SaveIndicator({
 }
 
 const steps: StepDef[] = [
-  { id: 1, title: "About", subtitle: "A short intro & interests", icon: UserIcon },
-  { id: 2, title: "Profile Details", subtitle: "Personal & cultural info", icon: IdCard },
-  { id: 3, title: "Horoscope", subtitle: "Birth chart details", icon: Sparkles },
-  { id: 4, title: "Education & Career", subtitle: "Studies and work", icon: GraduationCap },
-  { id: 5, title: "Family", subtitle: "Family background & contact", icon: Users },
-  { id: 6, title: "Partner Preferences", subtitle: "What you're looking for", icon: HeartHandshake },
-  { id: 7, title: "Photos", subtitle: "Add up to 5 photos", icon: Camera },
+  { id: 1, title: "Profile Details", subtitle: "Personal & cultural info", icon: IdCard },
+  { id: 2, title: "Horoscope", subtitle: "Birth chart details", icon: Sparkles },
+  { id: 3, title: "Education & Career", subtitle: "Studies and work", icon: GraduationCap },
+  { id: 4, title: "Family", subtitle: "Family background & contact", icon: Users },
+  { id: 5, title: "Partner Preferences", subtitle: "What you're looking for", icon: HeartHandshake },
+  { id: 6, title: "Photos", subtitle: "Add up to 5 photos", icon: Camera },
 ];
 
 type Relationship = NonNullable<Profile["relationship"]>;
+const LANGUAGE_OPTIONS = [
+  "Kannada",
+  "Hindi",
+  "Tamil",
+  "Telugu",
+  "English",
+  "Marathi",
+  "Tulu",
+  "Other",
+] as const;
+const LANGUAGE_SUGGESTIONS = [
+  "Kannada",
+  "English",
+  "Hindi",
+  "Marathi",
+  "Tamil",
+  "Telugu",
+  "Tulu",
+];
+const RASHI_ZODIAC_OPTIONS = [
+  "Mesha / Aries",
+  "Vrishabha / Taurus",
+  "Mithuna / Gemini",
+  "Karka / Cancer",
+  "Simha / Leo",
+  "Kanya / Virgo",
+  "Tula / Libra",
+  "Vrischika / Scorpio",
+  "Dhanu / Sagittarius",
+  "Makara / Capricorn",
+  "Kumbha / Aquarius",
+  "Meena / Pisces",
+] as const;
+const COUNTRY_SUGGESTIONS = [
+  "India",
+  "United States",
+  "United Kingdom",
+  "Canada",
+  "Australia",
+  "New Zealand",
+  "Singapore",
+  "United Arab Emirates",
+  "Saudi Arabia",
+  "Qatar",
+  "Kuwait",
+  "Oman",
+];
+
 const VALID_RELATIONSHIPS: Relationship[] = [
   "self",
   "son",
@@ -134,7 +184,7 @@ const initialProfile: Partial<Profile> = {
   subCaste: "",
   height: "",
   languagesKnown: "",
-  motherTongue: "",
+  motherTongue: "Kannada",
   dateOfBirth: "",
   timeOfBirth: "",
   placeOfBirth: "",
@@ -471,6 +521,9 @@ function ProfileCompleteInner() {
   // debounce fires again, we queue the second one instead of racing two
   // INSERTs that would both create a draft row.
   const savingRef = useRef(false);
+  const normalizedCountry = (profile.country || "").trim().toLowerCase();
+  const isIndiaSelected = normalizedCountry === "" || normalizedCountry === "india";
+  const districtOptions = isIndiaSelected ? getIndiaDistrictsForState(profile.state || "") : [];
 
   const { title, subtitle, badgeLabel } = useMemo(() => {
     // While hydrating we haven't yet discovered whether the URL profile
@@ -510,6 +563,12 @@ function ProfileCompleteInner() {
       router.replace("/login");
     }
   }, [authLoading, isLoggedIn, router]);
+
+  useEffect(() => {
+    if (!isIndiaSelected) return;
+    if (profile.state && profile.state.trim()) return;
+    update("state", "Karnataka");
+  }, [isIndiaSelected, profile.state]);
 
   useEffect(() => {
     let cancelled = false;
@@ -749,7 +808,7 @@ function ProfileCompleteInner() {
 
     if (!fullName || !dateOfBirth || !gender) {
       setError("Full Name, Date of Birth, and Gender are required.");
-      setStep(2);
+      setStep(1);
       return;
     }
 
@@ -897,6 +956,7 @@ function ProfileCompleteInner() {
                 style={{ width: `${progressPct}%` }}
               />
             </div>
+            <p className="mt-1 text-xs text-gray-500 text-right">{Math.round(progressPct)}% complete</p>
           </div>
 
           {/* Full stepper (desktop / tablet) — compact, no wrapping */}
@@ -952,6 +1012,7 @@ function ProfileCompleteInner() {
                 {currentStep.title}
               </p>
               <p className="text-xs text-gray-500">{currentStep.subtitle}</p>
+              <p className="text-xs text-gray-500 mt-1">{Math.round(progressPct)}% complete</p>
             </div>
           </div>
         </div>
@@ -959,67 +1020,6 @@ function ProfileCompleteInner() {
         {/* Step body */}
         <div className="space-y-5">
           {step === 1 && (
-            <SectionCard
-              icon={UserIcon}
-              title="Tell us about yourself"
-              description="A great intro helps you stand out"
-            >
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">About Me</label>
-                <textarea
-                  className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/30 focus:border-[var(--primary)] transition-all min-h-[140px] resize-y"
-                  placeholder="Share your personality, values, and what you're looking for..."
-                  value={profile.aboutMe || ""}
-                  onChange={(e) => update("aboutMe", e.target.value)}
-                  maxLength={1000}
-                />
-                <div className="flex justify-between mt-1">
-                  <span className="text-xs text-gray-400">Tip: Keep it warm and authentic</span>
-                  <span className="text-xs text-gray-400">{(profile.aboutMe || "").length}/1000</span>
-                </div>
-              </div>
-              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-[var(--primary)]/5 to-transparent rounded-xl border border-[var(--border)]">
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center text-[var(--primary)] shrink-0">
-                    {profile.aboutMeVisible ? <Eye size={18} /> : <EyeOff size={18} />}
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm text-gray-900">Show &ldquo;About Me&rdquo; to others</p>
-                    <p className="text-xs text-gray-500">Toggle visibility on your public profile</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={!!profile.aboutMeVisible}
-                  onClick={() => update("aboutMeVisible", !profile.aboutMeVisible)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    profile.aboutMeVisible ? "bg-[var(--primary)]" : "bg-gray-300"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-                      profile.aboutMeVisible ? "translate-x-5" : "translate-x-0.5"
-                    }`}
-                  />
-                </button>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Star size={14} className="text-gray-400" />
-                    Hobbies and Interests
-                  </span>
-                </label>
-                <HobbiesSelector
-                  value={profile.hobbies || []}
-                  onChange={(hobbies) => update("hobbies", hobbies)}
-                />
-              </div>
-            </SectionCard>
-          )}
-
-          {step === 2 && (
             <SectionCard
               icon={IdCard}
               title="Profile Details"
@@ -1105,28 +1105,78 @@ function ProfileCompleteInner() {
                   />
                 </IconField>
                 <IconField icon={Languages} label="Mother Tongue">
-                  <input
-                    placeholder="e.g. Kannada"
-                    value={profile.motherTongue || ""}
-                    onChange={(e) => update("motherTongue", e.target.value)}
+                  <select
+                    value={
+                      LANGUAGE_OPTIONS.includes((profile.motherTongue || "") as (typeof LANGUAGE_OPTIONS)[number])
+                        ? (profile.motherTongue as string)
+                        : "Other"
+                    }
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      if (next === "Other") {
+                        update("motherTongue", "");
+                        return;
+                      }
+                      update("motherTongue", next);
+                    }}
                     className={selectClass}
-                  />
+                  >
+                    {LANGUAGE_OPTIONS.map((lang) => (
+                      <option key={lang} value={lang}>
+                        {lang}
+                      </option>
+                    ))}
+                  </select>
                 </IconField>
+                {(!profile.motherTongue ||
+                  !LANGUAGE_OPTIONS.includes(
+                    (profile.motherTongue || "") as (typeof LANGUAGE_OPTIONS)[number]
+                  )) && (
+                  <IconField icon={Languages} label="Other Language">
+                    <input
+                      placeholder="Enter your language"
+                      value={profile.motherTongue || ""}
+                      onChange={(e) => update("motherTongue", e.target.value)}
+                      className={selectClass}
+                    />
+                  </IconField>
+                )}
                 <div className="sm:col-span-2">
                   <IconField icon={Languages} label="Languages Known">
                     <input
-                      placeholder="e.g. Kannada, Hindi, English"
+                      list="languages-known-list"
+                      placeholder="Type and separate by commas"
                       value={profile.languagesKnown || ""}
                       onChange={(e) => update("languagesKnown", e.target.value)}
                       className={selectClass}
                     />
+                    <datalist id="languages-known-list">
+                      {LANGUAGE_SUGGESTIONS.map((lang) => (
+                        <option key={lang} value={lang} />
+                      ))}
+                    </datalist>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Suggestions appear while typing. Add multiple languages separated by commas.
+                    </p>
                   </IconField>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Star size={14} className="text-gray-400" />
+                      Hobbies and Interests
+                    </span>
+                  </label>
+                  <HobbiesSelector
+                    value={profile.hobbies || []}
+                    onChange={(hobbies) => update("hobbies", hobbies)}
+                  />
                 </div>
               </div>
             </SectionCard>
           )}
 
-          {step === 3 && (
+          {step === 2 && (
             <SectionCard
               icon={Sparkles}
               title="Horoscope"
@@ -1147,12 +1197,20 @@ function ProfileCompleteInner() {
                     className={selectClass}
                   />
                 </IconField>
-                <Input
-                  label="Rashi"
-                  placeholder="e.g. Mesha"
-                  value={profile.rashi || ""}
-                  onChange={(e) => update("rashi", e.target.value)}
-                />
+                <IconField icon={Star} label="Rashi / Zodiac">
+                  <select
+                    value={profile.rashi || ""}
+                    onChange={(e) => update("rashi", e.target.value)}
+                    className={selectClass}
+                  >
+                    <option value="">Select rashi</option>
+                    {RASHI_ZODIAC_OPTIONS.map((rashi) => (
+                      <option key={rashi} value={rashi}>
+                        {rashi}
+                      </option>
+                    ))}
+                  </select>
+                </IconField>
                 <Input
                   label="Nakshatra"
                   placeholder="e.g. Bharani"
@@ -1174,7 +1232,7 @@ function ProfileCompleteInner() {
             </SectionCard>
           )}
 
-          {step === 4 && (
+          {step === 3 && (
             <SectionCard
               icon={GraduationCap}
               title="Education & Career"
@@ -1182,11 +1240,11 @@ function ProfileCompleteInner() {
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <IconField icon={GraduationCap} label="Qualification">
-                  <input
-                    placeholder="e.g. B.Tech, M.Sc"
+                  <SearchableSelect
                     value={profile.qualification || ""}
-                    onChange={(e) => update("qualification", e.target.value)}
-                    className={selectClass}
+                    onChange={(v) => update("qualification", v)}
+                    options={EDUCATION_SUGGESTIONS}
+                    placeholder="Type qualification"
                   />
                 </IconField>
                 <IconField icon={Briefcase} label="Profession Type">
@@ -1247,7 +1305,7 @@ function ProfileCompleteInner() {
             </SectionCard>
           )}
 
-          {step === 5 && (
+          {step === 4 && (
             <>
               <SectionCard icon={Users} title="Family" description="Parents and siblings">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1280,12 +1338,17 @@ function ProfileCompleteInner() {
                       />
                     </IconField>
                   </div>
-                  <Input
-                    label="Sibling Details"
-                    placeholder="e.g. 1 elder brother (married)"
-                    value={profile.siblingDetails || ""}
-                    onChange={(e) => update("siblingDetails", e.target.value)}
-                  />
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Sibling Details
+                    </label>
+                    <textarea
+                      className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/30 focus:border-[var(--primary)] transition-all min-h-[96px] resize-y"
+                      placeholder="e.g. 1 elder brother (married)"
+                      value={profile.siblingDetails || ""}
+                      onChange={(e) => update("siblingDetails", e.target.value)}
+                    />
+                  </div>
                 </div>
               </SectionCard>
 
@@ -1298,26 +1361,43 @@ function ProfileCompleteInner() {
                       onChange={(e) => update("address", e.target.value)}
                     />
                   </div>
+                  <IconField icon={MapPin} label="Country">
+                    <SearchableSelect
+                      value={profile.country || ""}
+                      onChange={(v) => update("country", v)}
+                      options={COUNTRY_SUGGESTIONS}
+                      placeholder="Type country name"
+                    />
+                  </IconField>
+                  <IconField icon={MapPin} label="State">
+                    <SearchableSelect
+                      value={profile.state || ""}
+                      onChange={(v) => update("state", v)}
+                      options={isIndiaSelected ? INDIAN_STATES : []}
+                      placeholder={isIndiaSelected ? "Start typing your state..." : "Enter state / province"}
+                      emptyMessage={isIndiaSelected ? "No matching state found" : ""}
+                    />
+                  </IconField>
+                  <IconField icon={MapPin} label="District">
+                    <SearchableSelect
+                      value={profile.district || ""}
+                      onChange={(v) => update("district", v)}
+                      options={isIndiaSelected ? districtOptions : []}
+                      placeholder={
+                        isIndiaSelected ? "Start typing your district..." : "Enter district / county / region"
+                      }
+                      emptyMessage={isIndiaSelected ? "No matching district found" : ""}
+                    />
+                    {isIndiaSelected && !districtOptions.length && (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Select a valid Indian state to get district suggestions.
+                      </p>
+                    )}
+                  </IconField>
                   <Input
                     label="City"
                     value={profile.city || ""}
                     onChange={(e) => update("city", e.target.value)}
-                  />
-                  <Input
-                    label="District"
-                    value={profile.district || ""}
-                    onChange={(e) => update("district", e.target.value)}
-                  />
-                  <IconField icon={MapPin} label="State">
-                    <StateSelect
-                      value={profile.state || ""}
-                      onChange={(v) => update("state", v)}
-                    />
-                  </IconField>
-                  <Input
-                    label="Country"
-                    value={profile.country || ""}
-                    onChange={(e) => update("country", e.target.value)}
                   />
                 </div>
               </SectionCard>
@@ -1342,7 +1422,7 @@ function ProfileCompleteInner() {
             </>
           )}
 
-          {step === 6 && (
+          {step === 5 && (
             <PartnerPreferencesForm
               value={profile.partnerPreference}
               onChange={(next) =>
@@ -1351,7 +1431,7 @@ function ProfileCompleteInner() {
             />
           )}
 
-          {step === 7 && (
+          {step === 6 && (
             <SectionCard
               icon={Camera}
               title="Profile Photos"

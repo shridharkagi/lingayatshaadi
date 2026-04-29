@@ -188,12 +188,19 @@ export async function deleteDraft(
 ): Promise<{ error: string | null }> {
   try {
     const supabase = createSupabaseClient();
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
       .delete()
       .eq("id", draftId)
-      .eq("moderation_status", DRAFT_STATUS);
-    return { error: error?.message ?? null };
+      .eq("moderation_status", DRAFT_STATUS)
+      .select("id");
+    if (error) return { error: error.message };
+    if (!data || data.length === 0) {
+      return {
+        error: "Draft could not be deleted. It may have already been submitted or removed.",
+      };
+    }
+    return { error: null };
   } catch (err) {
     return {
       error: err instanceof Error ? err.message : "Failed to delete draft",

@@ -7,6 +7,7 @@ import { ProfileTransferModal } from "@/components/admin/ProfileTransferModal";
 
 type Tab = "published" | "pending" | "draft" | "rejected" | "suspended" | "trash" | "plan_over";
 type DateFilter = "all" | "today" | "last7" | "last30" | "this_month";
+type BulkAction = "suspend" | "unsuspend" | "restore" | "purge" | "to_draft" | "trash";
 
 function toProfileSlug(publicId: string, fullName: string, fallbackId: string) {
   const base = (publicId || fallbackId || "").toLowerCase();
@@ -76,24 +77,114 @@ export default function SuperAdminReviewCenterPage() {
     setSelected(new Set(selectableIds));
   };
 
-  const runBulk = async (action: "suspend" | "unsuspend" | "restore" | "purge") => {
+  const runBulk = async (action: BulkAction) => {
     if (selected.size === 0) return;
     setBusy(true);
     setError(null);
     setSuccess(null);
     let ok = 0;
     let fail = 0;
+    const needsTrashReason = action === "trash";
+    const reason = needsTrashReason
+      ? window.prompt("Trash reason for selected profiles (required):", "No longer active")
+      : null;
+    if (needsTrashReason && (!reason || !reason.trim())) {
+      setBusy(false);
+      return;
+    }
+    const note = needsTrashReason
+      ? window.prompt("Optional trash note for selected profiles:", "") || ""
+      : "";
     for (const profileId of selected) {
       const res = await adminFetch("/api/superadmin/lifecycle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profileId, action }),
+        body: JSON.stringify({
+          profileId,
+          action,
+          ...(needsTrashReason
+            ? { reason: reason?.trim(), note: note.trim() || null }
+            : {}),
+        }),
       });
       if (res.ok) ok += 1;
       else fail += 1;
     }
     setBusy(false);
     setSuccess(`${ok} updated${fail ? `, ${fail} failed` : ""}.`);
+    await load(tab);
+  };
+
+  const runBulkReject = async () => {
+    if (selected.size === 0) return;
+    const reason = window.prompt("Reason for rejection (required):", "Needs correction");
+    if (!reason || !reason.trim()) return;
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+    let ok = 0;
+    let fail = 0;
+    for (const profileId of selected) {
+      const res = await adminFetch("/api/superadmin/moderation/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileId, action: "reject", reason: reason.trim() }),
+      });
+      if (res.ok) ok += 1;
+      else fail += 1;
+    }
+    setBusy(false);
+    setSuccess(`${ok} rejected${fail ? `, ${fail} failed` : ""}.`);
+    await load(tab);
+  };
+
+  const runBulkApprove = async () => {
+    if (selected.size === 0) return;
+    if (!window.confirm("Approve selected profiles and publish their current data?")) return;
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+    let ok = 0;
+    let fail = 0;
+    for (const profileId of selected) {
+      const res = await adminFetch("/api/superadmin/moderation/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileId, action: "approve" }),
+      });
+      if (res.ok) ok += 1;
+      else fail += 1;
+    }
+    setBusy(false);
+    setSuccess(`${ok} approved${fail ? `, ${fail} failed` : ""}.`);
+    await load(tab);
+  };
+
+  const runBulkTransfer = async () => {
+    if (selected.size === 0) return;
+    const target = window.prompt("Transfer selected profiles to account ID / user ID:", "");
+    if (!target || !target.trim()) return;
+    const note = window.prompt("Transfer note (optional):", "Bulk transfer from review center") || "";
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+    let ok = 0;
+    let fail = 0;
+    for (const profileId of selected) {
+      const res = await adminFetch("/api/superadmin/profiles/transfer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profileId,
+          target: target.trim(),
+          note: note.trim() || "Bulk transfer from review center",
+        }),
+      });
+      if (res.ok) ok += 1;
+      else fail += 1;
+    }
+    setBusy(false);
+    setSuccess(`${ok} transferred${fail ? `, ${fail} failed` : ""}.`);
     await load(tab);
   };
 
@@ -229,13 +320,58 @@ export default function SuperAdminReviewCenterPage() {
         >
           {allSelected ? "Unselect all" : "Select all"}
         </button>
-        {(tab === "published" || tab === "pending" || tab === "draft" || tab === "rejected") && (
+        {(tab === "pending" || tab === "draft" || tab === "rejected") && (
+          <button
+            onClick={runBulkApprove}
+            disabled={busy || selected.size === 0}
+            className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 disabled:opacity-50"
+          >
+            Bulk Approve
+          </button>
+        )}
+        {(tab === "published" || tab === "pending" || tab === "draft" || tab === "rejected" || tab === "plan_over") && (
           <button
             onClick={() => runBulk("suspend")}
             disabled={busy || selected.size === 0}
             className="rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 disabled:opacity-50"
           >
             Bulk Suspend
+          </button>
+        )}
+        {(tab === "published" || tab === "pending" || tab === "rejected" || tab === "suspended" || tab === "plan_over") && (
+          <button
+            onClick={() => runBulk("to_draft")}
+            disabled={busy || selected.size === 0}
+            className="rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 disabled:opacity-50"
+          >
+            Bulk Draft
+          </button>
+        )}
+        {(tab === "published" || tab === "pending" || tab === "draft" || tab === "suspended" || tab === "plan_over") && (
+          <button
+            onClick={runBulkReject}
+            disabled={busy || selected.size === 0}
+            className="rounded-md border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 disabled:opacity-50"
+          >
+            Bulk Reject
+          </button>
+        )}
+        {(tab === "published" || tab === "pending" || tab === "draft" || tab === "rejected" || tab === "suspended" || tab === "plan_over") && (
+          <button
+            onClick={() => runBulk("trash")}
+            disabled={busy || selected.size === 0}
+            className="rounded-md border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 disabled:opacity-50"
+          >
+            Bulk Trash
+          </button>
+        )}
+        {(tab === "published" || tab === "pending" || tab === "draft" || tab === "rejected" || tab === "suspended" || tab === "plan_over") && (
+          <button
+            onClick={runBulkTransfer}
+            disabled={busy || selected.size === 0}
+            className="rounded-md border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 disabled:opacity-50"
+          >
+            Bulk Transfer
           </button>
         )}
         {tab === "suspended" && (
@@ -318,6 +454,7 @@ export default function SuperAdminReviewCenterPage() {
                 <input type="checkbox" checked={allSelected} onChange={toggleAll} />
               </th>
               <th className="text-left px-5 py-3 text-xs text-gray-500">Member</th>
+              <th className="text-left px-5 py-3 text-xs text-gray-500">Account ID</th>
               <th className="text-left px-5 py-3 text-xs text-gray-500">Account Owner</th>
               <th className="text-left px-5 py-3 text-xs text-gray-500">Location</th>
               <th className="text-left px-5 py-3 text-xs text-gray-500">Note</th>
@@ -330,9 +467,9 @@ export default function SuperAdminReviewCenterPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={10} className="px-5 py-10 text-center text-gray-500">Loading…</td></tr>
+              <tr><td colSpan={11} className="px-5 py-10 text-center text-gray-500">Loading…</td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={10} className="px-5 py-10 text-center text-gray-500">No items found</td></tr>
+              <tr><td colSpan={11} className="px-5 py-10 text-center text-gray-500">No items found</td></tr>
             ) : (
               rows.map((r) => {
                 const id = String(r.profile_id || r.id || "");
@@ -364,6 +501,9 @@ export default function SuperAdminReviewCenterPage() {
                     <td className="px-5 py-3">
                       <div className="font-medium text-sm">{fullName}</div>
                       <div className="text-xs text-gray-500">{publicId}</div>
+                    </td>
+                    <td className="px-5 py-3 text-sm font-medium">
+                      {String(r.account_owner_code || "-")}
                     </td>
                     <td className="px-5 py-3 text-sm">
                       <div className="font-medium">{String(r.account_owner_name || "-")}</div>

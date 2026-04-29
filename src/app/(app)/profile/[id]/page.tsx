@@ -275,6 +275,7 @@ export default function OtherProfilePage() {
   const [fallbackProfile, setFallbackProfile] = useState<Profile | null>(null);
   const [fallbackLoading, setFallbackLoading] = useState(false);
   const [showContact, setShowContact] = useState(false);
+  const [revealingContact, setRevealingContact] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [galleryImgOpacity, setGalleryImgOpacity] = useState(1);
@@ -533,20 +534,22 @@ export default function OtherProfilePage() {
   }, [actorId, profile?.id]);
 
   const toggleContactDetails = useCallback(() => {
-    if (!profile) return;
+    if (!profile || revealingContact) return;
     if (showContact) {
       setShowContact(false);
       return;
     }
-    setShowContact(true);
+    setRevealingContact(true);
     void (async () => {
       const res = await trackContactView(profile, actorId || undefined);
       if (res.error) {
-        setShowContact(false);
         showToast(res.error, "error");
+      } else {
+        setShowContact(true);
       }
+      setRevealingContact(false);
     })();
-  }, [showContact, profile, actorId, showToast]);
+  }, [showContact, profile, actorId, showToast, revealingContact]);
 
   // Fetch interest status and shortlist when profile or user changes
   useEffect(() => {
@@ -2049,10 +2052,15 @@ export default function OtherProfilePage() {
                   <button
                     type="button"
                     onClick={toggleContactDetails}
+                    disabled={revealingContact}
                     className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[var(--primary)]/90 transition"
                   >
                     <Phone size={16} />
-                    {showContact ? "Hide Contact Details" : "View Contact Details"}
+                    {showContact
+                      ? "Hide Contact Details"
+                      : revealingContact
+                      ? "Checking access..."
+                      : "View Contact Details"}
                   </button>
                   <p className="mt-2 text-[11px] text-gray-500">
                     For genuine matchmaking only. Misuse may lead to account blocking.

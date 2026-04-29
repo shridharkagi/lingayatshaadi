@@ -143,6 +143,7 @@ export default function AccountPage() {
   const [deletionReason, setDeletionReason] = useState("");
   const [deletionSubmitBusy, setDeletionSubmitBusy] = useState(false);
   const [deletionSubmitErr, setDeletionSubmitErr] = useState("");
+  const [membershipsNowMs, setMembershipsNowMs] = useState(0);
 
   const loadPendingDeletionRequests = useCallback(async () => {
     const res = await adminFetch("/api/profile-deletion-request");
@@ -190,6 +191,19 @@ export default function AccountPage() {
   }, [profiles]);
   const nonDeletedOwnedCount = drafts.length + submittedProfiles.length;
   const canCreateMoreProfiles = nonDeletedOwnedCount < MAX_ACTIVE_OR_PENDING_PROFILES;
+
+  useEffect(() => {
+    if (loading || !isLoggedIn) return;
+    if (loadingProfiles) return;
+    if (typeof window === "undefined") return;
+    const createProfile = new URLSearchParams(window.location.search).get("createProfile");
+    if (createProfile !== "1") return;
+    if (!canCreateMoreProfiles) return;
+
+    setEditRelProfile(null);
+    setShowRelPicker(true);
+    router.replace("/account");
+  }, [loading, isLoggedIn, loadingProfiles, canCreateMoreProfiles, router]);
 
   const handleResumeDraft = (draft: Profile) => {
     // Going through the normal /profile/complete route with the draft
@@ -244,6 +258,10 @@ export default function AccountPage() {
       cancelled = true;
     };
   }, [authUser]);
+
+  useEffect(() => {
+    setMembershipsNowMs(Date.now());
+  }, []);
 
   const pendingEmailForEffect = authUser ? pendingAuthEmail(authUser) : null;
   useEffect(() => {
@@ -847,11 +865,10 @@ export default function AccountPage() {
             Upgrade or manage membership
           </Link>
           {(() => {
-            const now = Date.now();
             const activeSubscriptions = membershipHistory.subscriptions.filter((s) => {
               const status = String((s as { status?: string }).status || "").toLowerCase();
               const expiry = new Date(String((s as { expires_at?: string }).expires_at || "")).getTime();
-              return status === "active" && Number.isFinite(expiry) && expiry >= now;
+              return status === "active" && Number.isFinite(expiry) && expiry >= membershipsNowMs;
             });
             return activeSubscriptions.length === 0 ? (
             <div className="rounded-xl bg-gray-50/80 border border-dashed border-gray-200 px-4 py-6 text-center">
@@ -1519,15 +1536,15 @@ function RelationshipPickerModal({
 
 /**
  * Unfinished profile card on /account. Surfaces how far the user got
- * (step X of 7), which relationship it's for, and gives primary/secondary
+ * (step X of 6), which relationship it's for, and gives primary/secondary
  * actions to either resume or throw the draft away.
  *
  * We keep TOTAL_STEPS in sync with the wizard; the number itself is
- * cosmetic (X of 7). If the wizard gains/loses a step the percentage bar
+ * cosmetic (X of 6). If the wizard gains/loses a step the percentage bar
  * simply looks slightly off until this constant is bumped — no data
  * corruption risk.
  */
-const TOTAL_WIZARD_STEPS = 7;
+const TOTAL_WIZARD_STEPS = 6;
 
 function DraftRow({
   draft,
