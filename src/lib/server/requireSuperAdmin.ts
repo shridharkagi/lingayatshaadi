@@ -52,7 +52,7 @@ export async function requireSuperAdmin(req: NextRequest): Promise<SuperAdminAut
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
   }
-  if (userErr || !userData.user) {
+  if (userErr || !userData?.user) {
     return { ok: false, status: 401, error: userErr?.message || "Invalid token" };
   }
   const user = userData.user;
