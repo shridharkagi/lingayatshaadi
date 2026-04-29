@@ -9,6 +9,7 @@ import { ContactFloat } from "@/components/ui/ContactFloat";
 import { ConfigInjector } from "@/components/ConfigInjector";
 import { AuthModalProvider } from "@/contexts/AuthModalContext";
 import { TurnstileProvider } from "@/components/turnstile/TurnstileProvider";
+import { InstallPWAButton } from "@/components/pwa/InstallPWAButton";
 function getSeoConfig() {
   try {
     const path = join(process.cwd(), "data", "site-config.json");
@@ -34,10 +35,19 @@ const siteUrl = getPublicSiteUrl();
 export const metadata: Metadata = {
   title: "LingayatBandhu — Find your Lingayat match",
   description: seo.description,
+  manifest: "/manifest.json",
   keywords: seo.keywords,
   authors: [{ name: "LingayatBandhu" }],
   creator: "LingayatBandhu",
   publisher: "LingayatBandhu",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "LingayatBandhu",
+  },
+  icons: {
+    apple: "/icons/icon-192x192.png",
+  },
   formatDetection: {
     email: false,
     address: false,
@@ -84,6 +94,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  themeColor: "#8b0000",
+  viewportFit: "cover",
   interactiveWidget: "resizes-content",
 };
 
@@ -128,6 +140,7 @@ export default function RootLayout({
             <AppConfigProvider>
               <AuthModalProvider>
                 {children}
+                <InstallPWAButton />
                 <ContactFloat />
                 <ConfigInjector />
                 <div id="lingayat-external-scripts" suppressHydrationWarning />

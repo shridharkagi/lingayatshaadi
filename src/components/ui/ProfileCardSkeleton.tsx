@@ -3,7 +3,7 @@ export function ProfileCardSkeleton({ variant = "card" }: { variant?: "card" | "
     <div className="bg-white rounded-xl overflow-hidden shadow-[var(--shadow-soft)] border border-[var(--color-border)] animate-pulse">
       {/* Mobile / List: horizontal layout */}
       <div className={`flex flex-row ${variant === "list" ? "" : "lg:hidden"}`}>
-        <div className="relative w-[35%] min-w-[35%] max-w-[180px] aspect-[3/4] bg-gray-200 flex-shrink-0" />
+        <div className="relative w-[42%] min-w-[42%] max-w-[208px] aspect-[3/4] bg-gray-200 flex-shrink-0" />
         <div className="flex-1 min-w-0 p-4 flex flex-col justify-between">
           <div>
             <div className="h-5 bg-gray-200 rounded w-3/4 mb-2" />
