@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import path from "path";
+import withPWAInit from "next-pwa";
 
 /** Use this app folder as root so Next does not pick a parent directory that has another package-lock.json. */
 const projectRoot = path.join(__dirname);
@@ -66,4 +67,11 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+const withPWA = withPWAInit({
+  dest: "public",
+  disable: process.env.NODE_ENV === "development",
+  register: true,
+  skipWaiting: true,
+});
+
+export default withPWA(nextConfig);

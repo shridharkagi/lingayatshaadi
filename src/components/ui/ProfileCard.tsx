@@ -23,13 +23,13 @@ function ProfileCardComponent({ profile, displayName, variant = "card" }: Profil
     <div className="bg-white rounded-xl overflow-hidden shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-card)] transition-all duration-200 border border-[var(--color-border)] h-full lg:hover:-translate-y-0.5">
       {/* Mobile / List: horizontal layout - image left, details right */}
       <div className={`flex flex-row ${variant === "list" ? "" : "lg:hidden"}`}>
-        <div className="relative w-[35%] min-w-[35%] max-w-[180px] aspect-[3/4] bg-gray-200 flex-shrink-0 overflow-hidden">
+        <div className="relative w-[42%] min-w-[42%] max-w-[208px] aspect-[3/4] bg-gray-200 flex-shrink-0 overflow-hidden">
           <Image
             src={profile.profilePhoto || "/placeholder.svg"}
             alt={`Profile photo of ${name || "member"}`}
             fill
             className="object-cover"
-            sizes="(max-width: 640px) 35vw, 144px"
+            sizes="(max-width: 640px) 42vw, 176px"
             loading="lazy"
             unoptimized
           />
