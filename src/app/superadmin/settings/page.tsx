@@ -82,7 +82,12 @@ export default function SuperAdminSettingsPage() {
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
-        alert("Failed to save. Check server logs.");
+        const body = await res.json().catch(() => ({}));
+        const message =
+          typeof body?.error === "string" && body.error.trim()
+            ? body.error
+            : `Failed to save (HTTP ${res.status}).`;
+        alert(message);
         return;
       }
       updateConfig(payload);
@@ -103,7 +108,14 @@ export default function SuperAdminSettingsPage() {
         body: JSON.stringify({ robotsTxt, seoDescription, seoKeywords }),
       });
       if (res.ok) alert("SEO & robots.txt saved!");
-      else alert("Failed to save. Check server logs.");
+      else {
+        const body = await res.json().catch(() => ({}));
+        const message =
+          typeof body?.error === "string" && body.error.trim()
+            ? body.error
+            : `Failed to save (HTTP ${res.status}).`;
+        alert(message);
+      }
     } catch {
       alert("Failed to save.");
     } finally {

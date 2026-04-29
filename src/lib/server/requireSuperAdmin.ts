@@ -34,7 +34,24 @@ export async function requireSuperAdmin(req: NextRequest): Promise<SuperAdminAut
   const anonClient = createClient(url, anon, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const { data: userData, error: userErr } = await anonClient.auth.getUser(match[1]);
+  let userData: Awaited<ReturnType<typeof anonClient.auth.getUser>>["data"] | null = null;
+  let userErr: Awaited<ReturnType<typeof anonClient.auth.getUser>>["error"] | null = null;
+  // Network hiccups to Supabase can cause transient connect timeouts.
+  // Retry once before failing the entire superadmin action.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const res = await anonClient.auth.getUser(match[1]);
+      userData = res.data;
+      userErr = res.error;
+      if (!userErr) break;
+    } catch (err) {
+      if (attempt === 1) {
+        const message = err instanceof Error ? err.message : "Supabase auth request failed";
+        return { ok: false, status: 503, error: `Auth service temporarily unavailable: ${message}` };
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
   if (userErr || !userData.user) {
     return { ok: false, status: 401, error: userErr?.message || "Invalid token" };
   }
