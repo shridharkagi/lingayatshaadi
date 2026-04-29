@@ -58,7 +58,7 @@ export function InstallPWAButton() {
     <button
       type="button"
       onClick={handleInstall}
-      className="fixed bottom-24 right-4 z-50 rounded-full bg-[#8b0000] px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:bg-[#700000] focus:outline-none focus:ring-2 focus:ring-[#8b0000] focus:ring-offset-2 sm:bottom-6"
+      className="fixed bottom-24 left-4 z-50 rounded-full bg-gradient-to-r from-[#f59e0b] to-[#ea580c] px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:from-[#d97706] hover:to-[#c2410c] focus:outline-none focus:ring-2 focus:ring-[#ea580c] focus:ring-offset-2 sm:bottom-6"
       aria-label="Install LingayatBandhu app"
     >
       Install App
