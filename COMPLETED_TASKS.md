@@ -197,7 +197,7 @@ All guides are available in the repository:
 
 ## 🔗 GitHub Repository
 
-**Repository:** https://github.com/shridharkagi/lingayatshaadi  
+**Repository:** https://github.com/shridharkagi/lingayatbandhu  
 **Branch:** main  
 **Latest Commit:** 89e94de
 

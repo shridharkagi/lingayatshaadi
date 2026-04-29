@@ -43,7 +43,7 @@ export async function requireSuperAdmin(req: NextRequest): Promise<SuperAdminAut
   const phoneDigits = (user.phone || "").replace(/\D/g, "");
   const isPhoneAdmin = !!phoneDigits && phoneDigits.endsWith(SUPER_ADMIN_PHONE);
   const email = (user.email || "").toLowerCase();
-  const syntheticAdminEmail = `phone_${SUPER_ADMIN_PHONE}@phone.otp.lingayatshaadi`;
+  const syntheticAdminEmail = `phone_${SUPER_ADMIN_PHONE}@phone.otp.lingayatbandhu`;
   const isSyntheticPhoneEmail = email === syntheticAdminEmail;
   const isLegacyEmailContainsPhone = email.includes(SUPER_ADMIN_PHONE);
   const isAllowlistedEmail = superAdminEmailAllowlist().includes(email);

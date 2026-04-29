@@ -31,7 +31,7 @@ export function ProfilesPageHeader() {
         <Link href="/" className="flex items-center gap-2">
           <Heart className="w-8 h-8 text-[var(--primary)] fill-[var(--primary)]" aria-hidden />
           <span className="text-xl font-bold text-[var(--primary)]">
-            LingayatShaadi
+            LingayatBandhu
           </span>
         </Link>
         <nav className="hidden md:flex items-center gap-6">

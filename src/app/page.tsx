@@ -105,7 +105,7 @@ const successStories = [
 
 const faqs = [
   {
-    q: "What makes LingayatShaadi different for Lingayat matrimony?",
+    q: "What makes LingayatBandhu different for Lingayat matrimony?",
     a: "We focus solely on the Lingayat community. Our platform understands Lingayat traditions, sub-castes, and family expectations. Profiles are verified, and matching prioritizes shared values, education, and lifestyle—so you meet people who truly align with your background.",
   },
   {
@@ -240,7 +240,7 @@ export default function LandingPage() {
           <Link href="/" className="flex items-center gap-2">
             <Heart className="w-8 h-8 text-[var(--primary)] fill-[var(--primary)]" />
             <span className="text-xl font-bold text-[var(--primary)]">
-              LingayatShaadi
+              LingayatBandhu
             </span>
           </Link>
           <nav className="hidden md:flex items-center gap-6">
@@ -416,7 +416,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* The LingayatShaadi Experience */}
+      {/* The LingayatBandhu Experience */}
       <section className="py-12 sm:py-16 md:py-24 px-4">
         <div className="max-w-6xl mx-auto">
           <div className="mb-8 sm:mb-12 text-center">
@@ -553,12 +553,12 @@ export default function LandingPage() {
               <p className="text-xl md:text-2xl font-semibold text-[var(--color-text-primary)] -mt-4 mb-4">
                 We believe every Lingayat family deserves a dignified, respectful way to find compatible life partners—honoring our heritage while embracing modern matchmaking.
               </p>
-              <p className="text-[var(--color-text-muted)]">— The LingayatShaadi Team</p>
+              <p className="text-[var(--color-text-muted)]">— The LingayatBandhu Team</p>
             </div>
             <div className="lg:w-1/2 relative aspect-[4/3] min-h-[300px]">
               <Image
                 src={CEO_IMAGE}
-                alt="LingayatShaadi team"
+                alt="LingayatBandhu team"
                 fill
                 className="object-cover"
                 sizes="(max-width: 1024px) 100vw, 50vw"

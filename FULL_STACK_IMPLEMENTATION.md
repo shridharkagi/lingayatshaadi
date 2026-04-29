@@ -1,5 +1,5 @@
 # Full-Stack Implementation Guide
-## Making LingayatShaadi Fully Functional with Supabase
+## Making LingayatBandhu Fully Functional with Supabase
 
 ---
 

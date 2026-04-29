@@ -5,14 +5,14 @@ const siteUrl = getPublicSiteUrl();
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "Terms of Use | LingayatShaadi.in",
+  title: "Terms of Use | LingayatBandhu",
   description:
-    "Terms governing use of LingayatShaadi.in — eligibility, conduct, content, and liability for our Lingayat matrimony platform.",
+    "Terms governing use of LingayatBandhu — eligibility, conduct, content, and liability for our Lingayat matrimony platform.",
   openGraph: {
-    title: "Terms of Use | LingayatShaadi.in",
-    description: "Terms of use for LingayatShaadi.in.",
+    title: "Terms of Use | LingayatBandhu",
+    description: "Terms of use for LingayatBandhu.",
     url: `${siteUrl}/terms`,
-    siteName: "LingayatShaadi.in",
+    siteName: "LingayatBandhu",
   },
 };
 

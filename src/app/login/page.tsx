@@ -262,7 +262,7 @@ export default function LoginPage() {
           <Link href="/" className="flex items-center gap-2">
             <Heart className="w-7 h-7 text-[var(--primary)] fill-[var(--primary)]" />
             <span className="text-lg font-bold text-[var(--primary)]">
-              LingayatShaadi
+              LingayatBandhu
             </span>
           </Link>
           <nav className="hidden md:flex items-center gap-4">

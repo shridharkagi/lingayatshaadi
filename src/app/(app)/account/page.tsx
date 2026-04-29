@@ -431,7 +431,7 @@ export default function AccountPage() {
     <div className="max-w-2xl mx-auto pb-10 space-y-4">
       <header className="bg-[var(--primary)] text-white px-6 py-4 rounded-2xl shadow-sm flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/85">LingayatShaadi</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/85">LingayatBandhu</p>
           <h1 className="text-xl font-bold leading-tight">My Account</h1>
         </div>
         <Link

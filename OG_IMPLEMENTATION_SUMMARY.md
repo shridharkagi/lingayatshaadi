@@ -4,7 +4,7 @@
 
 ### 1. Default OG Image
 - **Created:** Professional OG image (`/lingayat-shaadi/public/og-image.png`) - 6.5MB, 1200x630px
-- **Design:** Maroon and gold color scheme with mandala patterns, "LingayatShaadi" branding
+- **Design:** Maroon and gold color scheme with mandala patterns, "LingayatBandhu" branding
 - **Usage:** Appears when homepage or any page without specific OG image is shared
 
 ### 2. Main Layout Metadata (Root Level)
@@ -24,15 +24,15 @@ openGraph: {
   type: "website",
   locale: "en_US",
   url: "https://test.ligayatshaadi.in",
-  siteName: "LingayatShaadi",
-  title: "LingayatShaadi - Find Your Perfect Match",
+  siteName: "LingayatBandhu",
+  title: "LingayatBandhu - Find Your Perfect Match",
   description: seo.description,
   images: [
     {
       url: "/og-image.png",
       width: 1200,
       height: 630,
-      alt: "LingayatShaadi - Premium Matrimonial Platform",
+      alt: "LingayatBandhu - Premium Matrimonial Platform",
     },
   ],
 }
@@ -50,7 +50,7 @@ openGraph: {
 - Proper URL handling for slug-based routes
 
 **Dynamic Content:**
-- Title: `{Name} - {Age} yrs, {Profession} | LingayatShaadi`
+- Title: `{Name} - {Age} yrs, {Profession} | LingayatBandhu`
 - Description: Full profile details including location, education, height
 - Image: Profile photo or default OG image
 

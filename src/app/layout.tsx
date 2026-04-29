@@ -16,7 +16,7 @@ function getSeoConfig() {
       const data = JSON.parse(readFileSync(path, "utf-8"));
       return {
         description: data.seoDescription || "Premium matrimonial platform for the Lingayat community",
-        keywords: data.seoKeywords || "Lingayat matrimony, Lingayat shaadi, Lingayat marriage",
+        keywords: data.seoKeywords || "Lingayat matrimony, LingayatBandhu, Lingayat marriage",
       };
     }
   } catch {
@@ -24,7 +24,7 @@ function getSeoConfig() {
   }
   return {
     description: "Premium matrimonial platform for the Lingayat community",
-    keywords: "Lingayat matrimony, Lingayat shaadi, Lingayat marriage",
+    keywords: "Lingayat matrimony, LingayatBandhu, Lingayat marriage",
   };
 }
 
@@ -32,12 +32,12 @@ const seo = getSeoConfig();
 const siteUrl = getPublicSiteUrl();
 
 export const metadata: Metadata = {
-  title: "LingayatShaadi.in — Find your Lingayat match",
+  title: "LingayatBandhu — Find your Lingayat match",
   description: seo.description,
   keywords: seo.keywords,
-  authors: [{ name: "LingayatShaadi" }],
-  creator: "LingayatShaadi",
-  publisher: "LingayatShaadi",
+  authors: [{ name: "LingayatBandhu" }],
+  creator: "LingayatBandhu",
+  publisher: "LingayatBandhu",
   formatDetection: {
     email: false,
     address: false,
@@ -47,21 +47,21 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_IN",
     url: siteUrl,
-    siteName: "LingayatShaadi.in",
-    title: "LingayatShaadi.in — Find your Lingayat match",
+    siteName: "LingayatBandhu",
+    title: "LingayatBandhu — Find your Lingayat match",
     description: seo.description,
     images: [
       {
         url: "/opengraph-image",
         width: 1200,
         height: 630,
-        alt: "LingayatShaadi — Lingayat matrimony",
+        alt: "LingayatBandhu — Lingayat matrimony",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "LingayatShaadi.in — Find your Lingayat match",
+    title: "LingayatBandhu — Find your Lingayat match",
     description: seo.description,
     images: ["/opengraph-image"],
   },

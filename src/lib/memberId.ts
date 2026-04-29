@@ -4,7 +4,7 @@ import { Profile } from "@/types";
  * Public ID format (current):
  *   L + [B|G] + YY + MM + NNNNN
  *
- *   - "L"     = Static prefix (Lingayat-Shaadi)
+ *   - "L"     = Static prefix (LingayatBandhu)
  *   - "B"|"G" = Profile gender flag: B = Bride (female), G = Groom (male)
  *   - "YY"    = 2-digit year of registration  (e.g. "26" for 2026)
  *   - "MM"    = 2-digit month of registration (e.g. "04" for April)

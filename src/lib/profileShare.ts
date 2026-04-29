@@ -25,7 +25,7 @@ export function buildProfileShareText(
 }
 
 export function buildProfileShareFooter(): string {
-  return `Need help? Call/WhatsApp ${SUPPORT_PHONE_DISPLAY}\n-Team LingayatShaadi.in`;
+  return `Need help? Call/WhatsApp ${SUPPORT_PHONE_DISPLAY}\n-Team LingayatBandhu`;
 }
 
 export function getShortProfilePath(profile: Profile): string {

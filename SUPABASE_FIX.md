@@ -77,7 +77,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // ✅ Return default metadata when Supabase isn't connected
   if (!profile) {
     return {
-      title: `Profile ${id} - LingayatShaadi`,
+      title: `Profile ${id} - LingayatBandhu`,
       description: "Find your perfect life partner in the Lingayat community...",
       // ... sensible defaults
     };

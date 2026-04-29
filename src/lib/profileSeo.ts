@@ -3,14 +3,14 @@ import { getAge } from "@/lib/utils";
 
 /**
  * SEO / share title pattern:
- * `[First Name], [Age] - [City] | LingayatShaadi.in`
+ * `[First Name], [Age] - [City] | LingayatBandhu`
  */
 export function buildProfileSeoTitle(profile: Pick<Profile, "fullName" | "dateOfBirth" | "city">): string {
   const first = (profile.fullName || "").trim().split(/\s+/)[0] || "Member";
   const age = profile.dateOfBirth ? getAge(profile.dateOfBirth) : "—";
   const city = (profile.city || "").trim() || "India";
   const ageLabel = typeof age === "number" ? `${age} yrs` : age;
-  return `${first}, ${ageLabel} - ${city} | LingayatShaadi.in`;
+  return `${first}, ${ageLabel} - ${city} | LingayatBandhu`;
 }
 
 export function buildProfileSeoDescription(
@@ -25,5 +25,5 @@ export function buildProfileSeoDescription(
     [profile.city, profile.state].filter(Boolean).join(", "),
     profile.qualification || "",
   ].filter(Boolean);
-  return `${name} — ${bits.join(" · ")}. View this Lingayat matrimonial profile on LingayatShaadi.in.`;
+  return `${name} — ${bits.join(" · ")}. View this Lingayat matrimonial profile on LingayatBandhu.`;
 }

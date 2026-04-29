@@ -1,6 +1,6 @@
 # Deployment Guide: Vercel + Supabase
 
-This guide walks through deploying LingayatShaadi to Vercel with Supabase backend.
+This guide walks through deploying LingayatBandhu to Vercel with Supabase backend.
 
 ---
 

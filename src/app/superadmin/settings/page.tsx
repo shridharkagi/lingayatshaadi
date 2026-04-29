@@ -118,11 +118,11 @@ export default function SuperAdminSettingsPage() {
       <div className="mt-6 bg-white rounded-xl shadow-sm p-6 space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700">Site Name</label>
-          <input type="text" defaultValue="LingayatShaadi" className="mt-1 w-full px-4 py-2 border rounded-lg" />
+          <input type="text" defaultValue="LingayatBandhu" className="mt-1 w-full px-4 py-2 border rounded-lg" />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">Support Email</label>
-          <input type="email" defaultValue="LingayatShaadi@gmail.com" className="mt-1 w-full px-4 py-2 border rounded-lg" />
+          <input type="email" defaultValue="LingayatBandhu@gmail.com" className="mt-1 w-full px-4 py-2 border rounded-lg" />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">Contact – Call Number</label>
@@ -291,7 +291,7 @@ export default function SuperAdminSettingsPage() {
               type="text"
               value={seoKeywords}
               onChange={(e) => setSeoKeywords(e.target.value)}
-              placeholder="Lingayat matrimony, Lingayat shaadi"
+              placeholder="Lingayat matrimony, LingayatBandhu"
               className="mt-1 w-full px-4 py-2 border rounded-lg"
             />
           </div>

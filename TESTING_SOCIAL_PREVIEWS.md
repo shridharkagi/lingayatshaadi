@@ -58,7 +58,7 @@ When sharing `https://test.ligayatshaadi.in/profile/ls26010003-rahul` on WhatsAp
 │  [Profile Photo or OG Image]    │
 ├─────────────────────────────────┤
 │ Rahul - 28 yrs, Software        │
-│ Engineer | LingayatShaadi        │
+│ Engineer | LingayatBandhu        │
 │                                  │
 │ Rahul - 28 years old, 5'10"     │
 │ tall, Software Engineer from     │
@@ -80,7 +80,7 @@ https://test.ligayatshaadi.in/profile/ls26010003-rahul
 ```
 ┌─────────────────────────────────┐
 │ Rahul - 28 yrs, Software        │
-│ Engineer | LingayatShaadi        │
+│ Engineer | LingayatBandhu        │
 │ test.ligayatshaadi.in            │
 └─────────────────────────────────┘
 ```
@@ -91,7 +91,7 @@ https://test.ligayatshaadi.in/profile/ls26010003-rahul
 ┌─────────────────────────────────┐
 │  [Old or Different Image]       │
 ├─────────────────────────────────┤
-│ Profile - LingayatShaadi         │
+│ Profile - LingayatBandhu         │
 │ test.ligayatshaadi.in            │
 └─────────────────────────────────┘
 ```

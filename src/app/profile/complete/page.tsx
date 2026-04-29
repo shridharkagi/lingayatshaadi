@@ -762,7 +762,7 @@ function ProfileCompleteInner() {
       profile.email ||
       (accountMeta?.phone
         ? syntheticEmailForPhone(accountMeta.phone.replace(/\D/g, "").slice(-10))
-        : authUser.email || `user_${authUser.id}@profile.lingayatshaadi`);
+        : authUser.email || `user_${authUser.id}@profile.lingayatbandhu`);
 
     setSaving(true);
     const payload: Partial<Profile> = {
@@ -854,7 +854,7 @@ function ProfileCompleteInner() {
         </button>
         <Link href="/" className="flex items-center gap-2">
           <Heart className="w-5 h-5 text-[var(--primary)] fill-[var(--primary)]" />
-          <span className="font-bold text-[var(--primary)]">LingayatShaadi</span>
+          <span className="font-bold text-[var(--primary)]">LingayatBandhu</span>
         </Link>
         <div className="w-16 sm:w-20 text-right text-xs text-gray-500">
           {Math.round(progressPct)}%

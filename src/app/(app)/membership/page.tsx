@@ -111,7 +111,7 @@ export default function MembershipPage() {
   return (
     <div className="max-w-lg mx-auto pb-6">
       <header className="bg-[var(--primary)] text-white px-4 py-8 text-center rounded-b-3xl">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/90 mb-2">LingayatShaadi</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/90 mb-2">LingayatBandhu</p>
         <h1 className="text-2xl font-bold">Upgrade to Premium</h1>
         <p className="text-white/90 mt-2">Unlock more features and find your perfect match faster</p>
       </header>

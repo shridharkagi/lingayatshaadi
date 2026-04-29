@@ -1232,7 +1232,7 @@ export default function OtherProfilePage() {
         {currentIdx >= 0 && profiles.length > 1 && (
           <div className="flex flex-col items-center gap-1 min-w-0 flex-1 px-2">
             <span className="text-xs sm:text-sm font-semibold text-[var(--primary)] tracking-tight truncate max-w-[11rem] sm:max-w-none">
-              LingayatShaadi
+              LingayatBandhu
             </span>
             <div className="flex gap-1">
               {profiles.slice(Math.max(0, currentIdx - 2), Math.min(profiles.length, currentIdx + 3)).map((_, i) => {

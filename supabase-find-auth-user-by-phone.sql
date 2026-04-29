@@ -20,9 +20,9 @@
 --   - phone column equals either the +E.164 form (+91xxxxxxxxxx) or the bare
 --     digits form (91xxxxxxxxxx) — GoTrue has used both historically.
 --   - email equals either the current synthetic format
---       phone_<digits10>@phone.otp.lingayatshaadi.in
+--       phone_<digits10>@phone.otp.lingayatbandhu.com
 --     or the legacy format (no TLD)
---       phone_<digits10>@phone.otp.lingayatshaadi
+--       phone_<digits10>@phone.otp.lingayatbandhu
 --
 -- Returned ordering (handled in TS, but kept stable here)
 --   Rows whose `phone` column actually matches the input are returned first,
@@ -62,8 +62,8 @@ begin
     when left(p_phone_e164, 1) = '+' then substring(p_phone_e164 from 2)
     else p_phone_e164
   end;
-  v_email_new    := lower('phone_' || p_digits10 || '@phone.otp.lingayatshaadi.in');
-  v_email_legacy := lower('phone_' || p_digits10 || '@phone.otp.lingayatshaadi');
+  v_email_new    := lower('phone_' || p_digits10 || '@phone.otp.lingayatbandhu.com');
+  v_email_legacy := lower('phone_' || p_digits10 || '@phone.otp.lingayatbandhu');
 
   -- auth.users.email and auth.users.phone are declared as varchar(255), so we
   -- explicitly cast to text here. RETURNS TABLE in plpgsql does an exact type

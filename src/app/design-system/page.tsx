@@ -52,7 +52,7 @@ export default function DesignSystemPage() {
             <ChevronLeft size={24} />
             <span>Back</span>
           </Link>
-          <h1 className="text-xl font-bold text-[var(--color-secondary-dark)]">LingayatShaadi</h1>
+          <h1 className="text-xl font-bold text-[var(--color-secondary-dark)]">LingayatBandhu</h1>
           <span className="text-sm font-medium text-[var(--color-primary)] px-4 py-2 bg-[var(--color-primary)]/10 rounded-[10px]">
             Design System
           </span>
@@ -66,7 +66,7 @@ export default function DesignSystemPage() {
             Design System Guide
           </h1>
           <p className="text-lg text-[var(--color-text-muted)] max-w-2xl mx-auto">
-            A complete UI kit for LingayatShaadi — premium, trustworthy, and modern Indian. Built on simplicity and discipline.
+            A complete UI kit for LingayatBandhu — premium, trustworthy, and modern Indian. Built on simplicity and discipline.
           </p>
         </div>
 
@@ -358,7 +358,7 @@ export default function DesignSystemPage() {
             <div>
               <p className="text-sm font-medium text-[var(--color-text-muted)] mb-2">Navbar</p>
               <nav className="bg-[var(--color-white)] rounded-[10px] border border-[var(--color-border)] shadow-[var(--shadow-soft)] px-6 py-4 flex items-center justify-between">
-                <span className="font-bold text-[var(--color-primary)]">LingayatShaadi</span>
+                <span className="font-bold text-[var(--color-primary)]">LingayatBandhu</span>
                 <div className="flex gap-4">
                   <a href="#" className="text-[var(--color-text-muted)] hover:text-[var(--color-primary)] text-sm">Home</a>
                   <a href="#" className="text-[var(--color-text-muted)] hover:text-[var(--color-primary)] text-sm">Search</a>
@@ -369,7 +369,7 @@ export default function DesignSystemPage() {
             <div>
               <p className="text-sm font-medium text-[var(--color-text-muted)] mb-2">Footer</p>
               <footer className="bg-[var(--color-secondary-dark)] rounded-[10px] px-6 py-8 text-center">
-                <p className="text-white font-medium mb-2">LingayatShaadi</p>
+                <p className="text-white font-medium mb-2">LingayatBandhu</p>
                 <p className="text-[var(--color-text-muted)] text-sm mb-4">Premium matrimonial platform for the Lingayat community</p>
                 <div className="flex justify-center gap-6 text-sm">
                   <a href="#" className="text-white/80 hover:text-white">Privacy</a>
@@ -519,7 +519,7 @@ export default function DesignSystemPage() {
       {/* Footer */}
       <footer className="border-t border-[var(--color-border)] bg-[var(--color-white)] py-8 mt-12">
         <div className="max-w-6xl mx-auto px-4 text-center text-[var(--color-text-muted)] text-sm">
-          LingayatShaadi Design System • Built for trust, simplicity, and tradition with modern thinking
+          LingayatBandhu Design System • Built for trust, simplicity, and tradition with modern thinking
         </div>
       </footer>
     </div>

@@ -5,14 +5,14 @@ const siteUrl = getPublicSiteUrl();
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "Privacy Policy | LingayatShaadi.in",
+  title: "Privacy Policy | LingayatBandhu",
   description:
-    "How LingayatShaadi.in collects, uses, and protects your data for Lingayat matrimony. Contact us for privacy questions.",
+    "How LingayatBandhu collects, uses, and protects your data for Lingayat matrimony. Contact us for privacy questions.",
   openGraph: {
-    title: "Privacy Policy | LingayatShaadi.in",
-    description: "Privacy practices for LingayatShaadi.in matrimonial profiles.",
+    title: "Privacy Policy | LingayatBandhu",
+    description: "Privacy practices for LingayatBandhu matrimonial profiles.",
     url: `${siteUrl}/privacy`,
-    siteName: "LingayatShaadi.in",
+    siteName: "LingayatBandhu",
   },
 };
 

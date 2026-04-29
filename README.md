@@ -1,4 +1,4 @@
-# LingayatShaadi
+# LingayatBandhu
 
 A responsive matrimonial web application for the Lingayat community. Built with Next.js, React, and Tailwind CSS.
 

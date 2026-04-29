@@ -17,7 +17,7 @@ export default function TermsPage() {
           </Link>
           <Link href="/" className="flex items-center gap-2">
             <Heart className="w-6 h-6 text-[var(--primary)] fill-[var(--primary)]" />
-            <span className="font-bold text-[var(--primary)]">LingayatShaadi</span>
+            <span className="font-bold text-[var(--primary)]">LingayatBandhu</span>
           </Link>
           <div className="w-16" />
         </div>
@@ -26,14 +26,14 @@ export default function TermsPage() {
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-8">
         <h1 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">Terms of Use</h1>
         <p className="text-sm text-[var(--color-text-muted)] mb-8">
-          Last updated: {new Date().toLocaleDateString()} · © {year} LingayatShaadi.in
+          Last updated: {new Date().toLocaleDateString()} · © {year} LingayatBandhu
         </p>
 
         <div className="prose prose-sm max-w-none space-y-6 text-[var(--color-text-muted)]">
           <section>
             <h2 className="text-lg font-semibold text-[var(--color-text-primary)] mb-2">1. Acceptance</h2>
             <p>
-              By accessing or using LingayatShaadi.in you agree to these Terms of Use and our Privacy Policy. If you do
+              By accessing or using LingayatBandhu you agree to these Terms of Use and our Privacy Policy. If you do
               not agree, do not use the platform. We may update these terms; continued use after changes constitutes
               acceptance of the revised terms where permitted by law.
             </p>
@@ -71,14 +71,14 @@ export default function TermsPage() {
             <h2 className="text-lg font-semibold text-[var(--color-text-primary)] mb-2">5. Content & intellectual property</h2>
             <p>
               You retain rights to content you upload. You grant us a licence to host, display, and process that content
-              to operate LingayatShaadi.in. Our name, logo, and branding are our property.
+              to operate LingayatBandhu. Our name, logo, and branding are our property.
             </p>
           </section>
 
           <section>
             <h2 className="text-lg font-semibold text-[var(--color-text-primary)] mb-2">6. Disclaimer & limitation of liability</h2>
             <p>
-              LingayatShaadi.in provides a platform to connect members. We do not guarantee matches or marriage
+              LingayatBandhu provides a platform to connect members. We do not guarantee matches or marriage
               outcomes. To the maximum extent permitted by law, we are not liable for user-to-user conduct, offline
               meetings, or decisions you make based on information on the site.
             </p>

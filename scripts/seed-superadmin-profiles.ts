@@ -120,7 +120,7 @@ function toRow(p: Profile, userId: string): Record<string, unknown> {
   return {
     user_id: userId,
     public_id: toV2PublicId(p.publicId || p.memberId, p.gender),
-    email: p.email || `${(p.fullName || "demo").toLowerCase().replace(/\W+/g, "")}@demo.lingayatshaadi.in`,
+    email: p.email || `${(p.fullName || "demo").toLowerCase().replace(/\W+/g, "")}@demo.lingayatbandhu.com`,
     full_name: p.fullName,
     date_of_birth: p.dateOfBirth,
     gender: p.gender,

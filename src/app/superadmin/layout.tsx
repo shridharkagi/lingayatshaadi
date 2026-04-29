@@ -52,7 +52,7 @@ export default function SuperAdminLayout({
           <div className="flex items-center justify-between">
             {!collapsed && (
               <div>
-                <Link href="/superadmin" className="text-xl font-bold">LingayatShaadi</Link>
+                <Link href="/superadmin" className="text-xl font-bold">LingayatBandhu</Link>
                 <p className="text-white/70 text-sm mt-1">Super Admin</p>
               </div>
             )}

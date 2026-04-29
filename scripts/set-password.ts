@@ -53,7 +53,7 @@ if (!newPassword || newPassword.length < 6) {
 
 const phoneE164NoPlus = `91${rawPhone}`; // Supabase stores phone as digits w/o '+'
 const phoneE164 = `+91${rawPhone}`;
-const syntheticEmail = `phone_${rawPhone}@phone.otp.lingayatshaadi`;
+const syntheticEmail = `phone_${rawPhone}@phone.otp.lingayatbandhu`;
 
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },

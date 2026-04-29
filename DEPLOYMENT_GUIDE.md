@@ -208,12 +208,12 @@ https://test.ligayatshaadi.in/profile/ls26010003-rahul
 - Profile photo (if available) or site OG image
 - Profile name and age
 - Description with profession and location
-- "LingayatShaadi" as the site name
+- "LingayatBandhu" as the site name
 
 **Preview format**:
 ```
 [Image: Profile Photo or OG Image]
-Rahul - 28 yrs, Software Engineer | LingayatShaadi
+Rahul - 28 yrs, Software Engineer | LingayatBandhu
 Rahul - 28 years old, 5'10" tall, Software Engineer from Bangalore, Karnataka...
 test.ligayatshaadi.in
 ```

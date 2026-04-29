@@ -15,10 +15,10 @@ export function normalizeIndianPhone(input: string): { e164: string; digits10: s
 
 /** Deterministic placeholder email for Supabase Auth (phone-only login). Not used for delivery. */
 export function syntheticEmailForPhone(digits10: string): string {
-  return `phone_${digits10}@phone.otp.lingayatshaadi.in`;
+  return `phone_${digits10}@phone.otp.lingayatbandhu.com`;
 }
 
-const SYNTHETIC_EMAIL_RE = /^phone_\d+@phone\.otp\.lingayatshaadi(?:\.in)?$/i;
+const SYNTHETIC_EMAIL_RE = /^phone_\d+@phone\.otp\.(?:lingayatbandhu(?:\.com)?|lingayatshaadi(?:\.in)?)$/i;
 
 /**
  * Backward compatibility for older accounts created before the synthetic
@@ -26,8 +26,11 @@ const SYNTHETIC_EMAIL_RE = /^phone_\d+@phone\.otp\.lingayatshaadi(?:\.in)?$/i;
  */
 export function syntheticEmailCandidatesForPhone(digits10: string): string[] {
   const next = syntheticEmailForPhone(digits10);
-  const legacy = `phone_${digits10}@phone.otp.lingayatshaadi`;
-  return [next, legacy];
+  // Keep legacy candidates so existing users created before rebrand can still sign in.
+  const legacyBandhuNoTld = `phone_${digits10}@phone.otp.lingayatbandhu`;
+  const legacyShaadiWithTld = `phone_${digits10}@phone.otp.lingayatshaadi.in`;
+  const legacyShaadiNoTld = `phone_${digits10}@phone.otp.lingayatshaadi`;
+  return [next, legacyBandhuNoTld, legacyShaadiWithTld, legacyShaadiNoTld];
 }
 
 /** True when this is our internal phone-placeholder row (hide in UI; not a customer email). */

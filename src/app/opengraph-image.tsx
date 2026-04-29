@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "LingayatShaadi — Lingayat matrimony";
+export const alt = "LingayatBandhu — Lingayat matrimony";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -19,7 +19,7 @@ export default function OpenGraphImage() {
           color: "white",
         }}
       >
-        <div style={{ fontSize: 56, fontWeight: 800, letterSpacing: "-0.02em" }}>LingayatShaadi</div>
+        <div style={{ fontSize: 56, fontWeight: 800, letterSpacing: "-0.02em" }}>LingayatBandhu</div>
         <div style={{ fontSize: 26, fontWeight: 400, marginTop: 16, opacity: 0.92 }}>
           Lingayat matrimony — find your match
         </div>

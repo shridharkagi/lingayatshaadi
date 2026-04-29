@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 export default function OGTestPage() {
-  const [url, setUrl] = useState("https://test.ligayatshaadi.in");
+  const [url, setUrl] = useState("https://test.lingayatbandhu.com");
   const [loading, setLoading] = useState(false);
 
   const testOGTags = () => {
@@ -42,7 +42,7 @@ export default function OGTestPage() {
                 type="url"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://test.ligayatshaadi.in"
+                placeholder="https://test.lingayatbandhu.com"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
@@ -94,9 +94,9 @@ export default function OGTestPage() {
                 Quick Test
               </h2>
               <div className="space-y-2">
-                <TestUrlButton url="https://test.ligayatshaadi.in" label="Homepage" />
-                <TestUrlButton url="https://test.ligayatshaadi.in/profiles" label="Profiles Page" />
-                <TestUrlButton url="https://test.ligayatshaadi.in/profile/example-id" label="Profile Page (Example)" />
+                <TestUrlButton url="https://test.lingayatbandhu.com" label="Homepage" />
+                <TestUrlButton url="https://test.lingayatbandhu.com/profiles" label="Profiles Page" />
+                <TestUrlButton url="https://test.lingayatbandhu.com/profile/example-id" label="Profile Page (Example)" />
               </div>
             </div>
 

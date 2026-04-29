@@ -1,6 +1,6 @@
 # Open Graph (OG) Images Setup
 
-This document explains how Open Graph images are configured in the LingayatShaadi application.
+This document explains how Open Graph images are configured in the LingayatBandhu application.
 
 ## What are OG Images?
 
@@ -20,27 +20,27 @@ This is the default OG image (1200x630px) that appears when:
 
 ```typescript
 export const metadata: Metadata = {
-  title: "LingayatShaadi - Find Your Perfect Match",
+  title: "LingayatBandhu - Find Your Perfect Match",
   description: seo.description,
   openGraph: {
     type: "website",
     locale: "en_US",
     url: "https://test.ligayatshaadi.in",
-    siteName: "LingayatShaadi",
-    title: "LingayatShaadi - Find Your Perfect Match",
+    siteName: "LingayatBandhu",
+    title: "LingayatBandhu - Find Your Perfect Match",
     description: seo.description,
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "LingayatShaadi - Premium Matrimonial Platform",
+        alt: "LingayatBandhu - Premium Matrimonial Platform",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "LingayatShaadi - Find Your Perfect Match",
+    title: "LingayatBandhu - Find Your Perfect Match",
     description: seo.description,
     images: ["/og-image.png"],
   },
@@ -73,7 +73,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   // Generate dynamic metadata with profile photo and details
   return {
-    title: `${profile.full_name} - ${age} yrs, ${profile.profession} | LingayatShaadi`,
+    title: `${profile.full_name} - ${age} yrs, ${profile.profession} | LingayatBandhu`,
     description: `${profile.full_name} - ${age} years old, ...`,
     openGraph: {
       images: [{ url: profile.profile_photo || "/og-image.png" }],

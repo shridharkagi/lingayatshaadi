@@ -13,7 +13,7 @@ import {
 } from "@/lib/support";
 
 export default function ContactPage() {
-  const whatsappUrl = supportWhatsAppHref("Hello, I need help with LingayatShaadi.in.");
+  const whatsappUrl = supportWhatsAppHref("Hello, I need help with LingayatBandhu.");
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)] flex flex-col">
@@ -25,7 +25,7 @@ export default function ContactPage() {
           </Link>
           <Link href="/" className="flex items-center gap-2">
             <Heart className="w-6 h-6 text-[var(--primary)] fill-[var(--primary)]" />
-            <span className="font-bold text-[var(--primary)]">LingayatShaadi</span>
+            <span className="font-bold text-[var(--primary)]">LingayatBandhu</span>
           </Link>
           <div className="w-16" />
         </div>

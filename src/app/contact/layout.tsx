@@ -5,13 +5,13 @@ const siteUrl = getPublicSiteUrl();
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "Contact Us | LingayatShaadi.in",
-  description: "Email, phone, and WhatsApp support for LingayatShaadi.in — Lingayat matrimony help.",
+  title: "Contact Us | LingayatBandhu",
+  description: "Email, phone, and WhatsApp support for LingayatBandhu — Lingayat matrimony help.",
   openGraph: {
-    title: "Contact Us | LingayatShaadi.in",
-    description: "Reach LingayatShaadi.in support by email, phone, or WhatsApp.",
+    title: "Contact Us | LingayatBandhu",
+    description: "Reach LingayatBandhu support by email, phone, or WhatsApp.",
     url: `${siteUrl}/contact`,
-    siteName: "LingayatShaadi.in",
+    siteName: "LingayatBandhu",
   },
 };
 

@@ -51,8 +51,8 @@ export async function POST(request: NextRequest) {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  // Use the shared helper so both legacy (`@phone.otp.lingayatshaadi`) and
-  // current (`@phone.otp.lingayatshaadi.in`) synthetic-email accounts match,
+  // Use the shared helper so both legacy (`@phone.otp.lingayatbandhu`) and
+  // current (`@phone.otp.lingayatbandhu.com`) synthetic-email accounts match,
   // and so reset-password and login/verify all use the SAME lookup contract.
   let user;
   try {

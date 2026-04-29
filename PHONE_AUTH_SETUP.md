@@ -1,7 +1,7 @@
 # Supabase Phone/SMS Authentication Setup Guide
 
 ## Overview
-This guide explains how to enable phone/SMS authentication in Supabase for the LingayatShaadi app.
+This guide explains how to enable phone/SMS authentication in Supabase for the LingayatBandhu app.
 
 ---
 
@@ -98,7 +98,7 @@ MessageBird Originator: your_sender_name_or_number
 ### 3.3 Configure SMS Template (Optional)
 Customize the OTP message:
 ```
-Your LingayatShaadi verification code is: {{ .Token }}
+Your LingayatBandhu verification code is: {{ .Token }}
 ```
 
 Default template works fine:

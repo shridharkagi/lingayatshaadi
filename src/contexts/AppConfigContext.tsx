@@ -3,7 +3,8 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import type { MembershipPlan } from "@/types";
 
-const CONFIG_KEY = "lingayat_shaadi_config";
+const CONFIG_KEY = "lingayat_bandhu_config";
+const LEGACY_CONFIG_KEY = "lingayat_shaadi_config";
 
 const ALL_PLAN_IDS = ["p0", "p1", "p2", "p3"];
 
@@ -41,7 +42,7 @@ const defaultConfig: AppConfig = {
   externalScripts: "",
   robotsTxt: "User-agent: *\nAllow: /",
   seoDescription: "Premium matrimonial platform for the Lingayat community",
-  seoKeywords: "Lingayat matrimony, Lingayat shaadi, Lingayat marriage",
+  seoKeywords: "Lingayat matrimony, LingayatBandhu, Lingayat marriage",
   bridesHeroImageUrl:
     "https://images.unsplash.com/photo-1519741497674-611481863552?w=1600&q=75&fit=crop",
   groomsHeroImageUrl:
@@ -59,7 +60,7 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      const stored = localStorage.getItem(CONFIG_KEY);
+      const stored = localStorage.getItem(CONFIG_KEY) || localStorage.getItem(LEGACY_CONFIG_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
         setConfig((prev) => ({

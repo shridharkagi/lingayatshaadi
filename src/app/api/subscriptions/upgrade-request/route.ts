@@ -8,7 +8,7 @@ async function notifyByEmail(payload: {
   html: string;
 }) {
   const resendApiKey = process.env.RESEND_API_KEY?.trim();
-  const from = process.env.RESEND_FROM_EMAIL?.trim() || "no-reply@ligayatshaadi.in";
+  const from = process.env.RESEND_FROM_EMAIL?.trim() || "no-reply@lingayatbandhu.com";
   if (!resendApiKey) return { sent: false, reason: "RESEND_API_KEY not set" };
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
   }
 
   const adminEmail = process.env.SUBSCRIPTION_ADMIN_EMAIL?.trim();
-  const fallbackAdminEmail = "LingayatShaadi@gmail.com";
+  const fallbackAdminEmail = "LingayatBandhu@gmail.com";
   const targetAdminEmail = adminEmail || fallbackAdminEmail;
   const emailResult =
     targetAdminEmail

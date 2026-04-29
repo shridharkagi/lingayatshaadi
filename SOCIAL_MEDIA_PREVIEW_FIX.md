@@ -121,7 +121,7 @@ Optimized:
 openGraph: {
   type: "website",
   url: "https://test.ligayatshaadi.in",
-  title: "LingayatShaadi - Find Your Perfect Match",
+  title: "LingayatBandhu - Find Your Perfect Match",
   description: "Premium matrimonial platform...",
   images: [{
     url: "/og-image.jpg",
@@ -154,7 +154,7 @@ openGraph: {
 │  [Profile Photo or OG Image]    │
 ├─────────────────────────────────┤
 │ Rahul - 28 yrs, Software        │
-│ Engineer | LingayatShaadi        │
+│ Engineer | LingayatBandhu        │
 │                                  │
 │ Rahul - 28 years old, 5'10"     │
 │ tall, Software Engineer from     │

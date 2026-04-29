@@ -9,10 +9,10 @@
 --       metadata NULL.   <- JUNK — residue of an older OTP-login auto-create
 --                            bug. Has no profile, no metadata, no email.
 --     • U26044 (created 18/04/2026): phone='+919844497002', email
---       'phone_9844497002@phone.otp.lingayatshaadi' (LEGACY format, no `.in`),
+--       'phone_9844497002@phone.otp.lingayatbandhu' (LEGACY format, no `.in`),
 --       metadata={Shridhar Kagi}.   <- THE REAL ACCOUNT — keep this.
 --     • U26049 (created 26/04/2026): phone NULL, email
---       'phone_9844497002@phone.otp.lingayatshaadi.in' (current format),
+--       'phone_9844497002@phone.otp.lingayatbandhu.com' (current format),
 --       metadata NULL.   <- JUNK — created by the magiclink auto-create bug
 --                            during a login attempt.
 --
@@ -71,8 +71,8 @@ select
 from auth.users u
 where u.phone in ('+919844497002', '919844497002', '9844497002')
    or lower(u.email::text) in (
-        'phone_9844497002@phone.otp.lingayatshaadi.in',
-        'phone_9844497002@phone.otp.lingayatshaadi'
+        'phone_9844497002@phone.otp.lingayatbandhu.com',
+        'phone_9844497002@phone.otp.lingayatbandhu'
       )
 order by completeness_score desc, u.created_at asc;
 
@@ -99,8 +99,8 @@ select
 from auth.users u
 where u.phone in ('+919844497002', '919844497002', '9844497002')
    or lower(u.email::text) in (
-        'phone_9844497002@phone.otp.lingayatshaadi.in',
-        'phone_9844497002@phone.otp.lingayatshaadi'
+        'phone_9844497002@phone.otp.lingayatbandhu.com',
+        'phone_9844497002@phone.otp.lingayatbandhu'
       )
 on conflict (id) do nothing;
 
@@ -158,7 +158,7 @@ select count(*) as backed_up_rows from public._auth_users_backup_9844497002;
 -- from auth.users u
 -- where u.phone in ('+919844497002', '919844497002', '9844497002')
 --    or lower(u.email::text) in (
---         'phone_9844497002@phone.otp.lingayatshaadi.in',
---         'phone_9844497002@phone.otp.lingayatshaadi'
+--         'phone_9844497002@phone.otp.lingayatbandhu.com',
+--         'phone_9844497002@phone.otp.lingayatbandhu'
 --       )
 -- order by u.created_at asc;

@@ -2,7 +2,7 @@
 -- Migration: Public ID v1 (LS+YY+MM+NNNN, 10 chars)  ->  v2 (L[BG]+YY+MM+NNNNN, 11 chars)
 --
 -- v2 format:
---   L  = static prefix (LingayatShaadi)
+--   L  = static prefix (LingayatBandhu)
 --   B  = Bride  (gender = 'female')
 --   G  = Groom  (gender = 'male')
 --   YY = 2-digit year of registration

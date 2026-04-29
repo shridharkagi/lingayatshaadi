@@ -15,7 +15,7 @@ import { buildProfileShareFooter, buildProfileShareText, getShortProfilePath } f
 
 async function handleShareProfile(user: Profile) {
   const url = typeof window !== "undefined" ? `${window.location.origin}${getShortProfilePath(user)}` : "";
-  const title = `${user.fullName} - LingayatShaadi Profile`;
+  const title = `${user.fullName} - LingayatBandhu Profile`;
   const text = buildProfileShareText(user);
   const footer = buildProfileShareFooter();
   const shareMessage = url ? `${text}\n${url}\n\n${footer}` : `${text}\n\n${footer}`;

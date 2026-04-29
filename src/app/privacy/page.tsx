@@ -17,7 +17,7 @@ export default function PrivacyPage() {
           </Link>
           <Link href="/" className="flex items-center gap-2">
             <Heart className="w-6 h-6 text-[var(--primary)] fill-[var(--primary)]" />
-            <span className="font-bold text-[var(--primary)]">LingayatShaadi</span>
+            <span className="font-bold text-[var(--primary)]">LingayatBandhu</span>
           </Link>
           <div className="w-16" />
         </div>
@@ -26,14 +26,14 @@ export default function PrivacyPage() {
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-8">
         <h1 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">Privacy Policy</h1>
         <p className="text-sm text-[var(--color-text-muted)] mb-8">
-          Last updated: {new Date().toLocaleDateString()} · © {year} LingayatShaadi.in
+          Last updated: {new Date().toLocaleDateString()} · © {year} LingayatBandhu
         </p>
 
         <div className="prose prose-sm max-w-none space-y-6 text-[var(--color-text-muted)]">
           <section>
             <h2 className="text-lg font-semibold text-[var(--color-text-primary)] mb-2">1. Who we are</h2>
             <p>
-              LingayatShaadi.in (“we”, “us”) is a matrimonial platform focused on the Lingayat community. This policy
+              LingayatBandhu (“we”, “us”) is a matrimonial platform focused on the Lingayat community. This policy
               explains what we collect, why we collect it, and your choices. This is a summary for members; we may
               refine legal wording in a future revision.
             </p>

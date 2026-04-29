@@ -202,8 +202,8 @@ async function findUsersFromProfilesContact(
  *   - `auth.users.phone` column with both `+91...` (E.164) and `91...` (no plus)
  *     formats, since GoTrue historically stored phone without the plus sign.
  *   - Both synthetic-email formats produced by our phone OTP flow:
- *       `phone_<digits10>@phone.otp.lingayatshaadi.in` (current)
- *       `phone_<digits10>@phone.otp.lingayatshaadi`    (legacy, no TLD)
+ *       `phone_<digits10>@phone.otp.lingayatbandhu.com` (current)
+ *       `phone_<digits10>@phone.otp.lingayatbandhu`    (legacy, no TLD)
  *
  * Strategy (in order — first one to return a match wins):
  *   1. RPC `public.find_auth_user_by_phone` — a SECURITY DEFINER function that

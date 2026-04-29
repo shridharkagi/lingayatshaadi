@@ -2,18 +2,18 @@
 
 ## ✅ What's Working Now
 
-Your LingayatShaadi website now has fully functional Open Graph (OG) images!
+Your LingayatBandhu website now has fully functional Open Graph (OG) images!
 
 ### When You Share Links:
 
 **Homepage** (`https://test.ligayatshaadi.in`)
-- Shows: Professional branded OG image with LingayatShaadi logo
-- Title: "LingayatShaadi - Find Your Perfect Match"
+- Shows: Professional branded OG image with LingayatBandhu logo
+- Title: "LingayatBandhu - Find Your Perfect Match"
 - Description: "Premium matrimonial platform for the Lingayat community"
 
 **Profile Pages** (`https://test.ligayatshaadi.in/profile/LS26010001`)
 - Shows: Profile photo (or default OG image if no photo)
-- Title: "{Name} - {Age} yrs, {Profession} | LingayatShaadi"
+- Title: "{Name} - {Age} yrs, {Profession} | LingayatBandhu"
 - Description: Full profile details including location, education, etc.
 
 ## 🧪 How to Test
@@ -105,17 +105,17 @@ const profileUrl = `https://your-production-url.com/profile/${params.id}`;
 <!-- Main Site -->
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://test.ligayatshaadi.in" />
-<meta property="og:title" content="LingayatShaadi - Find Your Perfect Match" />
+<meta property="og:title" content="LingayatBandhu - Find Your Perfect Match" />
 <meta property="og:description" content="Premium matrimonial platform..." />
 <meta property="og:image" content="https://test.ligayatshaadi.in/og-image.png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
-<meta property="og:site_name" content="LingayatShaadi" />
+<meta property="og:site_name" content="LingayatBandhu" />
 <meta property="og:locale" content="en_US" />
 
 <!-- Twitter -->
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="LingayatShaadi - Find Your Perfect Match" />
+<meta name="twitter:title" content="LingayatBandhu - Find Your Perfect Match" />
 <meta name="twitter:description" content="Premium matrimonial platform..." />
 <meta name="twitter:image" content="https://test.ligayatshaadi.in/og-image.png" />
 ```

@@ -20,20 +20,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!profile) {
     return {
       metadataBase: new URL(siteUrl),
-      title: `Profile — LingayatShaadi.in`,
-      description: "Find your life partner in the Lingayat community on LingayatShaadi.in.",
+      title: `Profile — LingayatBandhu`,
+      description: "Find your life partner in the Lingayat community on LingayatBandhu.",
       openGraph: {
         type: "website",
         url: `${siteUrl}${profilePath}`,
-        title: "Profile — LingayatShaadi.in",
+        title: "Profile — LingayatBandhu",
         description: "Lingayat matrimony profiles with privacy-first discovery.",
-        siteName: "LingayatShaadi.in",
-        images: [{ url: defaultOg, width: 1200, height: 630, alt: "LingayatShaadi" }],
+        siteName: "LingayatBandhu",
+        images: [{ url: defaultOg, width: 1200, height: 630, alt: "LingayatBandhu" }],
       },
       twitter: {
         card: "summary_large_image",
-        title: "Profile — LingayatShaadi.in",
-        description: "Lingayat matrimony on LingayatShaadi.in",
+        title: "Profile — LingayatBandhu",
+        description: "Lingayat matrimony on LingayatBandhu",
         images: [defaultOg],
       },
     };
@@ -57,7 +57,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       url: profileUrl,
       title,
       description,
-      siteName: "LingayatShaadi.in",
+      siteName: "LingayatBandhu",
       images: [
         {
           url: imageUrl,
