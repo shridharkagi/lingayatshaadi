@@ -46,6 +46,7 @@ import { getIndiaDistrictsForState } from "@/data/indiaDistricts";
 import { SubCasteSelector } from "@/components/ui/SubCasteSelector";
 import { ContactsEditor } from "@/components/ui/ContactsEditor";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { TagPillInput } from "@/components/ui/TagPillInput";
 import { PartnerPreferencesForm } from "@/components/PartnerPreferencesForm";
 import {
   DualRangeSlider,
@@ -174,6 +175,14 @@ const VALID_RELATIONSHIPS: Relationship[] = [
   "sister",
   "other",
 ];
+const RELATIONSHIP_LABELS: Record<Relationship, string> = {
+  self: "Self",
+  son: "Son",
+  daughter: "Daughter",
+  brother: "Brother",
+  sister: "Sister",
+  other: "Other",
+};
 
 const initialProfile: Partial<Profile> = {
   aboutMe: "",
@@ -338,6 +347,17 @@ function formatIncomeRange(lo: number, hi: number): string {
   return `${a} – ${b}`;
 }
 
+function splitCommaValues(raw?: string): string[] {
+  return (raw || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function joinCommaValues(items: string[]): string {
+  return items.join(", ");
+}
+
 /** "10:30 AM" <-> { hour: 10, minute: 30, period: "AM" } */
 type TimeOfDay = { hour: number; minute: number; period: "AM" | "PM" };
 function parseTimeOfBirth(raw: string | undefined): TimeOfDay {
@@ -478,6 +498,82 @@ function TimeOfBirthPicker({
   );
 }
 
+function DateOfBirthSelect({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  const [initialYear, initialMonth, initialDay] = (value || "").split("-");
+  const [day, setDay] = useState(initialDay || "");
+  const [month, setMonth] = useState(initialMonth || "");
+  const [year, setYear] = useState(initialYear || "");
+
+  useEffect(() => {
+    const [y, m, d] = (value || "").split("-");
+    setYear(y || "");
+    setMonth(m || "");
+    setDay(d || "");
+  }, [value]);
+
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 60 }, (_, i) => String(currentYear - 18 - i));
+  const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
+  const maxDay = Number(year) && Number(month) ? new Date(Number(year), Number(month), 0).getDate() : 31;
+  const days = Array.from({ length: maxDay }, (_, i) => String(i + 1).padStart(2, "0"));
+
+  const setPart = (nextYear: string, nextMonth: string, nextDay: string) => {
+    setYear(nextYear);
+    setMonth(nextMonth);
+    setDay(nextDay);
+    if (nextYear && nextMonth && nextDay) {
+      onChange(`${nextYear}-${nextMonth}-${nextDay}`);
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      <select
+        value={day || ""}
+        onChange={(e) => setPart(year || "", month || "", e.target.value)}
+        className={selectClass}
+      >
+        <option value="">DD</option>
+        {days.map((d) => (
+          <option key={d} value={d}>
+            {d}
+          </option>
+        ))}
+      </select>
+      <select
+        value={month || ""}
+        onChange={(e) => setPart(year || "", e.target.value, day || "")}
+        className={selectClass}
+      >
+        <option value="">MM</option>
+        {months.map((m) => (
+          <option key={m} value={m}>
+            {m}
+          </option>
+        ))}
+      </select>
+      <select
+        value={year || ""}
+        onChange={(e) => setPart(e.target.value, month || "", day || "")}
+        className={selectClass}
+      >
+        <option value="">YYYY</option>
+        {years.map((y) => (
+          <option key={y} value={y}>
+            {y}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function ProfileCompleteInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -563,12 +659,6 @@ function ProfileCompleteInner() {
       router.replace("/login");
     }
   }, [authLoading, isLoggedIn, router]);
-
-  useEffect(() => {
-    if (!isIndiaSelected) return;
-    if (profile.state && profile.state.trim()) return;
-    update("state", "Karnataka");
-  }, [isIndiaSelected, profile.state]);
 
   useEffect(() => {
     let cancelled = false;
@@ -761,43 +851,43 @@ function ProfileCompleteInner() {
 
   const next = async () => {
     setError("");
+    if (step === 1) {
+      const fullName = (profile.fullName || "").trim();
+      const dateOfBirth = profile.dateOfBirth || "";
+      const gender = profile.gender;
+      if (!fullName || !dateOfBirth || !gender) {
+        setError("Full Name, Date of Birth, and Gender are required.");
+        return;
+      }
+    }
     if (step < steps.length) {
       const newStep = step + 1;
+      if (isDraftFlow && authUser?.id) {
+        setSaveState("saving");
+        if (!draftId) {
+          const { data, error: createErr } = await createDraft(authUser.id, profile, newStep);
+          if (createErr || !data?.id) {
+            setSaveState("error");
+            setError(createErr || "Could not save this step. Please try again.");
+            return;
+          }
+          setDraftId(data.id);
+          const qs = new URLSearchParams({ profileId: data.id });
+          const rel = (profile.relationship || relationshipFromUrl) as Relationship | undefined;
+          if (rel) qs.set("relationship", rel);
+          router.replace(`/profile/complete?${qs.toString()}`);
+        } else {
+          const { error: updateErr } = await updateDraft(draftId, profile, newStep);
+          if (updateErr) {
+            setSaveState("error");
+            setError(updateErr || "Could not save this step. Please try again.");
+            return;
+          }
+        }
+        setSaveState("saved");
+      }
       dirtyRef.current = true;
       setStep(newStep);
-      // Proactively flush the autosave with the new step number so a
-      // refresh resumes at the page the user actually landed on. Fire-
-      // and-forget — the normal debounce will also catch this within
-      // 1.5s, but the immediate call eliminates the brief window during
-      // which the DB still shows the previous step.
-      if (isDraftFlow && authUser?.id) {
-        if (!draftId) {
-          // Very first advance before autosave has even fired — create
-          // the draft now so we have an id for subsequent updates.
-          if (!savingRef.current) {
-            savingRef.current = true;
-            setSaveState("saving");
-            createDraft(authUser.id, profile, newStep)
-              .then(({ data }) => {
-                if (data?.id) {
-                  setDraftId(data.id);
-                  const qs = new URLSearchParams({ profileId: data.id });
-                  if (relationshipFromUrl) qs.set("relationship", relationshipFromUrl);
-                  router.replace(`/profile/complete?${qs.toString()}`);
-                }
-                setSaveState("saved");
-              })
-              .catch(() => setSaveState("error"))
-              .finally(() => {
-                savingRef.current = false;
-              });
-          }
-        } else {
-          updateDraft(draftId, profile, newStep).catch(() => {
-            setSaveState("error");
-          });
-        }
-      }
       if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -935,6 +1025,33 @@ function ProfileCompleteInner() {
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{title}</h1>
           <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
+          {isDraftFlow && (
+            <div className="mt-3 w-full sm:w-72">
+              <label className="block text-xs font-semibold text-gray-600 mb-1">
+                Profile for
+              </label>
+              <select
+                value={(profile.relationship || relationshipFromUrl || "self") as string}
+                onChange={(e) => {
+                  const rel = e.target.value as Relationship;
+                  update("relationship", rel);
+                  update("managedBy", rel === "self" ? "self" : rel === "other" ? "guardian" : "parent");
+                  if (typeof window !== "undefined") {
+                    const qs = new URLSearchParams(window.location.search);
+                    qs.set("relationship", rel);
+                    window.history.replaceState({}, "", `${window.location.pathname}?${qs.toString()}`);
+                  }
+                }}
+                className={selectClass}
+              >
+                {VALID_RELATIONSHIPS.map((rel) => (
+                  <option key={rel} value={rel}>
+                    {RELATIONSHIP_LABELS[rel]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Stepper */}
@@ -1059,11 +1176,9 @@ function ProfileCompleteInner() {
                   </div>
                 </IconField>
                 <IconField icon={Calendar} label="Date of Birth" required>
-                  <input
-                    type="date"
+                  <DateOfBirthSelect
                     value={profile.dateOfBirth || ""}
-                    onChange={(e) => update("dateOfBirth", e.target.value)}
-                    className={selectClass}
+                    onChange={(next) => update("dateOfBirth", next)}
                   />
                 </IconField>
                 <IconField icon={Heart} label="Marital Status">
@@ -1105,59 +1220,23 @@ function ProfileCompleteInner() {
                   />
                 </IconField>
                 <IconField icon={Languages} label="Mother Tongue">
-                  <select
-                    value={
-                      LANGUAGE_OPTIONS.includes((profile.motherTongue || "") as (typeof LANGUAGE_OPTIONS)[number])
-                        ? (profile.motherTongue as string)
-                        : "Other"
-                    }
-                    onChange={(e) => {
-                      const next = e.target.value;
-                      if (next === "Other") {
-                        update("motherTongue", "");
-                        return;
-                      }
-                      update("motherTongue", next);
-                    }}
-                    className={selectClass}
-                  >
-                    {LANGUAGE_OPTIONS.map((lang) => (
-                      <option key={lang} value={lang}>
-                        {lang}
-                      </option>
-                    ))}
-                  </select>
+                  <TagPillInput
+                    values={profile.motherTongue ? [profile.motherTongue] : []}
+                    onChange={(next) => update("motherTongue", next[0] || "")}
+                    suggestions={LANGUAGE_SUGGESTIONS}
+                    maxTags={1}
+                    placeholder="Type mother tongue and press Enter"
+                  />
                 </IconField>
-                {(!profile.motherTongue ||
-                  !LANGUAGE_OPTIONS.includes(
-                    (profile.motherTongue || "") as (typeof LANGUAGE_OPTIONS)[number]
-                  )) && (
-                  <IconField icon={Languages} label="Other Language">
-                    <input
-                      placeholder="Enter your language"
-                      value={profile.motherTongue || ""}
-                      onChange={(e) => update("motherTongue", e.target.value)}
-                      className={selectClass}
-                    />
-                  </IconField>
-                )}
                 <div className="sm:col-span-2">
                   <IconField icon={Languages} label="Languages Known">
-                    <input
-                      list="languages-known-list"
-                      placeholder="Type and separate by commas"
-                      value={profile.languagesKnown || ""}
-                      onChange={(e) => update("languagesKnown", e.target.value)}
-                      className={selectClass}
+                    <TagPillInput
+                      values={splitCommaValues(profile.languagesKnown)}
+                      onChange={(next) => update("languagesKnown", joinCommaValues(next))}
+                      suggestions={LANGUAGE_SUGGESTIONS}
+                      placeholder="Type language and press Enter/comma"
+                      helperText="Enter and comma both work. Suggestions appear while typing."
                     />
-                    <datalist id="languages-known-list">
-                      {LANGUAGE_SUGGESTIONS.map((lang) => (
-                        <option key={lang} value={lang} />
-                      ))}
-                    </datalist>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Suggestions appear while typing. Add multiple languages separated by commas.
-                    </p>
                   </IconField>
                 </div>
                 <div className="sm:col-span-2">
@@ -1240,11 +1319,12 @@ function ProfileCompleteInner() {
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <IconField icon={GraduationCap} label="Qualification">
-                  <SearchableSelect
-                    value={profile.qualification || ""}
-                    onChange={(v) => update("qualification", v)}
-                    options={EDUCATION_SUGGESTIONS}
-                    placeholder="Type qualification"
+                  <TagPillInput
+                    values={splitCommaValues(profile.qualification)}
+                    onChange={(next) => update("qualification", joinCommaValues(next))}
+                    suggestions={EDUCATION_SUGGESTIONS}
+                    placeholder="Add degree and press Enter/comma"
+                    helperText="Add all degrees (e.g. MBBS, MD, DM). You can type custom qualifications."
                   />
                 </IconField>
                 <IconField icon={Briefcase} label="Profession Type">

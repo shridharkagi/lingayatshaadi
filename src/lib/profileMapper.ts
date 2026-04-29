@@ -11,7 +11,10 @@ export function toProfileRow(p: Partial<Profile>): ProfileRow {
   const row: ProfileRow = {};
   if (p.email != null) row.email = p.email;
   if (p.fullName != null) row.full_name = p.fullName;
-  if (p.dateOfBirth != null) row.date_of_birth = p.dateOfBirth;
+  if (p.dateOfBirth != null) {
+    const dob = String(p.dateOfBirth).trim();
+    row.date_of_birth = dob || null;
+  }
   if (p.gender != null) row.gender = p.gender;
   if (p.maritalStatus != null) row.marital_status = p.maritalStatus;
   if (p.caste != null) row.caste = p.caste;
