@@ -39,7 +39,13 @@ type RecentSubscriptionRow = {
 type MemberSummaryRow = {
   ownerAuthUserId: string;
   ownerAccountCode?: string | null;
+  accountName: string;
   ownerLabel: string;
+  activeProfiles: Array<{
+    profileId: string;
+    profilePublicId: string | null;
+    profileName: string;
+  }>;
   activePlanName: string;
   activePlanEndsAt: string | null;
   activeSubscriptionId?: string | null;
@@ -49,6 +55,16 @@ type MemberSummaryRow = {
   previousPlansCount: number;
   totalPlansCount: number;
   totalPaidAmount: number;
+  history: Array<{
+    subscriptionId: string;
+    planName: string;
+    status: string;
+    startsAt: string | null;
+    expiresAt: string | null;
+    contactsAllowed: number;
+    contactsTaken: number;
+    amountPaid: number;
+  }>;
 };
 type UpgradeRequest = {
   id: string;
@@ -108,6 +124,9 @@ export default function SuperAdminSubscriptionsPage() {
     dailyContactViewLimit: "",
     reason: "",
   });
+  const [historyMember, setHistoryMember] = useState<MemberSummaryRow | null>(null);
+  const [memberExpiryFrom, setMemberExpiryFrom] = useState("");
+  const [memberExpiryTo, setMemberExpiryTo] = useState("");
   const [form, setForm] = useState({
     userQuery: "",
     userId: "",
@@ -244,6 +263,7 @@ export default function SuperAdminSubscriptionsPage() {
       setUserCandidates(users);
       const exact = users.find(
         (u) =>
+          (u.accountCode || "").toLowerCase() === query.toLowerCase() ||
           (u.publicId || "").toLowerCase() === query.toLowerCase() ||
           (u.userId || "").toLowerCase() === query.toLowerCase()
       );
@@ -425,9 +445,17 @@ export default function SuperAdminSubscriptionsPage() {
         return hasActive && endsAtMs <= now + 7 * dayMs;
       if (memberExpiryFilter === "expiring_30")
         return hasActive && endsAtMs <= now + 30 * dayMs;
+      if (memberExpiryFrom && Number.isFinite(endsAtMs)) {
+        const fromTs = new Date(`${memberExpiryFrom}T00:00:00`).getTime();
+        if (endsAtMs < fromTs) return false;
+      }
+      if (memberExpiryTo && Number.isFinite(endsAtMs)) {
+        const toTs = new Date(`${memberExpiryTo}T23:59:59`).getTime();
+        if (endsAtMs > toTs) return false;
+      }
       return true;
     });
-  }, [memberSummaries, memberSearch, memberPlanFilter, memberExpiryFilter]);
+  }, [memberSummaries, memberSearch, memberPlanFilter, memberExpiryFilter, memberExpiryFrom, memberExpiryTo]);
   const fmtIn = (iso?: string | null) =>
     iso ? new Date(iso).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "—";
   const toDateInput = (iso?: string | null) => (iso ? new Date(iso).toISOString().slice(0, 10) : "");
@@ -668,21 +696,40 @@ export default function SuperAdminSubscriptionsPage() {
               setMemberSearch("");
               setMemberPlanFilter("all");
               setMemberExpiryFilter("all");
+              setMemberExpiryFrom("");
+              setMemberExpiryTo("");
             }}
             className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium hover:bg-gray-50"
           >
             Reset filters
           </button>
         </div>
+        <div className="mt-2 grid grid-cols-1 md:grid-cols-4 gap-2">
+          <input
+            type="date"
+            value={memberExpiryFrom}
+            onChange={(e) => setMemberExpiryFrom(e.target.value)}
+            className="rounded-lg border border-gray-200 px-3 py-2 text-xs"
+            placeholder="Expiry from"
+          />
+          <input
+            type="date"
+            value={memberExpiryTo}
+            onChange={(e) => setMemberExpiryTo(e.target.value)}
+            className="rounded-lg border border-gray-200 px-3 py-2 text-xs"
+            placeholder="Expiry to"
+          />
+        </div>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b text-left text-gray-500">
-                <th className="py-2 pr-3">Account</th>
+                <th className="py-2 pr-3">Account ID</th>
+                <th className="py-2 pr-3">Account Name</th>
+                <th className="py-2 pr-3">Profile ID</th>
+                <th className="py-2 pr-3">Profile Name</th>
                 <th className="py-2 pr-3">Current plan</th>
                 <th className="py-2 pr-3">Expires</th>
-                <th className="py-2 pr-3">Previous plans</th>
-                <th className="py-2 pr-3">Total plans</th>
                 <th className="py-2 pr-3">Total paid</th>
                 <th className="py-2">Actions</th>
               </tr>
@@ -690,7 +737,7 @@ export default function SuperAdminSubscriptionsPage() {
             <tbody>
               {filteredMemberSummaries.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-4 text-gray-500">
+                  <td colSpan={9} className="py-4 text-gray-500">
                     No subscribed member summary available yet.
                   </td>
                 </tr>
@@ -699,14 +746,34 @@ export default function SuperAdminSubscriptionsPage() {
                   <tr key={m.ownerAuthUserId} className="border-b border-gray-100">
                     <td className="py-2 pr-3">
                       <div className="font-medium text-gray-900">{m.ownerAccountCode || "—"}</div>
-                      <div className="text-[11px] text-gray-500">{m.ownerLabel}</div>
+                    </td>
+                    <td className="py-2 pr-3">{m.accountName || "—"}</td>
+                    <td className="py-2 pr-3">
+                      {m.activeProfiles.length === 0 ? (
+                        <span className="text-gray-400">No profile exists</span>
+                      ) : (
+                        <div className="space-y-0.5">
+                          {m.activeProfiles.map((p) => (
+                            <div key={p.profileId}>{p.profilePublicId || p.profileId.slice(0, 8)}</div>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-2 pr-3">
+                      {m.activeProfiles.length === 0 ? (
+                        <span className="text-gray-400">No profile exists</span>
+                      ) : (
+                        <div className="space-y-0.5">
+                          {m.activeProfiles.map((p) => (
+                            <div key={`${p.profileId}-name`}>{p.profileName}</div>
+                          ))}
+                        </div>
+                      )}
                     </td>
                     <td className="py-2 pr-3">{m.activePlanName}</td>
                     <td className="py-2 pr-3 whitespace-nowrap">{fmtIn(m.activePlanEndsAt)}</td>
-                    <td className="py-2 pr-3">{m.previousPlansCount}</td>
-                    <td className="py-2 pr-3">{m.totalPlansCount}</td>
                     <td className="py-2 pr-3">₹{Number(m.totalPaidAmount || 0).toLocaleString("en-IN")}</td>
-                    <td className="py-2">
+                    <td className="py-2 flex items-center gap-2">
                       <button
                         type="button"
                         onClick={() => openEditFromSummary(m)}
@@ -715,6 +782,13 @@ export default function SuperAdminSubscriptionsPage() {
                         title={m.activeSubscriptionId ? "Edit active subscription" : "No active subscription"}
                       >
                         Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setHistoryMember(m)}
+                        className="rounded-md border border-gray-200 px-2.5 py-1 text-xs font-medium hover:bg-gray-50"
+                      >
+                        History
                       </button>
                     </td>
                   </tr>
@@ -855,9 +929,9 @@ export default function SuperAdminSubscriptionsPage() {
             )}
             {userCandidates.length > 1 && (
               <select
-                value={resolvedUser?.profileId || ""}
+                value={resolvedUser?.userId || ""}
                 onChange={(e) => {
-                  const chosen = userCandidates.find((u) => u.profileId === e.target.value) || null;
+                  const chosen = userCandidates.find((u) => (u.userId || "") === e.target.value) || null;
                   setResolvedUser(chosen);
                   setForm((s) => ({
                     ...s,
@@ -868,7 +942,7 @@ export default function SuperAdminSubscriptionsPage() {
                 className="rounded-lg border border-gray-200 px-3 py-2 text-sm md:col-span-2"
               >
                 {userCandidates.map((u) => (
-                  <option key={String(u.profileId)} value={String(u.profileId || "")}>
+                  <option key={`${u.userId || "unknown"}-${u.profileId || "no-profile"}`} value={String(u.userId || "")}>
                     {u.fullName} {u.publicId ? `(${u.publicId})` : ""}
                   </option>
                 ))}
@@ -990,6 +1064,62 @@ export default function SuperAdminSubscriptionsPage() {
                 className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
               >
                 {savingSubEdit ? "Saving..." : "Save changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {historyMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="w-full max-w-4xl rounded-xl border bg-white p-5 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900">Plan History</h3>
+            <p className="text-xs text-gray-500 mt-1">
+              {historyMember.ownerAccountCode || "—"} · {historyMember.accountName || "User"}
+            </p>
+            <div className="mt-4 max-h-[60vh] overflow-auto">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-white border-b text-left text-gray-500">
+                  <tr>
+                    <th className="py-2 pr-2">Plan</th>
+                    <th className="py-2 pr-2">Status</th>
+                    <th className="py-2 pr-2">Start</th>
+                    <th className="py-2 pr-2">End</th>
+                    <th className="py-2 pr-2">Contacts allowed</th>
+                    <th className="py-2 pr-2">Contacts taken</th>
+                    <th className="py-2">Amount paid</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historyMember.history.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-4 text-gray-500">
+                        No plan history found.
+                      </td>
+                    </tr>
+                  ) : (
+                    historyMember.history.map((h) => (
+                      <tr key={h.subscriptionId} className="border-b border-gray-100">
+                        <td className="py-2 pr-2">{h.planName}</td>
+                        <td className="py-2 pr-2 capitalize">{h.status}</td>
+                        <td className="py-2 pr-2 whitespace-nowrap">{fmtIn(h.startsAt)}</td>
+                        <td className="py-2 pr-2 whitespace-nowrap">{fmtIn(h.expiresAt)}</td>
+                        <td className="py-2 pr-2">{h.contactsAllowed}</td>
+                        <td className="py-2 pr-2">{h.contactsTaken}</td>
+                        <td className="py-2">₹{Number(h.amountPaid || 0).toLocaleString("en-IN")}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setHistoryMember(null)}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium"
+              >
+                Close
               </button>
             </div>
           </div>

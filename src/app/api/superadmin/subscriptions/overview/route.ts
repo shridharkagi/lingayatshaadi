@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
       .lte("expires_at", weekAhead),
     admin
       .from("payment_transactions")
-      .select("amount, status")
+      .select("id, user_id, subscription_id, amount, status, paid_at, created_at")
       .eq("status", "paid")
       .order("created_at", { ascending: false })
       .limit(2000),
@@ -198,12 +198,15 @@ export async function GET(req: NextRequest) {
 
     const historyRows = !historyRes.error
       ? ((historyRes.data || []) as Array<{
+          id: string;
           user_id: string;
           plan_id?: string;
           status?: string;
           starts_at?: string;
           expires_at?: string;
           created_at?: string;
+          total_contact_views_snapshot?: number;
+          daily_contact_view_limit_snapshot?: number;
         }>)
       : [];
     const resolveOwnerAuthId = (uid: string) => byProfileId.get(uid)?.user_id || uid;
@@ -212,24 +215,135 @@ export async function GET(req: NextRequest) {
       {
         ownerAuthUserId: string;
         ownerAccountCode: string | null;
-        ownerLabel: string;
+        accountName: string;
         activePlanName: string;
         activePlanEndsAt: string | null;
         activeSubscriptionId: string | null;
         activeTotalContactViews: number;
         activeDailyContactViewLimit: number;
-          activeNotes: string | null;
+        activeNotes: string | null;
         previousPlansCount: number;
         totalPlansCount: number;
         totalPaidAmount: number;
+        activeProfiles: Array<{
+          profileId: string;
+          profilePublicId: string | null;
+          profileName: string;
+        }>;
+        history: Array<{
+          subscriptionId: string;
+          planName: string;
+          status: string;
+          startsAt: string | null;
+          expiresAt: string | null;
+          contactsAllowed: number;
+          contactsTaken: number;
+          amountPaid: number;
+        }>;
       }
     >();
     const paidByOwner = new Map<string, number>();
+    const paidBySubscription = new Map<string, number>();
     for (const t of txRes.data || []) {
-      const tx = t as { user_id?: string; amount?: number };
+      const tx = t as { user_id?: string; subscription_id?: string; amount?: number };
       if (!tx.user_id) continue;
       const owner = resolveOwnerAuthId(tx.user_id);
       paidByOwner.set(owner, (paidByOwner.get(owner) || 0) + Number(tx.amount || 0));
+      const sid = String(tx.subscription_id || "").trim();
+      if (sid) paidBySubscription.set(sid, (paidBySubscription.get(sid) || 0) + Number(tx.amount || 0));
+    }
+
+    const ownerAuthIds = Array.from(new Set(historyRows.map((h) => resolveOwnerAuthId(String(h.user_id || ""))).filter(Boolean)));
+    const accountNameByUser = new Map<string, string>();
+    let authUsersForCodes: Array<{ id: string; created_at?: string | null; user_metadata?: Record<string, unknown> | null }> = [];
+    try {
+      const authUsers = await listAllAuthUsers(admin);
+      authUsersForCodes = authUsers.map((u) => ({ id: u.id, created_at: u.created_at, user_metadata: u.user_metadata || null }));
+      for (const u of authUsers) {
+        const fullName =
+          String((u.user_metadata?.full_name as string) || "").trim() ||
+          [
+            String((u.user_metadata?.first_name as string) || "").trim(),
+            String((u.user_metadata?.last_name as string) || "").trim(),
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .trim();
+        if (fullName) accountNameByUser.set(u.id, fullName);
+      }
+    } catch {
+      authUsersForCodes = [];
+    }
+
+    let activeProfilesByOwner = new Map<
+      string,
+      Array<{ profileId: string; profilePublicId: string | null; profileName: string }>
+    >();
+    if (ownerAuthIds.length > 0) {
+      const profRes = await admin
+        .from("profiles")
+        .select("id, user_id, public_id, full_name")
+        .in("user_id", ownerAuthIds)
+        .is("deleted_at", null);
+      const rows = (profRes.data || []) as Array<{ id?: string; user_id?: string; public_id?: string | null; full_name?: string }>;
+      for (const p of rows) {
+        const uid = String(p.user_id || "");
+        const pid = String(p.id || "");
+        if (!uid || !pid) continue;
+        const next = activeProfilesByOwner.get(uid) || [];
+        next.push({
+          profileId: pid,
+          profilePublicId: String(p.public_id || "").trim() || null,
+          profileName: String(p.full_name || "Profile"),
+        });
+        activeProfilesByOwner.set(uid, next);
+      }
+    }
+
+    const allOwnerProfileIds = Array.from(
+      new Set(
+        [...activeProfilesByOwner.values()]
+          .flat()
+          .map((p) => p.profileId)
+          .filter(Boolean)
+      )
+    );
+    const minStart = historyRows
+      .map((h) => new Date(String(h.starts_at || "")).getTime())
+      .filter((n) => Number.isFinite(n));
+    const maxEnd = historyRows
+      .map((h) => new Date(String(h.expires_at || "")).getTime())
+      .filter((n) => Number.isFinite(n));
+    const viewsByOwnerAndSub = new Map<string, number>();
+    if (allOwnerProfileIds.length > 0 && minStart.length > 0 && maxEnd.length > 0) {
+      const profileToOwner = new Map<string, string>();
+      for (const [owner, profiles] of activeProfilesByOwner.entries()) {
+        for (const p of profiles) profileToOwner.set(p.profileId, owner);
+      }
+      const { data: viewRows } = await admin
+        .from("contact_views")
+        .select("viewer_id, viewed_at")
+        .in("viewer_id", allOwnerProfileIds)
+        .gte("viewed_at", new Date(Math.min(...minStart)).toISOString())
+        .lte("viewed_at", new Date(Math.max(...maxEnd)).toISOString())
+        .limit(20000);
+      const rows = (viewRows || []) as Array<{ viewer_id?: string; viewed_at?: string }>;
+      for (const v of rows) {
+        const pid = String(v.viewer_id || "");
+        const owner = profileToOwner.get(pid);
+        const viewedTs = new Date(String(v.viewed_at || "")).getTime();
+        if (!owner || !Number.isFinite(viewedTs)) continue;
+        for (const h of historyRows) {
+          const hOwner = resolveOwnerAuthId(String(h.user_id || ""));
+          if (hOwner !== owner) continue;
+          const s = new Date(String(h.starts_at || "")).getTime();
+          const e = new Date(String(h.expires_at || "")).getTime();
+          if (!Number.isFinite(s) || !Number.isFinite(e)) continue;
+          if (viewedTs < s || viewedTs > e) continue;
+          const key = `${owner}:${String(h.id || "")}`;
+          viewsByOwnerAndSub.set(key, (viewsByOwnerAndSub.get(key) || 0) + 1);
+        }
+      }
     }
     for (const h of historyRows) {
       const owner = resolveOwnerAuthId(String(h.user_id || ""));
@@ -237,7 +351,7 @@ export async function GET(req: NextRequest) {
       const existing = summaryMap.get(owner) || {
         ownerAuthUserId: owner,
         ownerAccountCode: null,
-        ownerLabel: memberLabel(owner),
+        accountName: accountNameByUser.get(owner) || "User",
         activePlanName: "—",
         activePlanEndsAt: null,
         activeSubscriptionId: null,
@@ -247,6 +361,8 @@ export async function GET(req: NextRequest) {
         previousPlansCount: 0,
         totalPlansCount: 0,
         totalPaidAmount: 0,
+        activeProfiles: activeProfilesByOwner.get(owner) || [],
+        history: [],
       };
       existing.totalPlansCount += 1;
       const starts = h.starts_at || "";
@@ -268,14 +384,24 @@ export async function GET(req: NextRequest) {
           existing.activeNotes = null;
         }
       }
+      const sid = String(h.id || "");
+      existing.history.push({
+        subscriptionId: sid,
+        planName: planNameById.get(String(h.plan_id || "")) || "Plan",
+        status: String(h.status || ""),
+        startsAt: h.starts_at || null,
+        expiresAt: h.expires_at || null,
+        contactsAllowed: Number(h.total_contact_views_snapshot || 0),
+        contactsTaken: viewsByOwnerAndSub.get(`${owner}:${sid}`) || 0,
+        amountPaid: paidBySubscription.get(sid) || 0,
+      });
       summaryMap.set(owner, existing);
     }
     let codeByUser = new Map<string, string>();
     try {
-      const authUsers = await listAllAuthUsers(admin);
       codeByUser = await resolveAccountCodeMap(
         admin,
-        authUsers.map((u) => ({ id: u.id, created_at: u.created_at }))
+        authUsersForCodes.map((u) => ({ id: u.id, created_at: u.created_at }))
       );
     } catch {
       codeByUser = new Map<string, string>();
@@ -288,6 +414,8 @@ export async function GET(req: NextRequest) {
         ownerAccountCode: codeByUser.get(s.ownerAuthUserId) || null,
         previousPlansCount,
         totalPaidAmount,
+        ownerLabel:
+          `${s.accountName}${(codeByUser.get(s.ownerAuthUserId) || "").trim() ? ` (${codeByUser.get(s.ownerAuthUserId)})` : ""}`,
       };
     });
     memberSummaries.sort((a, b) => {

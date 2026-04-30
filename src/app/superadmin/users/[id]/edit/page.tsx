@@ -9,6 +9,7 @@ import { getMemberIdDisplay } from "@/lib/memberId";
 import { useState, useEffect } from "react";
 import { Profile } from "@/types";
 import { getProfileById, updateProfileById } from "@/lib/api/profiles";
+import { parseDobDdMmYyyyToIso } from "@/lib/dateOfBirth";
 
 export default function SuperAdminEditProfilePage() {
   const params = useParams();
@@ -69,7 +70,17 @@ export default function SuperAdminEditProfilePage() {
   const handleSave = async () => {
     setSaving(true);
     setError(null);
-    const { error } = await updateProfileById(id, profile, { skipModeration: true });
+    const normalizedDob = parseDobDdMmYyyyToIso(String(profile.dateOfBirth || ""));
+    if (profile.dateOfBirth && !normalizedDob) {
+      setSaving(false);
+      setError("Date of birth must be in dd/mm/yyyy format.");
+      return;
+    }
+    const payload: Partial<Profile> = {
+      ...profile,
+      ...(normalizedDob ? { dateOfBirth: normalizedDob } : {}),
+    };
+    const { error } = await updateProfileById(id, payload, { skipModeration: true });
     setSaving(false);
     if (error) {
       setError(error);
