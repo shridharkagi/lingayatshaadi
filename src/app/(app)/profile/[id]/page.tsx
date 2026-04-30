@@ -1604,20 +1604,6 @@ export default function OtherProfilePage() {
           </div>
         )}
 
-        {/* Hobbies and Interests - after About Me (Screen 1 design) */}
-        {profile.hobbies && profile.hobbies.length > 0 && (
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-            <h3 className="font-semibold text-base sm:text-lg text-[var(--foreground)] mb-3 pb-2 border-b border-gray-200">
-              Hobbies and Interests
-            </h3>
-            <div className="flex flex-wrap gap-2 pt-1">
-              {profile.hobbies.map((hobby) => (
-                <HobbyTag key={hobby} label={hobby} />
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Profile Details - reference design (Location, Education & Career, Family) */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
           <h3 className="font-semibold text-base sm:text-lg text-[var(--foreground)] mb-3">Profile Details</h3>
@@ -1917,6 +1903,20 @@ export default function OtherProfilePage() {
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Hobbies and Interests - placed after Horoscope Details */}
+        {profile.hobbies && profile.hobbies.length > 0 && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <h3 className="font-semibold text-base sm:text-lg text-[var(--foreground)] mb-3 pb-2 border-b border-gray-200">
+              Hobbies and Interests
+            </h3>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {profile.hobbies.map((hobby) => (
+                <HobbyTag key={hobby} label={hobby} />
+              ))}
             </div>
           </div>
         )}
