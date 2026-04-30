@@ -12,6 +12,20 @@ export async function GET(req: NextRequest) {
   if (q.length < 2) return NextResponse.json({ items: [] });
 
   const admin = createSupabaseAdmin();
+  const { data: superadminOwners } = await admin
+    .from("profiles")
+    .select("user_id")
+    .eq("role", "superadmin")
+    .is("deleted_at", null);
+  const superadminUserIds = new Set<string>(
+    (superadminOwners || [])
+      .map((r) => String((r as { user_id?: string | null }).user_id || "").trim())
+      .filter(Boolean)
+  );
+  // Ensure the currently authenticated superadmin account is always searchable,
+  // even if its profile role row has not been seeded yet.
+  superadminUserIds.add(auth.userId);
+
   let users;
   try {
     users = await listAllAuthUsers(admin);
@@ -31,16 +45,19 @@ export async function GET(req: NextRequest) {
         String((u.user_metadata?.full_name as string) || "").trim() ||
         String((u.user_metadata?.first_name as string) || "").trim() ||
         "User";
+      const isAdmin = superadminUserIds.has(u.id);
+      const displayName = name === "User" && isAdmin ? "Admin" : name;
       return {
         userId: u.id,
         accountCode: codeByUser.get(u.id) || "",
-        name,
+        name: displayName,
         email: u.email || null,
         phone: u.phone || null,
+        isAdmin,
       };
     })
     .filter((u) => {
-      const hay = `${u.accountCode} ${u.userId} ${u.name} ${u.email || ""} ${u.phone || ""}`.toLowerCase();
+      const hay = `${u.accountCode} ${u.userId} ${u.name} ${u.email || ""} ${u.phone || ""} ${u.isAdmin ? "admin superadmin" : ""}`.toLowerCase();
       return hay.includes(q);
     })
     .slice(0, 20);
