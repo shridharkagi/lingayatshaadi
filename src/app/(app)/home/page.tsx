@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
@@ -8,6 +8,8 @@ import Image from "next/image";
 import { Search, ChevronRight, Quote } from "lucide-react";
 import { useProfiles } from "@/contexts/ProfilesContext";
 import { ProfileCard } from "@/components/ui/ProfileCard";
+import { getAccountAccessState } from "@/lib/api/accessState";
+import { maskLastNameKeepPrefix, type AccountAccessState } from "@/lib/accessPolicy";
 
 const testimonials = [
   {
@@ -31,6 +33,7 @@ export default function HomePage() {
   const router = useRouter();
   const { user, isLoggedIn, profileComplete, loading } = useAuth();
   const { profiles } = useProfiles();
+  const [accessState, setAccessState] = useState<AccountAccessState | null>(null);
 
   useEffect(() => {
     if (loading) return;
@@ -42,8 +45,23 @@ export default function HomePage() {
       router.replace("/profile/complete");
     }
   }, [loading, isLoggedIn, profileComplete, router]);
+  useEffect(() => {
+    let cancelled = false;
+    if (!isLoggedIn) {
+      setAccessState(null);
+      return;
+    }
+    void (async () => {
+      const access = await getAccountAccessState();
+      if (!cancelled) setAccessState(access);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn]);
   const matches = profiles.slice(0, 6);
   const firstName = user?.fullName?.split(" ")[0] || "User";
+  const canViewSensitiveFields = !!accessState?.hasValidSubscription;
 
   return (
     <div className="w-full pb-8 space-y-5">
@@ -119,7 +137,13 @@ export default function HomePage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
             {matches.map((profile) => (
-              <ProfileCard key={profile.id} profile={profile} />
+              <ProfileCard
+                key={profile.id}
+                profile={profile}
+                displayName={
+                  canViewSensitiveFields ? profile.fullName : maskLastNameKeepPrefix(profile.fullName)
+                }
+              />
             ))}
           </div>
         </div>

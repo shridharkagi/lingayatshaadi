@@ -77,7 +77,7 @@ import { computeProfileCompletion } from "@/lib/profileCompletion";
 import { buildProfileSeoTitle } from "@/lib/profileSeo";
 import { buildProfileShareFooter, buildProfileShareText, getShortProfilePath } from "@/lib/profileShare";
 import { getAccountAccessState } from "@/lib/api/accessState";
-import { maskBirthDateKeepYear, maskLastName, MASKED_VALUE, type AccountAccessState } from "@/lib/accessPolicy";
+import { maskBirthDateKeepYear, maskLastName, maskLastNameKeepPrefix, MASKED_VALUE, type AccountAccessState } from "@/lib/accessPolicy";
 import { WhatsAppGroupCta } from "@/components/whatsapp/WhatsAppGroupCta";
 
 /** Session-only: user dismissed the confidential-use strip for this browser session. */
@@ -2398,9 +2398,7 @@ export default function OtherProfilePage() {
                     displayName={
                       canViewSensitiveFields
                         ? similar.fullName
-                        : isLoggedIn
-                          ? maskLastName(similar.fullName)
-                          : maskString(similar.fullName, 5)
+                        : maskLastNameKeepPrefix(similar.fullName)
                     }
                   />
                 ))}

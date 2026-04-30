@@ -17,7 +17,7 @@ import { useAuthModal } from "@/contexts/AuthModalContext";
 import { ViewerForensicWatermark } from "@/components/ViewerForensicWatermark";
 import { SiteFooter } from "@/components/SiteFooter";
 import { getAccountAccessState } from "@/lib/api/accessState";
-import { maskLastName, maskPublicName, type AccountAccessState } from "@/lib/accessPolicy";
+import { maskLastNameKeepPrefix, type AccountAccessState } from "@/lib/accessPolicy";
 import { searchProfilesCursor } from "@/lib/api/profiles";
 import type { Profile } from "@/types";
 
@@ -341,9 +341,7 @@ export function ProfilesView({
                   displayName={
                     canViewSensitiveFields
                       ? profile.fullName
-                      : isLoggedIn
-                        ? maskLastName(profile.fullName)
-                        : maskPublicName(profile.fullName)
+                      : maskLastNameKeepPrefix(profile.fullName)
                   }
                 />
               ))}

@@ -65,3 +65,21 @@ export function maskPublicName(fullName: string): string {
     .map((p) => p.slice(0, 2) + "*".repeat(Math.max(0, p.length - 2)))
     .join(" ");
 }
+
+export function firstNameOnly(fullName: string): string {
+  const clean = (fullName || "").trim();
+  if (!clean) return "";
+  return clean.split(/\s+/)[0] || "";
+}
+
+export function maskLastNameKeepPrefix(fullName: string): string {
+  const clean = (fullName || "").trim();
+  if (!clean) return "";
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0];
+  const first = parts.slice(0, -1).join(" ");
+  const last = parts[parts.length - 1];
+  const visible = last.slice(0, 2);
+  const maskedCount = Math.max(2, last.length - 2);
+  return `${first} ${visible}${"*".repeat(maskedCount)}`;
+}
