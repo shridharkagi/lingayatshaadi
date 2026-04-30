@@ -9,7 +9,7 @@ import { debounce } from "@/lib/security";
 import { useAuth } from "@/contexts/AuthContext";
 import { ViewerForensicWatermark } from "@/components/ViewerForensicWatermark";
 import { getAccountAccessState } from "@/lib/api/accessState";
-import { maskLastName, maskPublicName, type AccountAccessState } from "@/lib/accessPolicy";
+import { maskLastNameKeepPrefix, type AccountAccessState } from "@/lib/accessPolicy";
 import { WhatsAppGroupCta } from "@/components/whatsapp/WhatsAppGroupCta";
 import { searchProfilesCursor } from "@/lib/api/profiles";
 import type { Profile } from "@/types";
@@ -246,11 +246,7 @@ export default function SearchPage() {
                 displayName={
                   canViewSensitiveFields
                     ? profile.fullName
-                    : !isLoggedIn
-                      ? maskPublicName(profile.fullName)
-                    : isLoggedIn
-                      ? maskLastName(profile.fullName)
-                      : undefined
+                    : maskLastNameKeepPrefix(profile.fullName)
                 }
               />
             ))}
@@ -264,11 +260,7 @@ export default function SearchPage() {
                 displayName={
                   canViewSensitiveFields
                     ? profile.fullName
-                    : !isLoggedIn
-                      ? maskPublicName(profile.fullName)
-                    : isLoggedIn
-                      ? maskLastName(profile.fullName)
-                      : undefined
+                    : maskLastNameKeepPrefix(profile.fullName)
                 }
               />
             ))}

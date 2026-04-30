@@ -72,6 +72,7 @@ const LATEST_PROFILE_IMAGES = [
   "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80&fit=crop",
   "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80&fit=crop",
   "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&q=80&fit=crop",
+  "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=400&q=80&fit=crop",
 ];
 
 const latestProfiles = [
@@ -80,6 +81,7 @@ const latestProfiles = [
   { name: "Anita J.", age: 26, location: "Dharwad", profession: "Teacher", image: LATEST_PROFILE_IMAGES[2] },
   { name: "Mahesh K.", age: 29, location: "Gadag", profession: "Doctor", image: LATEST_PROFILE_IMAGES[3] },
   { name: "Lakshmi P.", age: 28, location: "Bidar", profession: "Architect", image: LATEST_PROFILE_IMAGES[4] },
+  { name: "Prasad M.", age: 30, location: "Mysore", profession: "Consultant", image: LATEST_PROFILE_IMAGES[5] },
 ];
 
 const COMMUNITY_IMG =
@@ -159,7 +161,7 @@ export default function LandingPage() {
     let cancelled = false;
     (async () => {
       try {
-        const { data, error } = await searchProfiles({}, 5);
+        const { data, error } = await searchProfiles({}, 6);
         if (cancelled) return;
         if (error || !data || data.length === 0) {
           setLivePreviewProfiles([]);
@@ -182,7 +184,7 @@ export default function LandingPage() {
   const previewCards = useMemo(() => {
     const hasLive = livePreviewProfiles && livePreviewProfiles.length > 0;
     if (hasLive) {
-      return livePreviewProfiles!.slice(0, 5).map((p, i) => {
+      return livePreviewProfiles!.slice(0, 6).map((p, i) => {
         const age = calculateAge(p.dateOfBirth);
         const image = p.profilePhoto || p.photos?.[0] || LATEST_PROFILE_IMAGES[i % LATEST_PROFILE_IMAGES.length];
         const slug = getProfileSlug(p);
@@ -474,15 +476,15 @@ export default function LandingPage() {
           <p className="text-[var(--color-text-muted)] text-center max-w-2xl mx-auto mb-8 sm:mb-10">
             New Lingayat members register daily. Browse verified profiles from across Karnataka and beyond.
           </p>
-          <div className="space-y-3 sm:space-y-4">
-            <div className="space-y-3 sm:space-y-4">
+          <div className="mx-auto w-full max-w-5xl">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
               {previewCards.map((profile, i) => (
                 <Link
                   key={`${profile.href}-${i}`}
                   href={profile.href}
-                  className="bg-[var(--color-bg)] rounded-2xl overflow-hidden shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-card)] transition-all border border-[var(--color-border)]/50 group flex"
+                  className="bg-[var(--color-bg)] rounded-2xl overflow-hidden shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-card)] transition-all border border-[var(--color-border)]/50 group flex h-full"
                 >
-                  <div className="relative w-[42%] min-w-[42%] max-w-[210px] aspect-[3/4] bg-gray-200 flex-shrink-0 overflow-hidden">
+                  <div className="relative w-[42%] min-w-[42%] max-w-[220px] aspect-[3/4] bg-gray-200 flex-shrink-0 overflow-hidden">
                     <Image
                       src={profile.image}
                       alt={profile.name}
@@ -492,21 +494,17 @@ export default function LandingPage() {
                       unoptimized
                     />
                   </div>
-                  <div className="p-4 flex-1 min-w-0 flex flex-col justify-between">
-                    <div>
+                  <div className="p-4 sm:p-5 flex-1 min-w-0 flex flex-col justify-center">
                     <h3 className="font-semibold text-[var(--color-text-primary)] text-lg sm:text-xl truncate">
                       {profile.name}
                     </h3>
-                    <p className="text-sm sm:text-base text-[var(--color-text-muted)] mt-0.5">
-                      {profile.age ? `${profile.age} yrs` : "—"}
-                      {" • "}
-                      {profile.profession || "—"}
+                    <p className="text-sm sm:text-base text-[var(--color-text-muted)] mt-1">
+                      {profile.age ? `${profile.age} yrs` : "—"}{" • "}{profile.profession || "—"}
                     </p>
                     <p className="text-sm sm:text-base text-[var(--color-text-muted)] mt-1 truncate">
-                      {profile.location || ""}
+                      {profile.location || "Location not available"}
                     </p>
-                    </div>
-                    <span className="inline-flex mt-4 w-fit px-5 py-2.5 rounded-2xl bg-[var(--primary)] text-white text-sm sm:text-base font-semibold group-hover:bg-[var(--color-primary-hover)] transition-colors">
+                    <span className="inline-flex mt-4 w-fit px-4 py-2 rounded-xl bg-[var(--primary)] text-white text-sm font-semibold group-hover:bg-[var(--color-primary-hover)] transition-colors">
                       View Profile
                     </span>
                   </div>
