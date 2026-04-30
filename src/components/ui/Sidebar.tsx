@@ -61,7 +61,12 @@ export function Sidebar() {
     <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-[var(--border)] min-h-screen fixed left-0 top-0 z-40">
       <Link href="/profiles" className="p-6 flex items-center gap-2 border-b border-[var(--border)]">
         <Heart className="w-8 h-8 text-[var(--primary)] fill-[var(--primary)]" />
-        <span className="text-xl font-bold text-[var(--primary)]">LingayatBandhu</span>
+        <span className="leading-tight text-[var(--primary)]">
+          <span className="block text-xl font-bold">LingayatBandhu</span>
+          <span className="block text-[11px] font-semibold tracking-[0.14em] uppercase text-[var(--primary)]/85">
+            Matrimony
+          </span>
+        </span>
       </Link>
       <nav className="flex-1 p-4 space-y-1">
         {navItems.map(({ href, icon: Icon, label }) => {

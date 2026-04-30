@@ -222,7 +222,7 @@ export function PhotoUpload({
               <button
                 type="button"
                 onClick={() => handleRemove(url)}
-                className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/50 hover:bg-black/70 text-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/55 hover:bg-black/70 text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 transition-opacity z-10"
                 aria-label="Remove photo"
               >
                 <X size={18} />

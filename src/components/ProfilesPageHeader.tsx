@@ -30,8 +30,11 @@ export function ProfilesPageHeader() {
       <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-14 sm:h-16">
         <Link href="/" className="flex items-center gap-2">
           <Heart className="w-8 h-8 text-[var(--primary)] fill-[var(--primary)]" aria-hidden />
-          <span className="text-xl font-bold text-[var(--primary)]">
-            LingayatBandhu
+          <span className="leading-tight text-[var(--primary)]">
+            <span className="block text-xl font-bold">LingayatBandhu</span>
+            <span className="block text-[11px] sm:text-xs font-semibold tracking-[0.14em] uppercase text-[var(--primary)]/85">
+              Matrimony
+            </span>
           </span>
         </Link>
         <nav className="hidden md:flex items-center gap-6">

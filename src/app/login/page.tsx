@@ -261,8 +261,11 @@ export default function LoginPage() {
         <div className="flex items-center justify-between px-4 h-14">
           <Link href="/" className="flex items-center gap-2">
             <Heart className="w-7 h-7 text-[var(--primary)] fill-[var(--primary)]" />
-            <span className="text-lg font-bold text-[var(--primary)]">
-              LingayatBandhu
+            <span className="leading-tight text-[var(--primary)]">
+              <span className="block text-lg font-bold">LingayatBandhu</span>
+              <span className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-[var(--primary)]/85">
+                Matrimony
+              </span>
             </span>
           </Link>
           <nav className="hidden md:flex items-center gap-4">
