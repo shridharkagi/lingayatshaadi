@@ -46,6 +46,8 @@ export const metadata: Metadata = {
     title: "LingayatBandhu",
   },
   icons: {
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
     apple: "/icons/icon-192x192.png",
   },
   formatDetection: {
@@ -94,7 +96,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#8b0000",
+  themeColor: "#d4a437",
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
 };
