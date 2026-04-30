@@ -64,6 +64,7 @@ import {
   findDraftForUser,
 } from "@/lib/api/drafts";
 import { Cloud, CloudOff, Loader2 } from "lucide-react";
+import { formatIsoToDobDdMmYyyy, parseDobDdMmYyyyToIso } from "@/lib/dateOfBirth";
 
 interface StepDef {
   id: number;
@@ -466,18 +467,19 @@ function TimeOfBirthPicker({
         ))}
       </select>
       <span className="text-gray-400 font-semibold">:</span>
-      <select
-        value={t.minute}
-        onChange={(e) => set({ minute: Number(e.target.value) })}
+      <input
+        type="number"
+        min={0}
+        max={59}
+        value={String(t.minute).padStart(2, "0")}
+        onChange={(e) => {
+          const n = Number(e.target.value);
+          if (Number.isNaN(n)) return;
+          set({ minute: Math.max(0, Math.min(59, n)) });
+        }}
         className="w-16 px-2 py-2 rounded-lg border border-[var(--border)] bg-white text-sm tabular-nums focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/30 focus:border-[var(--primary)]"
         aria-label="Minute"
-      >
-        {Array.from({ length: 12 }, (_, i) => i * 5).map((m) => (
-          <option key={m} value={m}>
-            {String(m).padStart(2, "0")}
-          </option>
-        ))}
-      </select>
+      />
       <div className="inline-flex rounded-lg border border-[var(--border)] overflow-hidden ml-1">
         {(["AM", "PM"] as const).map((p) => (
           <button
@@ -509,12 +511,14 @@ function DateOfBirthSelect({
   const [day, setDay] = useState(initialDay || "");
   const [month, setMonth] = useState(initialMonth || "");
   const [year, setYear] = useState(initialYear || "");
+  const [manualDob, setManualDob] = useState(formatIsoToDobDdMmYyyy(value || ""));
 
   useEffect(() => {
     const [y, m, d] = (value || "").split("-");
     setYear(y || "");
     setMonth(m || "");
     setDay(d || "");
+    setManualDob(formatIsoToDobDdMmYyyy(value || ""));
   }, [value]);
 
   const currentYear = new Date().getFullYear();
@@ -533,7 +537,19 @@ function DateOfBirthSelect({
   };
 
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="space-y-2">
+      <input
+        type="text"
+        value={manualDob}
+        onChange={(e) => setManualDob(e.target.value)}
+        onBlur={(e) => {
+          const normalized = parseDobDdMmYyyyToIso(e.target.value);
+          if (normalized) onChange(normalized);
+        }}
+        placeholder="dd/mm/yyyy"
+        className={selectClass}
+      />
+      <div className="grid grid-cols-3 gap-2">
       <select
         value={day || ""}
         onChange={(e) => setPart(year || "", month || "", e.target.value)}
@@ -570,6 +586,7 @@ function DateOfBirthSelect({
           </option>
         ))}
       </select>
+      </div>
     </div>
   );
 }
@@ -859,6 +876,10 @@ function ProfileCompleteInner() {
         setError("Full Name, Date of Birth, and Gender are required.");
         return;
       }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) {
+        setError("Date of Birth format should be dd/mm/yyyy.");
+        return;
+      }
     }
     if (step < steps.length) {
       const newStep = step + 1;
@@ -898,6 +919,11 @@ function ProfileCompleteInner() {
 
     if (!fullName || !dateOfBirth || !gender) {
       setError("Full Name, Date of Birth, and Gender are required.");
+      setStep(1);
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) {
+      setError("Date of Birth format should be dd/mm/yyyy.");
       setStep(1);
       return;
     }

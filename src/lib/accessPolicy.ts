@@ -23,7 +23,7 @@ export function resolveAccountAccess(input: AccountAccessInput): AccountAccessSt
   const hasOwnedProfile = input.nonDeletedProfileCount > 0;
   const canSave = input.isLoggedIn;
   const canSendInterest = input.isLoggedIn && hasOwnedProfile;
-  const canContact = input.isLoggedIn && hasOwnedProfile && input.hasValidSubscription;
+  const canContact = input.isLoggedIn && input.hasValidSubscription;
   const canCreateProfile =
     input.isLoggedIn && input.nonDeletedProfileCount < MAX_ACTIVE_OR_PENDING_PROFILES;
   const shouldMaskSensitiveFields = !input.hasValidSubscription;

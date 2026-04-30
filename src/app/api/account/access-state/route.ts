@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireAuthUser } from "@/lib/server/requireAuthUser";
 import { resolveAccountAccess } from "@/lib/accessPolicy";
+import { ensureFreePlanForUser } from "@/lib/server/freePlanProvisioning";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuthUser(req);
@@ -9,6 +10,9 @@ export async function GET(req: NextRequest) {
 
   const admin = createSupabaseAdmin();
   const nowIso = new Date().toISOString();
+
+  // Backfill: older accounts without any active plan receive Free automatically.
+  await ensureFreePlanForUser(admin, auth.userId);
 
   const [{ data: ownedProfiles, count: nonDeletedProfileCount }] = await Promise.all([
     admin

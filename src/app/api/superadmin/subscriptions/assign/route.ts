@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
 import { logAdminAudit } from "@/lib/server/adminAudit";
+import { listAllAuthUsers } from "@/lib/server/authUsers";
 
 type PaymentMode = "phonepe" | "gpay" | "bank_transfer" | "check" | "other" | "cash" | "free_auto";
 
@@ -47,6 +48,12 @@ function isUserSubscriptionsNotesColumnError(message: string | undefined): boole
   if (!message) return false;
   const m = message.toLowerCase();
   return m.includes("column") && m.includes("notes") && m.includes("does not exist");
+}
+
+function syntheticProfileEmailFromPhone(phone: string): string {
+  const digits10 = String(phone || "").replace(/\D/g, "").slice(-10);
+  if (digits10.length === 10) return `phone_${digits10}@profile.lingayatbandhu`;
+  return `user_${Date.now()}@profile.lingayatbandhu`;
 }
 
 type SubscriptionPlanRow = {
@@ -150,6 +157,90 @@ async function resolveMembershipPlanIdForFk(
   return { legacyPlanId: null, membershipPlansRowCount: list.length };
 }
 
+async function ensureShadowProfileForLegacySubscriptionFk(
+  admin: ReturnType<typeof createSupabaseAdmin>,
+  authUserId: string
+): Promise<string | null> {
+  const userId = String(authUserId || "").trim();
+  if (!userId) return null;
+
+  const { data: existing } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  const existingId = String((existing as { id?: string } | null)?.id || "").trim();
+  if (existingId) return existingId;
+
+  let fullName = "Account Holder";
+  let email = "";
+  let contact = "";
+  try {
+    const { data: authLookup } = await admin.auth.admin.getUserById(userId);
+    const u = authLookup?.user;
+    fullName =
+      String((u?.user_metadata?.full_name as string) || "").trim() ||
+      [
+        String((u?.user_metadata?.first_name as string) || "").trim(),
+        String((u?.user_metadata?.last_name as string) || "").trim(),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .trim() ||
+      "Account Holder";
+    email =
+      String(u?.email || "").trim() ||
+      syntheticProfileEmailFromPhone(String(u?.phone || ""));
+    contact = String(u?.phone || "").trim();
+  } catch {
+    email = syntheticProfileEmailFromPhone("");
+  }
+
+  const nowIso = new Date().toISOString();
+  const payloadWithSoftDelete = {
+    user_id: userId,
+    email,
+    full_name: fullName,
+    date_of_birth: "1990-01-01",
+    gender: "other",
+    managed_by: "self",
+    role: "user",
+    profile_status: "pending",
+    profile_type: "free",
+    country: "India",
+    contact: contact || null,
+    account_holder_name: fullName,
+    about_me_visible: false,
+    deleted_at: nowIso,
+    deleted_reason: "auto_shadow_for_subscription_fk",
+    moderation_status: "draft",
+    updated_at: nowIso,
+  };
+  const payloadMinimal = {
+    user_id: userId,
+    email,
+    full_name: fullName,
+    date_of_birth: "1990-01-01",
+    gender: "other",
+    managed_by: "self",
+    role: "user",
+    country: "India",
+    contact: contact || null,
+    account_holder_name: fullName,
+    about_me_visible: false,
+    updated_at: nowIso,
+  };
+
+  let ins = await admin.from("profiles").insert(payloadWithSoftDelete).select("id").single();
+  if (ins.error && isSchemaMismatchError(ins.error.message)) {
+    ins = await admin.from("profiles").insert(payloadMinimal).select("id").single();
+  }
+  if (ins.error) return null;
+  return String((ins.data as { id?: string } | null)?.id || "").trim() || null;
+}
+
 export async function POST(req: NextRequest) {
   const auth = await requireSuperAdmin(req);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
@@ -190,6 +281,21 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
     const mappedUserId = String((codeRow as { user_id?: string } | null)?.user_id || "").trim();
     if (mappedUserId) normalizedUserId = mappedUserId;
+    if (!mappedUserId) {
+      const { data: codeRows } = await admin
+        .from("user_account_codes")
+        .select("user_id, account_code")
+        .ilike("account_code", `${accountCodeCandidate}%`)
+        .limit(3);
+      const uniqueUsers = Array.from(
+        new Set(
+          (codeRows || [])
+            .map((r) => String((r as { user_id?: string }).user_id || "").trim())
+            .filter(Boolean)
+        )
+      );
+      if (uniqueUsers.length === 1) normalizedUserId = uniqueUsers[0];
+    }
   }
   if (body.profileId) {
     const { data: ownerRow } = await admin
@@ -214,16 +320,24 @@ export async function POST(req: NextRequest) {
   try {
     const { data: authLookup, error: authLookupErr } = await admin.auth.admin.getUserById(normalizedUserId);
     if (authLookupErr || !authLookup?.user?.id) {
+      const allUsers = await listAllAuthUsers(admin);
+      const exists = allUsers.some((u) => u.id === normalizedUserId);
+      if (!exists) {
+        return NextResponse.json(
+          { error: "Could not map this input to a valid account owner. Please search and select the member again." },
+          { status: 400 }
+        );
+      }
+    }
+  } catch {
+    const allUsers = await listAllAuthUsers(admin);
+    const exists = allUsers.some((u) => u.id === normalizedUserId);
+    if (!exists) {
       return NextResponse.json(
         { error: "Could not map this input to a valid account owner. Please search and select the member again." },
         { status: 400 }
       );
     }
-  } catch {
-    return NextResponse.json(
-      { error: "Could not map this input to a valid account owner. Please search and select the member again." },
-      { status: 400 }
-    );
   }
   const now = new Date().toISOString();
   const startImmediately = body.startImmediately ?? true;
@@ -415,6 +529,14 @@ export async function POST(req: NextRequest) {
   };
 
   let inserted = await tryInsertForPlanId(effectivePlanId);
+  const subErrorMessage = String((subError as { message?: string } | null)?.message || "");
+  if (!inserted && subErrorMessage && isUserSubscriptionsUserFkError(subErrorMessage) && ownedProfileIds.length === 0) {
+    const shadowProfileId = await ensureShadowProfileForLegacySubscriptionFk(admin, normalizedUserId);
+    if (shadowProfileId) {
+      subscriptionUserIdCandidates.unshift(shadowProfileId);
+      inserted = await tryInsertForPlanId(effectivePlanId);
+    }
+  }
   if (!inserted && sawPlanFkError) {
     const { legacyPlanId, membershipPlansRowCount } = await resolveMembershipPlanIdForFk(admin, planRow);
     if (!legacyPlanId) {

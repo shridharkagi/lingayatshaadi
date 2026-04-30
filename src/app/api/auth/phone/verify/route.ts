@@ -8,6 +8,7 @@ import { createSupabaseAdmin } from "@/lib/supabase";
 import { ensureAccountCodeForUser } from "@/lib/server/accountCodes";
 import { findAuthUserByPhone } from "@/lib/server/authUsers";
 import { issueMagicLinkSession } from "@/lib/server/issueMagicLinkSession";
+import { ensureFreePlanForUser } from "@/lib/server/freePlanProvisioning";
 
 export const runtime = "nodejs";
 
@@ -415,6 +416,19 @@ async function handleSignup({
       logTiming(reqId, "ensure_account_code", accountCodeStart);
     } catch (e) {
       console.warn("[phone/verify] ensureAccountCodeForUser failed:", e);
+    }
+    try {
+      const freePlanStart = nowMs();
+      const provision = await ensureFreePlanForUser(admin, createdUserId);
+      logTiming(reqId, "auto_free_plan", freePlanStart, {
+        created: provision.created,
+        skipped: provision.skipped,
+      });
+      if (provision.error) {
+        console.warn("[phone/verify] auto free-plan provision warning:", provision.error);
+      }
+    } catch (e) {
+      console.warn("[phone/verify] auto free-plan provision failed:", e);
     }
   }
 

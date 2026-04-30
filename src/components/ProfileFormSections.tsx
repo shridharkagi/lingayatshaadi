@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/Input";
 import { HobbiesSelector } from "@/components/ui/HobbiesSelector";
 import { PhotoUpload } from "@/components/PhotoUpload";
@@ -7,13 +8,55 @@ import { KycDocumentsUpload } from "@/components/KycDocumentsUpload";
 import { SubCasteSelector } from "@/components/ui/SubCasteSelector";
 import { ContactsEditor } from "@/components/ui/ContactsEditor";
 import { Profile } from "@/types";
-import { PROFESSION_TYPES } from "@/data/constants";
+import {
+  EDUCATION_SUGGESTIONS,
+  INDIAN_STATES,
+  PROFESSION_TYPES,
+} from "@/data/constants";
+import { SingleRangeSlider } from "@/components/ui/RangeSlider";
+import {
+  BadgeCheck,
+  Briefcase,
+  Calendar,
+  Camera,
+  FileCheck2,
+  Heart,
+  MapPin,
+  Sparkles,
+  UserRound,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
+import { formatIsoToDobDdMmYyyy, parseDobDdMmYyyyToIso } from "@/lib/dateOfBirth";
+import { TagPillInput } from "@/components/ui/TagPillInput";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { getIndiaDistrictsForState } from "@/data/indiaDistricts";
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  subtitle,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  icon?: LucideIcon;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="space-y-3">
-      <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">{title}</h3>
-      {children}
+    <div className="rounded-2xl border border-[var(--border)] bg-white p-4 sm:p-5 shadow-sm space-y-4">
+      <div className="flex items-start gap-3">
+        {Icon && (
+          <div className="w-9 h-9 rounded-xl bg-[var(--primary)]/10 text-[var(--primary)] flex items-center justify-center shrink-0">
+            <Icon size={18} />
+          </div>
+        )}
+        <div>
+          <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+          {subtitle ? <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p> : null}
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{children}</div>
     </div>
   );
 }
@@ -23,6 +66,223 @@ interface ProfileFormSectionsProps {
   onChange: (updates: Partial<Profile>) => void;
   adminMode?: boolean;
   userId?: string;
+}
+
+const HEIGHT_INCH_MIN = 48;
+const HEIGHT_INCH_MAX = 84;
+
+function inchesToFeetInches(total: number): string {
+  const ft = Math.floor(total / 12);
+  const inch = total % 12;
+  return `${ft}'${inch}"`;
+}
+
+function parseHeightToInches(raw: string | undefined): number {
+  if (!raw) return 65;
+  const m = raw.match(/^(\d+)\s*[.'’ft]+\s*(\d+)?/i);
+  if (m) {
+    const ft = Number(m[1] || 0);
+    const inch = Number(m[2] || 0);
+    return Math.min(HEIGHT_INCH_MAX, Math.max(HEIGHT_INCH_MIN, ft * 12 + inch));
+  }
+  const n = Number(raw);
+  if (Number.isFinite(n)) {
+    const asInches = n < 12 ? Math.round(n * 12) : Math.round(n);
+    return Math.min(HEIGHT_INCH_MAX, Math.max(HEIGHT_INCH_MIN, asInches));
+  }
+  return 65;
+}
+
+function DobInputWithPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  const pickerRef = useRef<HTMLInputElement | null>(null);
+  const [manual, setManual] = useState(String(value || ""));
+
+  useEffect(() => {
+    const v = String(value || "");
+    setManual(/^\d{4}-\d{2}-\d{2}$/.test(v) ? formatIsoToDobDdMmYyyy(v) : v);
+  }, [value]);
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
+      <div className="relative">
+        <input
+          type="text"
+          value={manual}
+          onChange={(e) => setManual(e.target.value)}
+          onBlur={() => {
+            const iso = parseDobDdMmYyyyToIso(manual);
+            if (iso) onChange(formatIsoToDobDdMmYyyy(iso));
+          }}
+          placeholder="dd/mm/yyyy"
+          className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+        />
+        <button
+          type="button"
+          onClick={() => pickerRef.current?.showPicker?.()}
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-gray-500 hover:bg-gray-100"
+          aria-label="Open date picker"
+        >
+          <Calendar size={16} />
+        </button>
+        <input
+          ref={pickerRef}
+          type="date"
+          className="sr-only"
+          onChange={(e) => {
+            const ddmmyyyy = formatIsoToDobDdMmYyyy(e.target.value);
+            if (!ddmmyyyy) return;
+            setManual(ddmmyyyy);
+            onChange(ddmmyyyy);
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+const LANGUAGE_SUGGESTIONS = [
+  "Kannada",
+  "English",
+  "Hindi",
+  "Marathi",
+  "Tamil",
+  "Telugu",
+  "Tulu",
+];
+
+const COUNTRY_SUGGESTIONS = [
+  "India",
+  "United States",
+  "United Kingdom",
+  "Canada",
+  "Australia",
+  "New Zealand",
+  "Singapore",
+  "United Arab Emirates",
+  "Saudi Arabia",
+  "Qatar",
+  "Kuwait",
+  "Oman",
+];
+
+const RASHI_ZODIAC_OPTIONS = [
+  "Mesha / Aries",
+  "Vrishabha / Taurus",
+  "Mithuna / Gemini",
+  "Karka / Cancer",
+  "Simha / Leo",
+  "Kanya / Virgo",
+  "Tula / Libra",
+  "Vrischika / Scorpio",
+  "Dhanu / Sagittarius",
+  "Makara / Capricorn",
+  "Kumbha / Aquarius",
+  "Meena / Pisces",
+] as const;
+
+function splitCommaValues(raw?: string): string[] {
+  return (raw || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function joinCommaValues(items: string[]): string {
+  return items.join(", ");
+}
+
+type TimeOfDay = { hour: number; minute: number; period: "AM" | "PM" };
+function parseTimeOfBirth(raw: string | undefined): TimeOfDay {
+  if (!raw) return { hour: 10, minute: 0, period: "AM" };
+  const m = raw.match(/^\s*(\d{1,2})[:.](\d{2})\s*(AM|PM|am|pm)?\s*$/);
+  if (!m) return { hour: 10, minute: 0, period: "AM" };
+  let hour = Number(m[1]);
+  const minute = Number(m[2]);
+  let period: "AM" | "PM" = (m[3] || "AM").toUpperCase() as "AM" | "PM";
+  if (!m[3]) {
+    if (hour === 0) {
+      hour = 12;
+      period = "AM";
+    } else if (hour === 12) {
+      period = "PM";
+    } else if (hour > 12) {
+      hour -= 12;
+      period = "PM";
+    } else {
+      period = "AM";
+    }
+  }
+  if (hour < 1 || hour > 12) hour = 10;
+  return { hour, minute: Number.isNaN(minute) ? 0 : minute, period };
+}
+function formatTimeOfBirth(t: TimeOfDay): string {
+  const hh = String(t.hour).padStart(2, "0");
+  const mm = String(t.minute).padStart(2, "0");
+  return `${hh}:${mm} ${t.period}`;
+}
+function TimeOfBirthPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  const t = parseTimeOfBirth(value);
+  const set = (patch: Partial<TimeOfDay>) => onChange(formatTimeOfBirth({ ...t, ...patch }));
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Time of Birth</label>
+      <div className="inline-flex items-center gap-1.5">
+        <select
+          value={t.hour}
+          onChange={(e) => set({ hour: Number(e.target.value) })}
+          className="w-16 px-2 py-2 rounded-lg border border-[var(--border)] bg-white text-sm tabular-nums focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/30 focus:border-[var(--primary)]"
+          aria-label="Hour"
+        >
+          {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
+            <option key={h} value={h}>
+              {String(h).padStart(2, "0")}
+            </option>
+          ))}
+        </select>
+        <span className="text-gray-400 font-semibold">:</span>
+        <input
+          type="number"
+          min={0}
+          max={59}
+          value={String(t.minute).padStart(2, "0")}
+          onChange={(e) => {
+            const n = Number(e.target.value);
+            if (Number.isNaN(n)) return;
+            set({ minute: Math.max(0, Math.min(59, n)) });
+          }}
+          className="w-16 px-2 py-2 rounded-lg border border-[var(--border)] bg-white text-sm tabular-nums focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/30 focus:border-[var(--primary)]"
+          aria-label="Minute"
+        />
+        <div className="inline-flex rounded-lg border border-[var(--border)] overflow-hidden ml-1">
+          {(["AM", "PM"] as const).map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => set({ period: p })}
+              className={`px-2.5 py-2 text-xs font-semibold transition ${
+                t.period === p ? "bg-[var(--primary)] text-white" : "bg-white text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function ProfileFormSections({
@@ -43,11 +303,14 @@ export function ProfileFormSections({
       contactType: primary?.belongsTo || "",
     });
   };
+  const normalizedCountry = (profile.country || "").trim().toLowerCase();
+  const isIndiaSelected = normalizedCountry === "" || normalizedCountry === "india";
+  const districtOptions = isIndiaSelected ? getIndiaDistrictsForState(profile.state || "") : [];
 
   return (
     <div className="space-y-6">
       {adminMode && (
-        <Section title="Admin">
+        <Section title="Admin Controls" subtitle="Review controls and identity details" icon={BadgeCheck}>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Member ID (Public ID)</label>
             <p className="px-4 py-3 rounded-xl border border-[var(--border)] bg-gray-50 text-gray-600">
@@ -82,48 +345,37 @@ export function ProfileFormSections({
         </Section>
       )}
 
-      <Section title="About Me">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">About Me</label>
-          <textarea
-            className="w-full px-4 py-3 rounded-xl border border-[var(--border)] min-h-[100px] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-            value={profile.aboutMe || ""}
-            onChange={(e) => update("aboutMe", e.target.value)}
-          />
-        </div>
-        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-          <span className="font-medium">Show About Me to others</span>
-          <button
-            onClick={() => update("aboutMeVisible", !profile.aboutMeVisible)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${profile.aboutMeVisible ? "bg-[var(--primary)] text-white" : "bg-gray-200 text-gray-600"}`}
-          >
-            {profile.aboutMeVisible ? "Visible" : "Hidden"}
-          </button>
-        </div>
-        <HobbiesSelector
-          value={profile.hobbies || []}
-          onChange={(hobbies) => update("hobbies", hobbies)}
-        />
-      </Section>
-
-      <Section title="Basic Details">
+      <Section title="Basic Details" subtitle="Personal and cultural information" icon={Heart}>
         {(profile.managedBy === "parent" || profile.managedBy === "guardian") && (
-          <div className="p-4 rounded-xl bg-[var(--primary)]/5 border border-[var(--primary)]/20 text-sm text-gray-600">
+          <div className="md:col-span-2 p-4 rounded-xl bg-[var(--primary)]/5 border border-[var(--primary)]/20 text-sm text-gray-600">
             <p className="font-medium text-[var(--primary)]">Profile managed by {profile.accountHolderName || "parent/guardian"}</p>
           </div>
         )}
         <Input label="Full Name" value={profile.fullName || ""} onChange={(e) => update("fullName", e.target.value)} />
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
-          <select
-            value={profile.gender || ""}
-            onChange={(e) => update("gender", e.target.value as "male" | "female")}
-            className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-          >
-            <option value="">Select gender</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-          </select>
+          <div className="inline-flex gap-2">
+            {[
+              { v: "male", label: "Male" },
+              { v: "female", label: "Female" },
+            ].map((g) => {
+              const active = profile.gender === g.v;
+              return (
+                <button
+                  key={g.v}
+                  type="button"
+                  onClick={() => update("gender", g.v as "male" | "female")}
+                  className={`px-4 py-2 rounded-full text-sm font-medium border transition-all ${
+                    active
+                      ? "bg-[var(--primary)] text-white border-[var(--primary)] shadow-sm"
+                      : "bg-white text-gray-700 border-[var(--border)] hover:border-[var(--primary)]/40 hover:bg-[var(--primary)]/5"
+                  }`}
+                >
+                  {g.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Marital Status</label>
@@ -140,20 +392,64 @@ export function ProfileFormSections({
             <option value="Awaiting Divorce">Awaiting Divorce</option>
           </select>
         </div>
-        <Input label="Date of Birth" type="date" value={profile.dateOfBirth || ""} onChange={(e) => update("dateOfBirth", e.target.value)} />
-        <Input label="Height (ft)" placeholder="e.g. 5.8" value={profile.height || ""} onChange={(e) => update("height", e.target.value)} />
-        <Input label="Languages Known" placeholder="e.g. Kannada, Hindi, English" value={profile.languagesKnown || ""} onChange={(e) => update("languagesKnown", e.target.value)} />
-        <Input label="Mother Tongue" placeholder="e.g. Kannada" value={profile.motherTongue || ""} onChange={(e) => update("motherTongue", e.target.value)} />
+        <DobInputWithPicker
+          value={profile.dateOfBirth || ""}
+          onChange={(next) => update("dateOfBirth", next)}
+        />
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Height</label>
+          <SingleRangeSlider
+            min={HEIGHT_INCH_MIN}
+            max={HEIGHT_INCH_MAX}
+            value={parseHeightToInches(profile.height)}
+            onChange={(v) => update("height", inchesToFeetInches(v))}
+            format={inchesToFeetInches}
+            ariaLabel="Height"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Mother Tongue</label>
+          <TagPillInput
+            values={profile.motherTongue ? [profile.motherTongue] : []}
+            onChange={(next) => update("motherTongue", next[0] || "")}
+            suggestions={LANGUAGE_SUGGESTIONS}
+            maxTags={1}
+            placeholder="Type mother tongue and press Enter"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Languages Known</label>
+          <TagPillInput
+            values={splitCommaValues(profile.languagesKnown)}
+            onChange={(next) => update("languagesKnown", joinCommaValues(next))}
+            suggestions={LANGUAGE_SUGGESTIONS}
+            placeholder="Type language and press Enter/comma"
+          />
+        </div>
         <Input label="Caste" value={profile.caste || ""} onChange={(e) => update("caste", e.target.value)} />
         <SubCasteSelector value={profile.subCaste || ""} onChange={(v) => update("subCaste", v)} />
       </Section>
 
-      <Section title="Horoscope">
-        <Input label="Time of Birth" placeholder="e.g. 10:30" value={profile.timeOfBirth || ""} onChange={(e) => update("timeOfBirth", e.target.value)} />
+      <Section title="Horoscope Details" subtitle="Birth and astrology information" icon={Sparkles}>
+        <TimeOfBirthPicker value={profile.timeOfBirth || ""} onChange={(v) => update("timeOfBirth", v)} />
         <Input label="Place of Birth" value={profile.placeOfBirth || ""} onChange={(e) => update("placeOfBirth", e.target.value)} />
-        <Input label="Rashi" placeholder="e.g. Mesha" value={profile.rashi || ""} onChange={(e) => update("rashi", e.target.value)} />
-        <Input label="Nakshatra" placeholder="e.g. Bharani" value={profile.nakshatra || ""} onChange={(e) => update("nakshatra", e.target.value)} />
         <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Rashi / Zodiac</label>
+          <select
+            value={profile.rashi || ""}
+            onChange={(e) => update("rashi", e.target.value)}
+            className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+          >
+            <option value="">Select rashi</option>
+            {RASHI_ZODIAC_OPTIONS.map((rashi) => (
+              <option key={rashi} value={rashi}>
+                {rashi}
+              </option>
+            ))}
+          </select>
+        </div>
+        <Input label="Nakshatra" placeholder="e.g. Bharani" value={profile.nakshatra || ""} onChange={(e) => update("nakshatra", e.target.value)} />
+        <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-2">Horoscope Other Details</label>
           <textarea
             className="w-full px-4 py-3 rounded-xl border border-[var(--border)] min-h-[80px] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
@@ -163,8 +459,16 @@ export function ProfileFormSections({
         </div>
       </Section>
 
-      <Section title="Education & Career">
-        <Input label="Qualification" placeholder="e.g. B.Tech, M.Sc" value={profile.qualification || ""} onChange={(e) => update("qualification", e.target.value)} />
+      <Section title="Education & Career" subtitle="Qualification and profession" icon={Briefcase}>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Qualification</label>
+          <TagPillInput
+            values={splitCommaValues(profile.qualification)}
+            onChange={(next) => update("qualification", joinCommaValues(next))}
+            suggestions={EDUCATION_SUGGESTIONS}
+            placeholder="Add degree and press Enter/comma"
+          />
+        </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Profession Type</label>
           <select
@@ -185,14 +489,14 @@ export function ProfileFormSections({
         <Input label="Annual Income" placeholder="e.g. 10-12 Lakhs" value={profile.annualIncome || ""} onChange={(e) => update("annualIncome", e.target.value)} />
       </Section>
 
-      <Section title="Family Details">
+      <Section title="Family Details" subtitle="Parents, siblings and family context" icon={Users}>
         <Input label="Father's Name" value={profile.fatherName || ""} onChange={(e) => update("fatherName", e.target.value)} />
         <Input label="Father's Occupation" value={profile.fatherOccupation || ""} onChange={(e) => update("fatherOccupation", e.target.value)} />
         <Input label="Mother's Name" value={profile.motherName || ""} onChange={(e) => update("motherName", e.target.value)} />
         <Input label="Mother's Occupation" value={profile.motherOccupation || ""} onChange={(e) => update("motherOccupation", e.target.value)} />
         <Input label="Food Habits" placeholder="e.g. Vegetarian" value={profile.foodHabits || ""} onChange={(e) => update("foodHabits", e.target.value)} />
         <Input label="Sibling Details" value={profile.siblingDetails || ""} onChange={(e) => update("siblingDetails", e.target.value)} />
-        <div>
+        <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-2">Family Other Details</label>
           <textarea
             className="w-full px-4 py-3 rounded-xl border border-[var(--border)] min-h-[80px] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
@@ -202,13 +506,65 @@ export function ProfileFormSections({
         </div>
       </Section>
 
-      <Section title="Location & Contact">
+      <Section title="About Me" subtitle="Self introduction and visibility" icon={UserRound}>
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-2">About Me</label>
+          <textarea
+            className="w-full px-4 py-3 rounded-xl border border-[var(--border)] min-h-[100px] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+            value={profile.aboutMe || ""}
+            onChange={(e) => update("aboutMe", e.target.value)}
+          />
+        </div>
+        <div className="md:col-span-2 flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+          <span className="font-medium">Show About Me to others</span>
+          <button
+            onClick={() => update("aboutMeVisible", !profile.aboutMeVisible)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium ${profile.aboutMeVisible ? "bg-[var(--primary)] text-white" : "bg-gray-200 text-gray-600"}`}
+          >
+            {profile.aboutMeVisible ? "Visible" : "Hidden"}
+          </button>
+        </div>
+        <div className="md:col-span-2">
+          <HobbiesSelector
+            value={profile.hobbies || []}
+            onChange={(hobbies) => update("hobbies", hobbies)}
+          />
+        </div>
+      </Section>
+
+      <Section title="Location & Contact" subtitle="Address and contact preferences" icon={MapPin}>
         <Input label="Address" value={profile.address || ""} onChange={(e) => update("address", e.target.value)} />
         <Input label="City" value={profile.city || ""} onChange={(e) => update("city", e.target.value)} />
-        <Input label="District" value={profile.district || ""} onChange={(e) => update("district", e.target.value)} />
-        <Input label="State" value={profile.state || ""} onChange={(e) => update("state", e.target.value)} />
-        <Input label="Country" value={profile.country || ""} onChange={(e) => update("country", e.target.value)} />
-        <div className="pt-1">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+          <SearchableSelect
+            value={profile.country || ""}
+            onChange={(v) => update("country", v)}
+            options={COUNTRY_SUGGESTIONS}
+            placeholder="Type country name"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+          <SearchableSelect
+            value={profile.state || ""}
+            onChange={(v) => update("state", v)}
+            options={isIndiaSelected ? INDIAN_STATES : []}
+            placeholder={isIndiaSelected ? "Start typing your state..." : "Enter state / province"}
+            emptyMessage={isIndiaSelected ? "No matching state found" : ""}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">District</label>
+          <SearchableSelect
+            value={profile.district || ""}
+            onChange={(v) => update("district", v)}
+            options={isIndiaSelected ? districtOptions : []}
+            placeholder={isIndiaSelected ? "Start typing your district..." : "Enter district / county / region"}
+            emptyMessage={isIndiaSelected ? "No matching district found" : ""}
+          />
+        </div>
+        <div className="pt-1 md:col-span-2">
           <ContactsEditor
             accountPhone={profile.contact || ""}
             value={profile.contacts}
@@ -218,9 +574,9 @@ export function ProfileFormSections({
         </div>
       </Section>
 
-      <Section title="Profile Photo">
+      <Section title="Profile Photos" subtitle="Primary and additional profile photos" icon={Camera}>
         {userId ? (
-          <>
+          <div className="md:col-span-2">
             <p className="text-sm text-gray-600 mb-2">Up to 5 photos. First photo is your profile photo. Images are compressed and converted to WebP.</p>
             <PhotoUpload
               currentPhotos={[
@@ -259,9 +615,9 @@ export function ProfileFormSections({
               userId={userId}
               profileId={profile.id}
             />
-          </>
+          </div>
         ) : (
-          <>
+          <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Profile Photo URL</label>
               <input
@@ -289,23 +645,25 @@ export function ProfileFormSections({
                 }
               />
             </div>
-          </>
+          </div>
         )}
       </Section>
 
-      <Section title="KYC Documents">
-        <p className="text-sm text-gray-600">
+      <Section title="KYC Documents" subtitle="Identity verification uploads" icon={FileCheck2}>
+        <p className="md:col-span-2 text-sm text-gray-600">
           Upload Aadhar, Voter ID, PAN, or any government-issued ID for verification.
           Admins may use these documents while deciding approval.
         </p>
         {userId ? (
-          <KycDocumentsUpload
-            profileId={profile.id}
-            userId={userId}
-            adminMode={adminMode}
-          />
+          <div className="md:col-span-2">
+            <KycDocumentsUpload
+              profileId={profile.id}
+              userId={userId}
+              adminMode={adminMode}
+            />
+          </div>
         ) : (
-          <p className="text-sm text-gray-500">
+          <p className="md:col-span-2 text-sm text-gray-500">
             Save the profile first to enable document upload.
           </p>
         )}
