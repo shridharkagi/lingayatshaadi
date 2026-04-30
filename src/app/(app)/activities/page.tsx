@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Heart, Eye, Bookmark, UserX, Phone } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -89,6 +89,7 @@ function formatViewedAtLabel(timestamp: string): string {
 
 export default function ActivitiesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const { profiles, getProfileById } = useProfiles();
   const [activeTab, setActiveTab] = useState<TabId>("interests");
@@ -124,19 +125,17 @@ export default function ActivitiesPage() {
   );
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const tabFromUrl = new URLSearchParams(window.location.search).get("tab");
+    const tabFromUrl = searchParams.get("tab");
     if (!isValidTabId(tabFromUrl)) return;
     if (tabFromUrl !== activeTab) setActiveTab(tabFromUrl);
-  }, [isValidTabId, activeTab]);
+  }, [searchParams, isValidTabId, activeTab]);
 
   const setTab = useCallback((tab: TabId) => {
     setActiveTab(tab);
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(searchParams.toString());
     params.set("tab", tab);
     router.replace(`/activities?${params.toString()}`, { scroll: false });
-  }, [router]);
+  }, [router, searchParams]);
 
   useEffect(() => {
     let cancelled = false;
