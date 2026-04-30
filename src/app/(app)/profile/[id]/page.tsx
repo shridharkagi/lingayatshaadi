@@ -1672,9 +1672,8 @@ export default function OtherProfilePage() {
                   <div className="mt-1">
                     {(() => {
                       const mb = profile.managedBy;
-                      // Use explicit managedBy from profile row to avoid accidental
-                      // misclassification based on account holder naming patterns.
-                      const isAdmin = mb === "admin";
+                      const ownerLabel = String(profile.accountHolderName || "").trim().toLowerCase();
+                      const isAdmin = mb === "admin" || profile.role === "superadmin" || ownerLabel === "admin";
                       const isSelf = mb === "self";
                       const isParentGuardian = mb === "parent" || mb === "guardian";
                       if (!isAdmin && !isSelf && !isParentGuardian) return null;

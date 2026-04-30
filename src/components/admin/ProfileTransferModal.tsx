@@ -9,6 +9,7 @@ type Candidate = {
   name: string;
   email: string | null;
   phone: string | null;
+  isAdmin?: boolean;
 };
 
 export function ProfileTransferModal({
@@ -99,6 +100,26 @@ export function ProfileTransferModal({
         <p className="text-sm text-gray-600 mt-1">
           Search by account code, name, email, phone, or auth user ID.
         </p>
+        <button
+          type="button"
+          onClick={() =>
+            setSelected({
+              userId: "my-admin",
+              accountCode: "MY_ADMIN",
+              name: "My Admin Account",
+              email: null,
+              phone: null,
+              isAdmin: true,
+            })
+          }
+          className={`mt-3 inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition ${
+            selected?.accountCode === "MY_ADMIN"
+              ? "border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary)]"
+              : "border-gray-200 text-gray-700 hover:bg-gray-50"
+          }`}
+        >
+          Transfer to my admin account
+        </button>
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -123,8 +144,11 @@ export function ProfileTransferModal({
                   >
                     <p className="text-sm font-medium text-gray-900">{r.name || "User"}</p>
                     <p className="text-xs text-gray-500">
-                      {r.accountCode} · {r.phone || "—"} · {r.email || "—"}
+                      {r.accountCode || "—"} · {r.phone || "—"} · {r.email || "—"}
                     </p>
+                    {r.isAdmin && (
+                      <p className="text-[11px] font-semibold text-[var(--primary)] mt-0.5">Admin account</p>
+                    )}
                   </button>
                 );
               })}
