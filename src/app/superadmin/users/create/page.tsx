@@ -6,9 +6,9 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ProfileFormSections } from "@/components/ProfileFormSections";
-import { useProfiles } from "@/contexts/ProfilesContext";
 import { Profile } from "@/types";
 import { parseDobDdMmYyyyToIso } from "@/lib/dateOfBirth";
+import { adminFetch } from "@/lib/api/adminClient";
 
 const initialProfile: Partial<Profile> = {
   aboutMe: "",
@@ -52,16 +52,12 @@ const initialProfile: Partial<Profile> = {
 
 export default function SuperAdminCreateProfilePage() {
   const router = useRouter();
-  const { addProfile } = useProfiles();
   const [profile, setProfile] = useState<Partial<Profile>>(initialProfile);
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     const normalizedDob = parseDobDdMmYyyyToIso(profile.dateOfBirth || "");
-    if (!profile.email?.trim()) {
-      setError("Email is required");
-      return;
-    }
     if (!profile.fullName?.trim()) {
       setError("Full name is required");
       return;
@@ -75,23 +71,39 @@ export default function SuperAdminCreateProfilePage() {
       return;
     }
     setError("");
-
-    const newProfile = addProfile({
-      ...profile,
-      email: profile.email!,
-      fullName: profile.fullName!,
-      gender: profile.gender as "male" | "female",
-      dateOfBirth: normalizedDob,
-      maritalStatus: profile.maritalStatus || "",
-      caste: profile.caste || "Lingayat",
-      subCaste: profile.subCaste || "",
-      height: profile.height || "",
-      aboutMe: profile.aboutMe || "",
-      aboutMeVisible: profile.aboutMeVisible ?? true,
-      verified: profile.verified ?? false,
-      trustScore: profile.trustScore ?? 0,
-    });
-    router.push(`/superadmin/users/${newProfile.id}/edit`);
+    setSaving(true);
+    try {
+      const res = await adminFetch("/api/superadmin/users/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profile: {
+            ...profile,
+            fullName: profile.fullName!,
+            gender: profile.gender as "male" | "female",
+            dateOfBirth: normalizedDob,
+            maritalStatus: profile.maritalStatus || "",
+            caste: profile.caste || "Lingayat",
+            subCaste: profile.subCaste || "",
+            height: profile.height || "",
+            aboutMe: profile.aboutMe || "",
+            aboutMeVisible: profile.aboutMeVisible ?? true,
+            verified: profile.verified ?? false,
+            trustScore: profile.trustScore ?? 0,
+          },
+        }),
+      });
+      const json = (await res.json()) as { error?: string; profileId?: string };
+      if (!res.ok || !json.profileId) {
+        setError(json.error || "Failed to create profile");
+        return;
+      }
+      router.push(`/superadmin/users/${json.profileId}/edit`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to create profile");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -127,15 +139,16 @@ export default function SuperAdminCreateProfilePage() {
           <Button variant="outline" onClick={() => router.push("/superadmin/users")} className="flex-1">
             Cancel
           </Button>
-          <Button onClick={handleCreate} className="flex-1">
-            Create Profile
+          <Button onClick={() => void handleCreate()} className="flex-1" disabled={saving}>
+            {saving ? "Creating..." : "Create Profile"}
           </Button>
         </div>
       </div>
       <aside className="hidden 2xl:block 2xl:sticky 2xl:top-4 rounded-xl border border-gray-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-gray-900">Quick checklist</h2>
         <ul className="mt-3 space-y-2 text-xs text-gray-600">
-          <li>Email, Full name, Gender, DOB are mandatory.</li>
+          <li>Full name, Gender, DOB are mandatory.</li>
+          <li>New profile is auto-linked to your superadmin account.</li>
           <li>DOB accepts only `dd/mm/yyyy` format.</li>
           <li>Height now uses slider for faster mobile entry.</li>
           <li>Gender uses quick radio-style chips.</li>

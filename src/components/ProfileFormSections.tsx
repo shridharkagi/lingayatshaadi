@@ -318,12 +318,6 @@ export function ProfileFormSections({
             </p>
             <p className="text-xs text-gray-500 mt-1">Auto-generated. Format: LS + YY + MM + sequence</p>
           </div>
-          <Input
-            label="Email"
-            type="email"
-            value={profile.email || ""}
-            onChange={(e) => update("email", e.target.value)}
-          />
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Verified</label>
             <select
