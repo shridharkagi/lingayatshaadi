@@ -141,7 +141,12 @@ export default function SignupPage() {
       <div className="flex-1 flex flex-col justify-start md:justify-center min-h-0 max-w-md mx-auto w-full overflow-y-auto">
         <Link href="/login" className="flex items-center gap-2 mb-3 md:mb-6 flex-shrink-0">
           <Heart className="w-6 h-6 md:w-8 md:h-8 text-[var(--primary)] fill-[var(--primary)]" />
-          <span className="text-base md:text-xl font-bold text-[var(--primary)]">LingayatBandhu</span>
+          <span className="leading-tight text-[var(--primary)]">
+            <span className="block text-base md:text-xl font-bold">LingayatBandhu</span>
+            <span className="block text-[10px] md:text-xs font-semibold tracking-[0.14em] uppercase text-[var(--primary)]/85">
+              Matrimony
+            </span>
+          </span>
         </Link>
         <h1 className="text-xl md:text-2xl font-bold text-[var(--foreground)] mb-1 md:mb-2 flex-shrink-0">
           {step === 1 ? "Create Account" : "Verify Mobile"}

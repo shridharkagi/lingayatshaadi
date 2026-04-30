@@ -17,7 +17,12 @@ export default function PrivacyPage() {
           </Link>
           <Link href="/" className="flex items-center gap-2">
             <Heart className="w-6 h-6 text-[var(--primary)] fill-[var(--primary)]" />
-            <span className="font-bold text-[var(--primary)]">LingayatBandhu</span>
+            <span className="leading-tight text-[var(--primary)]">
+              <span className="block font-bold">LingayatBandhu</span>
+              <span className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-[var(--primary)]/85">
+                Matrimony
+              </span>
+            </span>
           </Link>
           <div className="w-16" />
         </div>

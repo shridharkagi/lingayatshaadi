@@ -239,8 +239,11 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-14 sm:h-16">
           <Link href="/" className="flex items-center gap-2">
             <Heart className="w-8 h-8 text-[var(--primary)] fill-[var(--primary)]" />
-            <span className="text-xl font-bold text-[var(--primary)]">
-              LingayatBandhu
+            <span className="leading-tight text-[var(--primary)]">
+              <span className="block text-xl font-bold">LingayatBandhu</span>
+              <span className="block text-[11px] sm:text-xs font-semibold tracking-[0.14em] uppercase text-[var(--primary)]/85">
+                Matrimony
+              </span>
             </span>
           </Link>
           <nav className="hidden md:flex items-center gap-6">
@@ -471,37 +474,40 @@ export default function LandingPage() {
           <p className="text-[var(--color-text-muted)] text-center max-w-2xl mx-auto mb-8 sm:mb-10">
             New Lingayat members register daily. Browse verified profiles from across Karnataka and beyond.
           </p>
-          <div className="overflow-x-auto pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible">
-            <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-5 min-w-max sm:min-w-0">
+          <div className="space-y-3 sm:space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {previewCards.map((profile, i) => (
                 <Link
                   key={`${profile.href}-${i}`}
                   href={profile.href}
-                  className="flex-shrink-0 w-[260px] sm:w-auto bg-[var(--color-bg)] rounded-2xl overflow-hidden shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-card)] transition-all border border-[var(--color-border)]/50 group"
+                  className="bg-[var(--color-bg)] rounded-2xl overflow-hidden shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-card)] transition-all border border-[var(--color-border)]/50 group flex"
                 >
-                  <div className="relative aspect-[3/4]">
+                  <div className="relative w-[42%] min-w-[42%] max-w-[210px] aspect-[3/4] bg-gray-200 flex-shrink-0 overflow-hidden">
                     <Image
                       src={profile.image}
                       alt={profile.name}
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-300"
-                      sizes="(max-width: 640px) 260px, (max-width: 1024px) 50vw, 20vw"
+                      sizes="(max-width: 640px) 42vw, (max-width: 1024px) 36vw, 220px"
                       unoptimized
                     />
                   </div>
-                  <div className="p-4">
-                    <h3 className="font-semibold text-[var(--color-text-primary)] truncate">
+                  <div className="p-4 flex-1 min-w-0 flex flex-col justify-between">
+                    <div>
+                    <h3 className="font-semibold text-[var(--color-text-primary)] text-lg sm:text-xl truncate">
                       {profile.name}
                     </h3>
-                    <p className="text-sm text-[var(--color-text-muted)] mt-0.5">
+                    <p className="text-sm sm:text-base text-[var(--color-text-muted)] mt-0.5">
                       {profile.age ? `${profile.age} yrs` : "—"}
-                      {profile.profession ? ` • ${profile.profession}` : ""}
+                      {" • "}
+                      {profile.profession || "—"}
                     </p>
-                    <p className="text-xs text-[var(--color-text-muted)] mt-1 truncate">
+                    <p className="text-sm sm:text-base text-[var(--color-text-muted)] mt-1 truncate">
                       {profile.location || ""}
                     </p>
-                    <span className="inline-block mt-3 text-sm font-medium text-[var(--primary)] group-hover:underline">
-                      View Profile →
+                    </div>
+                    <span className="inline-flex mt-4 w-fit px-5 py-2.5 rounded-2xl bg-[var(--primary)] text-white text-sm sm:text-base font-semibold group-hover:bg-[var(--color-primary-hover)] transition-colors">
+                      View Profile
                     </span>
                   </div>
                 </Link>
@@ -511,7 +517,7 @@ export default function LandingPage() {
           <div className="text-center mt-8">
             <Link href="/profiles">
               <Button variant="outline" className="rounded-full">
-                View All Profiles
+                Explore All Profiles
               </Button>
             </Link>
           </div>

@@ -1338,7 +1338,7 @@ export default function OtherProfilePage() {
               </div>
             </>
           )}
-          <div className="relative aspect-[4/5] md:aspect-[3/4] md:max-h-[620px] md:mx-auto md:w-[min(100%,560px)] lg:w-full lg:max-h-[760px] max-h-[640px] bg-gray-200 overflow-hidden rounded-t-2xl rounded-b-none">
+          <div className="relative aspect-[4/6] md:aspect-[3/4] md:max-h-[620px] md:mx-auto md:w-[min(100%,560px)] lg:w-full lg:max-h-[760px] max-h-[640px] bg-gray-200 overflow-hidden rounded-t-2xl rounded-b-none">
             <Image
               src={profile.profilePhoto || "/placeholder.svg"}
               alt={profile.fullName}
@@ -1828,7 +1828,7 @@ export default function OtherProfilePage() {
                 </div>
 
                 {displaySibling && (
-                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                  <div className="col-span-2 md:col-span-1 rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
                     <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                       Sibling
                     </p>
