@@ -64,7 +64,7 @@ export const metadata: Metadata = {
     description: seo.description,
     images: [
       {
-        url: "/og/lingayatbandhu-og.png",
+        url: "/og/lingayatbandhu-og-home-v2.png",
         width: 1200,
         height: 630,
         alt: "LingayatBandhu — Lingayat matrimony",
@@ -75,7 +75,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "LingayatBandhu — Find your Lingayat match",
     description: seo.description,
-    images: ["/og/lingayatbandhu-og.png"],
+    images: ["/og/lingayatbandhu-og-home-v2.png"],
   },
   metadataBase: new URL(siteUrl),
   robots: {
