@@ -173,6 +173,12 @@ export function ContactsEditor({
                     update(idx, {
                       belongsTo: e.target.value,
                       ...(e.target.value !== "Other" ? { belongsToOther: "" } : {}),
+                      ...(e.target.value === "LingayatBandhu Matrimony"
+                        ? {
+                            number: "6360130905",
+                            methods: ["Call", "WhatsApp", "SMS"] as ContactMethod[],
+                          }
+                        : {}),
                     })
                   }
                   className={selectClass}

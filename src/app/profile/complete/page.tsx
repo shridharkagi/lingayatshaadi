@@ -993,7 +993,11 @@ function ProfileCompleteInner() {
       return;
     }
 
-    router.push("/account");
+    if (hasUrlProfileId && !isDraftFlow) {
+      router.push("/account");
+      return;
+    }
+    router.push(`/account?profileCreated=1&createdProfileId=${encodeURIComponent(saved.id)}`);
   };
 
   const prev = () => {

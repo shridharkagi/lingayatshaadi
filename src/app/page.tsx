@@ -24,8 +24,7 @@ import { getProfileSlug } from "@/lib/memberId";
 import { WhatsAppGroupCta } from "@/components/whatsapp/WhatsAppGroupCta";
 
 // Indian traditional couple and matrimony images
-const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?w=1920&q=80&fit=crop";
+const HERO_IMAGE = "/home-hero-bg.jpg";
 const CEO_IMAGE =
   "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?w=600&q=80&fit=crop";
 const COUPLE_1 =
@@ -325,7 +324,7 @@ export default function LandingPage() {
               : "grid-rows-[0fr] opacity-0 -translate-y-2 pointer-events-none border-t-0"
           }`}
         >
-          <div className={`overflow-hidden flex flex-col gap-2 ${mobileMenuOpen ? "px-4 pb-4 pt-0" : "px-0 pb-0 pt-0"}`}>
+          <div className={`overflow-hidden flex flex-col gap-3 ${mobileMenuOpen ? "px-4 pb-4 pt-2" : "px-0 pb-0 pt-0"}`}>
             <Link href="/profiles" onClick={() => setMobileMenuOpen(false)}>
               Profiles
             </Link>
@@ -337,8 +336,8 @@ export default function LandingPage() {
                 <Link href="/home" onClick={() => setMobileMenuOpen(false)}>
                   Home
                 </Link>
-                <Link href="/account" onClick={() => setMobileMenuOpen(false)}>
-                  <Button fullWidth>My Account</Button>
+                <Link href="/account" onClick={() => setMobileMenuOpen(false)} className="w-fit">
+                  <Button className="px-6">My Account</Button>
                 </Link>
               </>
             ) : (
@@ -354,7 +353,7 @@ export default function LandingPage() {
                   Sign In
                 </button>
                 <Button
-                  fullWidth
+                  className="w-fit px-6"
                   onClick={() => {
                     setMobileMenuOpen(false);
                     openAuthModal("signup");
@@ -369,22 +368,22 @@ export default function LandingPage() {
       </header>
 
       {/* Hero */}
-      <section className="relative min-h-[75vh] sm:min-h-[80vh] lg:min-h-[85vh] flex items-center justify-center overflow-hidden pt-16 pb-20">
+      <section className="relative min-h-[75vh] sm:min-h-[80vh] lg:min-h-[85vh] flex items-center justify-start overflow-hidden pt-16 pb-20">
         <div className="absolute inset-0">
           <Image
             src={HERO_IMAGE}
             alt="Indian couple in traditional attire"
             fill
-            className="object-cover"
+            className="object-cover object-[64%_50%] sm:object-[62%_52%] lg:object-[58%_50%]"
             priority
             sizes="100vw"
             unoptimized
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
         </div>
-        <div className="relative z-10 text-center text-white px-4 max-w-2xl mx-auto">
+        <div className="relative z-10 text-left text-white px-4 max-w-2xl mx-auto sm:mx-0 sm:ml-[4%]">
           <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-3 sm:mb-4 drop-shadow-lg">
-            Where Lingayat Values Meet Lasting Love
+            Find your perfect match with LingayatBandhu Matrimony
           </h1>
           <p className="text-lg sm:text-xl md:text-2xl text-white/95 mb-6 sm:mb-8">
             Connect with compatible life partners rooted in shared faith, tradition, and community

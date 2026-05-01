@@ -40,6 +40,7 @@ import {
 } from "@/lib/profileCompletion";
 import { BrideIcon, GroomIcon } from "@/components/ui/icons/BrideGroomIcons";
 import { MAX_ACTIVE_OR_PENDING_PROFILES } from "@/lib/accessPolicy";
+import { ProfileCreatedApprovalModal } from "@/components/modals/ProfileCreatedApprovalModal";
 
 type RelationshipValue = NonNullable<Profile["relationship"]>;
 type SimpleIcon = ComponentType<SVGProps<SVGSVGElement> & { size?: number }>;
@@ -144,6 +145,7 @@ export default function AccountPage() {
   const [deletionSubmitBusy, setDeletionSubmitBusy] = useState(false);
   const [deletionSubmitErr, setDeletionSubmitErr] = useState("");
   const [membershipsNowMs, setMembershipsNowMs] = useState(0);
+  const [showCreatedModal, setShowCreatedModal] = useState(false);
 
   const loadPendingDeletionRequests = useCallback(async () => {
     const res = await adminFetch("/api/profile-deletion-request");
@@ -191,6 +193,21 @@ export default function AccountPage() {
   }, [profiles]);
   const nonDeletedOwnedCount = drafts.length + submittedProfiles.length;
   const canCreateMoreProfiles = nonDeletedOwnedCount < MAX_ACTIVE_OR_PENDING_PROFILES;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const isCreated = params.get("profileCreated") === "1";
+    if (!isCreated) return;
+    const createdProfileId = params.get("createdProfileId") || "generic";
+    const onceKey = `profile-created-modal:${createdProfileId}`;
+    const seen = window.sessionStorage.getItem(onceKey) === "1";
+    if (!seen) {
+      setShowCreatedModal(true);
+      window.sessionStorage.setItem(onceKey, "1");
+    }
+    router.replace("/account");
+  }, [router]);
 
   useEffect(() => {
     if (loading || !isLoggedIn) return;
@@ -1020,6 +1037,12 @@ export default function AccountPage() {
           onSelectEdit={handleSaveRelationshipEdit}
         />
       )}
+
+      <ProfileCreatedApprovalModal
+        open={showCreatedModal}
+        accountName={accountMeta?.fullName || authUser?.email || "User"}
+        onClose={() => setShowCreatedModal(false)}
+      />
     </div>
   );
 }

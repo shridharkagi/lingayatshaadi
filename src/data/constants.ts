@@ -41,6 +41,8 @@ export const INDIAN_STATES = [
  * profile contact number. The form also allows a free-text "Other" entry.
  */
 export const CONTACT_OWNER_RELATIONS = [
+  "LingayatBandhu Matrimony",
+  "Parents",
   "Self",
   "Father",
   "Mother",
@@ -48,7 +50,6 @@ export const CONTACT_OWNER_RELATIONS = [
   "Sister",
   "Guardian",
   "Spouse",
-  "Office",
   "Uncle",
   "Aunt",
   "Cousin",

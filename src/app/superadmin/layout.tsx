@@ -91,6 +91,14 @@ export default function SuperAdminLayout({
         </div>
       </aside>
       <main className={`flex-1 ${collapsed ? "ml-20" : "ml-64"} p-6 transition-all duration-200`}>
+        <div className="mb-4 flex justify-end">
+          <Link
+            href="/superadmin/users/create"
+            className="inline-flex items-center rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-95"
+          >
+            Create Profile
+          </Link>
+        </div>
         {children}
       </main>
     </div>

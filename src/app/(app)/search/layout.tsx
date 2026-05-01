@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { ProfilesClientProvider } from "@/components/providers/ProfilesClientProvider";
 
 export const metadata: Metadata = {
   openGraph: {
@@ -17,6 +16,6 @@ export const metadata: Metadata = {
   },
 };
 
-export default function ProfilesLayout({ children }: { children: React.ReactNode }) {
-  return <ProfilesClientProvider>{children}</ProfilesClientProvider>;
+export default function SearchLayout({ children }: { children: React.ReactNode }) {
+  return children;
 }

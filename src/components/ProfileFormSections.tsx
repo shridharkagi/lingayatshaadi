@@ -70,6 +70,8 @@ interface ProfileFormSectionsProps {
 
 const HEIGHT_INCH_MIN = 48;
 const HEIGHT_INCH_MAX = 84;
+const ANNUAL_INCOME_MIN_LAKHS = 1;
+const ANNUAL_INCOME_MAX_LAKHS = 100;
 
 function inchesToFeetInches(total: number): string {
   const ft = Math.floor(total / 12);
@@ -91,6 +93,19 @@ function parseHeightToInches(raw: string | undefined): number {
     return Math.min(HEIGHT_INCH_MAX, Math.max(HEIGHT_INCH_MIN, asInches));
   }
   return 65;
+}
+
+function parseAnnualIncomeLakhs(raw: string | undefined): number {
+  if (!raw) return 10;
+  const m = raw.match(/(\d+(\.\d+)?)/);
+  if (!m) return 10;
+  const n = Number(m[1]);
+  if (!Number.isFinite(n)) return 10;
+  return Math.min(ANNUAL_INCOME_MAX_LAKHS, Math.max(ANNUAL_INCOME_MIN_LAKHS, Math.round(n)));
+}
+
+function formatAnnualIncomeLakhs(value: number): string {
+  return `${value} Lakhs`;
 }
 
 function DobInputWithPicker({
@@ -115,10 +130,20 @@ function DobInputWithPicker({
         <input
           type="text"
           value={manual}
-          onChange={(e) => setManual(e.target.value)}
+          onChange={(e) => {
+            const next = e.target.value;
+            setManual(next);
+            // Keep parent state in sync as user types so submit handlers
+            // don't read stale/empty DOB when user clicks save immediately.
+            onChange(next);
+          }}
           onBlur={() => {
             const iso = parseDobDdMmYyyyToIso(manual);
-            if (iso) onChange(formatIsoToDobDdMmYyyy(iso));
+            if (iso) {
+              const normalized = formatIsoToDobDdMmYyyy(iso);
+              setManual(normalized);
+              onChange(normalized);
+            }
           }}
           placeholder="dd/mm/yyyy"
           className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
@@ -480,7 +505,26 @@ export function ProfileFormSections({
         </div>
         <Input label="Profession" placeholder="e.g. Software Engineer, Senior CA" value={profile.profession || ""} onChange={(e) => update("profession", e.target.value)} />
         <Input label="Company Name" value={profile.companyName || ""} onChange={(e) => update("companyName", e.target.value)} />
-        <Input label="Annual Income" placeholder="e.g. 10-12 Lakhs" value={profile.annualIncome || ""} onChange={(e) => update("annualIncome", e.target.value)} />
+        {adminMode ? (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Annual Income</label>
+            <SingleRangeSlider
+              min={ANNUAL_INCOME_MIN_LAKHS}
+              max={ANNUAL_INCOME_MAX_LAKHS}
+              value={parseAnnualIncomeLakhs(profile.annualIncome)}
+              onChange={(v) => update("annualIncome", formatAnnualIncomeLakhs(v))}
+              format={formatAnnualIncomeLakhs}
+              ariaLabel="Annual Income"
+            />
+          </div>
+        ) : (
+          <Input
+            label="Annual Income"
+            placeholder="e.g. 10-12 Lakhs"
+            value={profile.annualIncome || ""}
+            onChange={(e) => update("annualIncome", e.target.value)}
+          />
+        )}
       </Section>
 
       <Section title="Family Details" subtitle="Parents, siblings and family context" icon={Users}>

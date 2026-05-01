@@ -12,6 +12,17 @@ export const metadata: Metadata = {
     description: "Reach LingayatBandhu support by email, phone, or WhatsApp.",
     url: `${siteUrl}/contact`,
     siteName: "LingayatBandhu",
+    images: [
+      {
+        url: "/og/lingayatbandhu-og.png",
+        width: 1200,
+        height: 630,
+        alt: "LingayatBandhu Matrimony",
+      },
+    ],
+  },
+  twitter: {
+    images: ["/og/lingayatbandhu-og.png"],
   },
 };
 
