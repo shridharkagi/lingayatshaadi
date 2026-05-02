@@ -150,9 +150,11 @@ export function AuthModal({ open, initialMode, onClose }: AuthModalProps) {
       return;
     }
     setLoading(true);
+    setInfo("Sending verification code…");
     const result = await sendPhoneOtp(normalizePhone(loginMobile), "login");
     setLoading(false);
     if (result.error) {
+      setInfo("");
       setError(result.error);
       if (result.retryAfter) setResendIn(result.retryAfter);
       return;
@@ -253,9 +255,11 @@ export function AuthModal({ open, initialMode, onClose }: AuthModalProps) {
     if (signup.password !== signup.confirmPassword) return setError("Passwords do not match");
 
     setLoading(true);
+    setInfo("Sending verification code…");
     const result = await sendPhoneOtp(normalizePhone(signup.mobile), "signup");
     setLoading(false);
     if (result.error) {
+      setInfo("");
       setError(result.error);
       if (result.retryAfter) setResendIn(result.retryAfter);
       return;
@@ -272,6 +276,7 @@ export function AuthModal({ open, initialMode, onClose }: AuthModalProps) {
     setInfo("");
     if (signupOtp.length !== 6) return setError("Enter 6-digit OTP");
     setLoading(true);
+    setInfo("Creating your account…");
     const fullName = [signup.firstName, signup.lastName].filter(Boolean).join(" ").trim();
     const birthYear = Number((signup.dateOfBirth.match(/^\d{4}/) || [])[0]) || undefined;
     const result = await verifyPhoneOtp(normalizePhone(signup.mobile), signupOtp, signup.password, {
@@ -285,9 +290,11 @@ export function AuthModal({ open, initialMode, onClose }: AuthModalProps) {
     });
     setLoading(false);
     if (result.error) {
+      setInfo("");
       setError(result.error);
       return;
     }
+    setInfo("");
     afterSuccess("Account created successfully");
   };
 

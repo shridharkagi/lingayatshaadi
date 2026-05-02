@@ -410,25 +410,22 @@ async function handleSignup({
   }
 
   if (createdUserId) {
-    try {
-      const accountCodeStart = nowMs();
-      await ensureAccountCodeForUser(admin, createdUserId);
-      logTiming(reqId, "ensure_account_code", accountCodeStart);
-    } catch (e) {
-      console.warn("[phone/verify] ensureAccountCodeForUser failed:", e);
+    const provisionStart = nowMs();
+    const [codeResult, planResult] = await Promise.allSettled([
+      ensureAccountCodeForUser(admin, createdUserId),
+      ensureFreePlanForUser(admin, createdUserId),
+    ]);
+    logTiming(reqId, "signup_post_provision_parallel", provisionStart, {
+      account_code: codeResult.status,
+      free_plan: planResult.status,
+    });
+    if (codeResult.status === "rejected") {
+      console.warn("[phone/verify] ensureAccountCodeForUser failed:", codeResult.reason);
     }
-    try {
-      const freePlanStart = nowMs();
-      const provision = await ensureFreePlanForUser(admin, createdUserId);
-      logTiming(reqId, "auto_free_plan", freePlanStart, {
-        created: provision.created,
-        skipped: provision.skipped,
-      });
-      if (provision.error) {
-        console.warn("[phone/verify] auto free-plan provision warning:", provision.error);
-      }
-    } catch (e) {
-      console.warn("[phone/verify] auto free-plan provision failed:", e);
+    if (planResult.status === "fulfilled" && planResult.value.error) {
+      console.warn("[phone/verify] auto free-plan provision warning:", planResult.value.error);
+    } else if (planResult.status === "rejected") {
+      console.warn("[phone/verify] auto free-plan provision failed:", planResult.reason);
     }
   }
 
