@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useAppConfig } from "@/contexts/AppConfigContext";
 
-function injectScriptsIntoParent(html: string, parent: ParentNode, slot: "head" | "body") {
+function injectScriptsIntoParent(html: string, parent: ParentNode, slot: "head" | "body" | "body-end") {
   const marker = slot;
   parent.querySelectorAll(`script[data-lingayat-injected="${marker}"]`).forEach((el) => el.remove());
   const trimmed = html.trim();
@@ -94,6 +94,21 @@ export function ConfigInjector() {
       container.querySelectorAll(`script[data-lingayat-injected="body"]`).forEach((el) => el.remove());
     };
   }, [config.externalScriptsBody, config.externalScripts]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const html = config.externalScriptsBodyEnd?.trim();
+    const container = document.getElementById("lingayat-external-scripts-end");
+    if (!container) return;
+
+    container.querySelectorAll(`script[data-lingayat-injected="body-end"]`).forEach((el) => el.remove());
+    if (!html) return;
+
+    injectScriptsIntoParent(html, container, "body-end");
+    return () => {
+      container.querySelectorAll(`script[data-lingayat-injected="body-end"]`).forEach((el) => el.remove());
+    };
+  }, [config.externalScriptsBodyEnd]);
 
   return null;
 }

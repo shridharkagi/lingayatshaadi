@@ -13,6 +13,7 @@ export default function SuperAdminSettingsPage() {
   const [faviconUrl, setFaviconUrl] = useState("");
   const [externalScriptsHead, setExternalScriptsHead] = useState("");
   const [externalScriptsBody, setExternalScriptsBody] = useState("");
+  const [externalScriptsBodyEnd, setExternalScriptsBodyEnd] = useState("");
   const [robotsTxt, setRobotsTxt] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
   const [seoKeywords, setSeoKeywords] = useState("");
@@ -79,6 +80,7 @@ export default function SuperAdminSettingsPage() {
         faviconUrl,
         externalScriptsHead,
         externalScriptsBody,
+        externalScriptsBodyEnd,
         externalScripts: externalScriptsBody,
         bridesHeroImageUrl,
         groomsHeroImageUrl,
@@ -247,6 +249,22 @@ export default function SuperAdminSettingsPage() {
             value={externalScriptsBody}
             onChange={(e) => setExternalScriptsBody(e.target.value)}
             placeholder={'<script>...</script>\n<!-- or paste script URL -->'}
+            rows={5}
+            className="mt-1 w-full px-4 py-2 border rounded-lg font-mono text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Scripts before closing &lt;/body&gt;
+          </label>
+          <p className="text-xs text-gray-500 mt-0.5 mb-1">
+            Runs last, right before the document ends — good for deferred pixels, Hotjar/Clarity bootstraps that expect to
+            run after the page. Same format as above.
+          </p>
+          <textarea
+            value={externalScriptsBodyEnd}
+            onChange={(e) => setExternalScriptsBodyEnd(e.target.value)}
+            placeholder={'<script defer src="https://..."></script>'}
             rows={5}
             className="mt-1 w-full px-4 py-2 border rounded-lg font-mono text-sm"
           />

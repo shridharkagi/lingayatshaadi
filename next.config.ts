@@ -30,16 +30,42 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              // Cloudflare Turnstile loader script.
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com",
+              // Turnstile + GA/GTM + tawk.to + Microsoft Clarity + Hotjar (superadmin scripts).
+              [
+                "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+                "https://challenges.cloudflare.com",
+                "https://www.googletagmanager.com https://*.googletagmanager.com",
+                "https://www.google-analytics.com https://ssl.google-analytics.com https://*.google-analytics.com",
+                "https://*.hotjar.com",
+                "https://*.tawk.to",
+                "https://*.clarity.ms",
+              ].join(" "),
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-              "img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co",
+              [
+                "img-src 'self' data: blob:",
+                "https://images.unsplash.com https://*.supabase.co",
+                "https://www.google-analytics.com https://www.googletagmanager.com",
+                "https://*.hotjar.com https://*.tawk.to https://*.clarity.ms https://c.clarity.ms",
+              ].join(" "),
               "font-src 'self' data: https://fonts.gstatic.com",
-              // Supabase Realtime uses wss://; https:// alone is not enough for connect-src on strict mobile browsers.
-              // Cloudflare Turnstile makes XHR requests from inside its iframe.
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://challenges.cloudflare.com",
-              // Turnstile renders a challenge iframe served from challenges.cloudflare.com.
-              "frame-src https://challenges.cloudflare.com",
+              [
+                "connect-src 'self'",
+                "https://*.supabase.co wss://*.supabase.co",
+                "https://challenges.cloudflare.com",
+                "https://www.google-analytics.com https://*.google-analytics.com https://analytics.google.com",
+                "https://www.googletagmanager.com https://*.googletagmanager.com https://stats.g.doubleclick.net",
+                "https://*.hotjar.com wss://*.hotjar.com",
+                "https://*.tawk.to wss://*.tawk.to",
+                "https://*.clarity.ms",
+              ].join(" "),
+              "worker-src 'self' blob: https://*.hotjar.com https://*.clarity.ms",
+              [
+                "frame-src",
+                "https://challenges.cloudflare.com",
+                "https://www.googletagmanager.com https://*.googletagmanager.com",
+                "https://*.tawk.to",
+                "https://*.hotjar.com",
+              ].join(" "),
               "frame-ancestors 'none'",
             ]
               .join("; ")

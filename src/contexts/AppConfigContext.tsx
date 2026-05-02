@@ -21,6 +21,8 @@ export interface AppConfig {
   externalScriptsHead: string;
   /** Injected at start of body (widgets, deferred loaders) */
   externalScriptsBody: string;
+  /** Injected just before the closing body tag */
+  externalScriptsBodyEnd: string;
   /** @deprecated same as body scripts — kept for older cached localStorage */
   externalScripts: string;
   /** robots.txt content */
@@ -45,6 +47,7 @@ const defaultConfig: AppConfig = {
   faviconUrl: "",
   externalScriptsHead: "",
   externalScriptsBody: "",
+  externalScriptsBodyEnd: "",
   externalScripts: "",
   robotsTxt: "User-agent: *\nAllow: /",
   seoDescription: "Premium matrimonial platform for the Lingayat community",
@@ -83,6 +86,8 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
               : typeof parsed.externalScripts === "string"
                 ? parsed.externalScripts
                 : "",
+          externalScriptsBodyEnd:
+            typeof parsed.externalScriptsBodyEnd === "string" ? parsed.externalScriptsBodyEnd : "",
           externalScripts:
             typeof parsed.externalScriptsBody === "string"
               ? parsed.externalScriptsBody

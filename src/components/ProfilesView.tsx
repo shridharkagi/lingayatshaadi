@@ -237,8 +237,8 @@ export function ProfilesView({
     <div className="min-h-screen bg-[var(--color-bg)]">
       <ProfilesPageHeader />
 
-      {/* Compact hero */}
-      <section className="relative h-[280px] sm:h-[320px] md:h-[360px] overflow-hidden pt-14 sm:pt-16">
+      {/* Compact hero — z-[22] above forensic watermark (fixed z-[21]) */}
+      <section className="relative h-[min(300px,52vh)] min-h-[260px] sm:h-[320px] md:h-[360px] overflow-hidden pt-14 sm:pt-16">
         <div className="absolute inset-0">
           <Image
             src={heroImage}
@@ -251,16 +251,18 @@ export function ProfilesView({
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-[var(--color-bg)]" />
         </div>
-        <div className="relative z-10 h-full max-w-6xl mx-auto px-4 flex flex-col justify-center text-white">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 drop-shadow">
+        <div className="relative z-[22] isolate h-full max-w-6xl mx-auto px-3.5 sm:px-4 pt-2 pb-4 flex flex-col justify-center text-white items-center text-center sm:items-start sm:text-left">
+          <h1 className="text-[clamp(1.25rem,4.6vw,2.25rem)] sm:text-3xl md:text-4xl font-bold mb-2 sm:mb-2.5 drop-shadow max-w-2xl px-0.5">
             {title}
           </h1>
-          <p className="text-sm sm:text-base text-white/90 max-w-2xl">{subtitle}</p>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+          <p className="text-sm sm:text-base text-white/90 max-w-2xl px-0.5 leading-relaxed">
+            {subtitle}
+          </p>
+          <div className="mt-4 flex w-full max-w-md sm:max-w-none flex-wrap items-center justify-center gap-2.5 sm:justify-start sm:gap-2">
             {isLoggedIn && (
               <Link
                 href="/account"
-                className="px-3 py-1.5 rounded-full bg-white/20 hover:bg-white/30 text-xs sm:text-sm font-medium transition"
+                className="min-h-[40px] inline-flex items-center justify-center px-4 py-2 rounded-full bg-white/20 hover:bg-white/30 text-xs sm:text-sm font-medium transition"
               >
                 My Account
               </Link>
@@ -268,7 +270,7 @@ export function ProfilesView({
             {isLoggedIn && (
               <Link
                 href="/search"
-                className="px-3 py-1.5 rounded-full bg-black/20 hover:bg-black/30 text-xs sm:text-sm font-medium transition"
+                className="min-h-[40px] inline-flex items-center justify-center px-4 py-2 rounded-full bg-black/20 hover:bg-black/30 text-xs sm:text-sm font-medium transition"
               >
                 Advanced Search
               </Link>
@@ -277,21 +279,21 @@ export function ProfilesView({
               <button
                 type="button"
                 onClick={() => openAuthModal("login")}
-                className="px-3 py-1.5 rounded-full bg-black/20 hover:bg-black/30 text-xs sm:text-sm font-medium transition"
+                className="min-h-[40px] inline-flex items-center justify-center px-4 py-2 rounded-full bg-black/20 hover:bg-black/30 text-xs sm:text-sm font-medium transition"
               >
                 Sign In
               </button>
             )}
           </div>
           {showCreateProfileStrip && (
-            <div className="mt-3 flex max-w-xl flex-row flex-wrap items-center gap-2.5 rounded-2xl border border-white/20 bg-black/30 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md sm:gap-3 sm:py-2 sm:pl-3.5 sm:pr-3">
-              <p className="min-w-0 flex-1 text-[11px] leading-snug text-white/90 sm:text-xs">
+            <div className="mt-3 w-full max-w-xl flex flex-col gap-3 rounded-2xl border border-white/20 bg-black/40 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:py-2.5 sm:pl-4 sm:pr-4">
+              <p className="min-w-0 text-left text-[12px] leading-snug text-white/95 sm:flex-1 sm:text-xs">
                 List your profile — quick setup, family-friendly privacy.
               </p>
               {isLoggedIn ? (
                 <Link
                   href="/account?createProfile=1"
-                  className="inline-flex min-h-0 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-[var(--primary)] px-3.5 py-1.5 text-[11px] font-semibold text-white shadow-sm ring-1 ring-white/10 transition hover:brightness-105 sm:px-4 sm:py-2 sm:text-xs"
+                  className="inline-flex min-h-[40px] w-full shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-[var(--primary)] px-4 py-2.5 text-xs font-semibold text-white shadow-sm ring-1 ring-white/10 transition hover:brightness-105 sm:w-auto sm:min-h-0 sm:px-4 sm:py-2"
                 >
                   Create your profile
                 </Link>
@@ -299,7 +301,7 @@ export function ProfilesView({
                 <button
                   type="button"
                   onClick={() => openAuthModal("signup")}
-                  className="inline-flex min-h-0 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-[var(--primary)] px-3.5 py-1.5 text-[11px] font-semibold text-white shadow-sm ring-1 ring-white/10 transition hover:brightness-105 sm:px-4 sm:py-2 sm:text-xs"
+                  className="inline-flex min-h-[40px] w-full shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-[var(--primary)] px-4 py-2.5 text-xs font-semibold text-white shadow-sm ring-1 ring-white/10 transition hover:brightness-105 sm:w-auto sm:min-h-0 sm:px-4 sm:py-2"
                 >
                   Create your profile
                 </button>
@@ -311,13 +313,13 @@ export function ProfilesView({
 
       {/* Sticky search + filter bar — less overlap when CTA strip is shown */}
       <div
-        className={`sticky top-14 sm:top-16 z-30 px-4 ${
+        className={`sticky top-14 sm:top-16 z-30 px-3 sm:px-4 ${
           showCreateProfileStrip ? "-mt-4 sm:-mt-6" : "-mt-7 sm:-mt-9"
         }`}
       >
         <div className="max-w-6xl mx-auto">
-          <div className="bg-white/95 backdrop-blur rounded-2xl shadow-lg border border-[var(--color-border)] p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
-            <div className="relative flex-1">
+          <div className="bg-white/95 backdrop-blur rounded-2xl shadow-lg border border-[var(--color-border)] p-2.5 sm:p-4 flex items-stretch sm:items-center gap-2.5 sm:gap-3 min-h-[52px] sm:min-h-0">
+            <div className="relative flex-1 min-w-0">
               <Search
                 size={18}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
@@ -327,15 +329,15 @@ export function ProfilesView({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search by name, city, profession…"
-                className="w-full pl-10 pr-3 py-2.5 sm:py-3 rounded-xl bg-[var(--color-bg)] focus:bg-white border border-transparent focus:border-[var(--primary)] focus:outline-none text-sm transition"
+                className="w-full min-w-0 pl-10 pr-2.5 sm:pr-3 py-2.5 sm:py-3 rounded-xl bg-[var(--color-bg)] focus:bg-white border border-transparent focus:border-[var(--primary)] focus:outline-none text-sm transition"
               />
             </div>
             <button
               type="button"
               onClick={() => setFilterOpen(true)}
-              className="relative flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-[var(--color-border)] bg-white hover:bg-gray-50 text-sm font-medium text-gray-700 transition"
+              className="relative flex shrink-0 items-center justify-center gap-1.5 sm:gap-2 pl-2.5 pr-2.5 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-[var(--color-border)] bg-white hover:bg-gray-50 text-sm font-medium text-gray-700 transition min-w-[48px] sm:min-w-0"
             >
-              <SlidersHorizontal size={18} />
+              <SlidersHorizontal size={18} className="shrink-0" />
               <span className="hidden sm:inline">Filters</span>
               {activeCount > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[10px] font-bold rounded-full bg-[var(--primary)] text-white">
@@ -348,9 +350,9 @@ export function ProfilesView({
       </div>
 
       {/* Listing */}
-      <section className="px-4 pt-6 pb-24 lg:pb-12">
+      <section className="px-3 sm:px-4 pt-6 pb-24 lg:pb-12">
         <div className="max-w-6xl mx-auto">
-          <div className="flex flex-wrap items-center gap-2 mb-5">
+          <div className="flex flex-wrap items-center justify-center gap-2 mb-5 sm:justify-start">
             <h2 className="text-lg sm:text-xl font-bold text-[var(--color-text-primary)] mr-1">
               {profilesLoading
                 ? `Loading ${itemNoun}…`

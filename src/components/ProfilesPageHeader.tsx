@@ -27,7 +27,7 @@ export function ProfilesPageHeader() {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-[var(--color-border)] shadow-[var(--shadow-soft)]">
-      <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-14 sm:h-16">
+      <div className="max-w-6xl mx-auto px-3.5 sm:px-4 flex items-center justify-between h-14 sm:h-16 gap-2">
         <Link href="/" className="flex items-center gap-2">
           <Heart className="w-8 h-8 text-[var(--primary)] fill-[var(--primary)]" aria-hidden />
           <span className="leading-tight text-[var(--primary)]">
@@ -75,7 +75,7 @@ export function ProfilesPageHeader() {
             </>
           )}
         </nav>
-        <div className="md:hidden flex items-center gap-1 -mr-1">
+        <div className="md:hidden flex shrink-0 items-center gap-0.5 sm:gap-1">
           <Link
             href="/search"
             className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-[var(--color-border)]/50 active:bg-[var(--color-border)] transition-colors touch-manipulation"

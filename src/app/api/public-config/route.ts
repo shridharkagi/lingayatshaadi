@@ -10,6 +10,7 @@ const DEFAULT_PUBLIC_CONFIG = {
   externalScripts: "",
   externalScriptsHead: "",
   externalScriptsBody: "",
+  externalScriptsBodyEnd: "",
   bridesHeroImageUrl:
     "https://images.unsplash.com/photo-1519741497674-611481863552?w=1600&q=75&fit=crop",
   groomsHeroImageUrl:
@@ -30,6 +31,7 @@ export async function GET() {
       externalScripts: bodyScripts,
       externalScriptsHead: c.externalScriptsHead,
       externalScriptsBody: bodyScripts,
+      externalScriptsBodyEnd: c.externalScriptsBodyEnd ?? "",
       bridesHeroImageUrl: c.bridesHeroImageUrl,
       groomsHeroImageUrl: c.groomsHeroImageUrl,
     });

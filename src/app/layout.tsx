@@ -134,6 +134,7 @@ export default function RootLayout({
                 <ContactFloat />
                 <ConfigInjector />
                 <div id="lingayat-external-scripts" suppressHydrationWarning />
+                <div id="lingayat-external-scripts-end" suppressHydrationWarning />
               </AuthModalProvider>
             </AppConfigProvider>
           </AuthProvider>

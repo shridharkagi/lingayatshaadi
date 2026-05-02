@@ -37,6 +37,9 @@ export async function POST(request: NextRequest) {
       patch.externalScripts = body.externalScripts;
       patch.externalScriptsBody = body.externalScripts;
     }
+    if (typeof body.externalScriptsBodyEnd === "string") {
+      patch.externalScriptsBodyEnd = body.externalScriptsBodyEnd;
+    }
     if (typeof body.bridesHeroImageUrl === "string") patch.bridesHeroImageUrl = body.bridesHeroImageUrl;
     if (typeof body.groomsHeroImageUrl === "string") patch.groomsHeroImageUrl = body.groomsHeroImageUrl;
 

@@ -18,6 +18,8 @@ export type SiteConfig = {
   externalScripts: string;
   externalScriptsHead: string;
   externalScriptsBody: string;
+  /** Injected just before </body> (e.g. deferred analytics, end-of-page widgets) */
+  externalScriptsBodyEnd: string;
   bridesHeroImageUrl: string;
   groomsHeroImageUrl: string;
 };
@@ -34,6 +36,7 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
   externalScripts: "",
   externalScriptsHead: "",
   externalScriptsBody: "",
+  externalScriptsBodyEnd: "",
   bridesHeroImageUrl:
     "https://images.unsplash.com/photo-1519741497674-611481863552?w=1600&q=75&fit=crop",
   groomsHeroImageUrl:
