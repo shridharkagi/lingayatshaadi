@@ -238,7 +238,7 @@ export function ProfilesView({
       <ProfilesPageHeader />
 
       {/* Compact hero — z-[22] above forensic watermark (fixed z-[21]) */}
-      <section className="relative h-[min(300px,52vh)] min-h-[260px] sm:h-[320px] md:h-[360px] overflow-hidden pt-14 sm:pt-16">
+      <section className="relative h-[min(320px,55vh)] min-h-[280px] sm:h-[320px] md:h-[360px] overflow-hidden pt-[4.75rem] sm:pt-16">
         <div className="absolute inset-0">
           <Image
             src={heroImage}
@@ -251,7 +251,7 @@ export function ProfilesView({
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-[var(--color-bg)]" />
         </div>
-        <div className="relative z-[22] isolate h-full max-w-6xl mx-auto px-3.5 sm:px-4 pt-2 pb-4 flex flex-col justify-center text-white items-center text-center sm:items-start sm:text-left">
+        <div className="relative z-[22] isolate h-full max-w-6xl mx-auto px-3.5 sm:px-4 pt-1 pb-5 sm:pt-2 sm:pb-4 flex flex-col justify-center text-white items-center text-center sm:items-start sm:text-left">
           <h1 className="text-[clamp(1.25rem,4.6vw,2.25rem)] sm:text-3xl md:text-4xl font-bold mb-2 sm:mb-2.5 drop-shadow max-w-2xl px-0.5">
             {title}
           </h1>
@@ -286,7 +286,7 @@ export function ProfilesView({
             )}
           </div>
           {showCreateProfileStrip && (
-            <div className="mt-3 w-full max-w-xl flex flex-col gap-3 rounded-2xl border border-white/20 bg-black/40 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:py-2.5 sm:pl-4 sm:pr-4">
+            <div className="mt-3 sm:mt-3.5 w-full max-w-xl flex flex-col gap-3 rounded-2xl border border-white/20 bg-black/40 px-3.5 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:py-2.5 sm:pl-4 sm:pr-4">
               <p className="min-w-0 text-left text-[12px] leading-snug text-white/95 sm:flex-1 sm:text-xs">
                 List your profile — quick setup, family-friendly privacy.
               </p>
@@ -314,7 +314,7 @@ export function ProfilesView({
       {/* Sticky search + filter bar — less overlap when CTA strip is shown */}
       <div
         className={`sticky top-14 sm:top-16 z-30 px-3 sm:px-4 ${
-          showCreateProfileStrip ? "-mt-4 sm:-mt-6" : "-mt-7 sm:-mt-9"
+          showCreateProfileStrip ? "-mt-2.5 sm:-mt-5" : "-mt-6 sm:-mt-8"
         }`}
       >
         <div className="max-w-6xl mx-auto">

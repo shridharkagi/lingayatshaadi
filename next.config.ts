@@ -58,7 +58,7 @@ const nextConfig: NextConfig = {
                 "https://*.tawk.to wss://*.tawk.to",
                 "https://*.clarity.ms",
               ].join(" "),
-              "worker-src 'self' blob: https://*.hotjar.com https://*.clarity.ms",
+              "worker-src 'self' blob: https://challenges.cloudflare.com https://*.hotjar.com https://*.clarity.ms",
               [
                 "frame-src",
                 "https://challenges.cloudflare.com",

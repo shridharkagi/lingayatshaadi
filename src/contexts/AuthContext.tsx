@@ -284,14 +284,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     token: string;
     blocked: boolean;
   }> => {
-    try {
-      const token = await getTurnstileToken();
-      return { token, blocked: false };
-    } catch (e) {
-      const reason = e instanceof Error ? e.message : String(e);
-      console.warn("[auth] captcha token unavailable:", reason);
-      return { token: "", blocked: true };
+    /** Slow networks / cold widget load often fail once; retry before telling users they're "blocked". */
+    const backoffMs = [0, 450, 900];
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < backoffMs.length; attempt++) {
+      if (backoffMs[attempt] > 0) {
+        await new Promise((r) => setTimeout(r, backoffMs[attempt]));
+      }
+      try {
+        const token = await getTurnstileToken();
+        return { token, blocked: false };
+      } catch (e) {
+        lastErr = e;
+      }
     }
+    const reason = lastErr instanceof Error ? lastErr.message : String(lastErr);
+    console.warn("[auth] captcha token unavailable after retries:", reason);
+    return { token: "", blocked: true };
   };
 
   /** If the Supabase error mentions captcha/turnstile, swap in our actionable copy. */

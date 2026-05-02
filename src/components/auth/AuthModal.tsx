@@ -6,6 +6,7 @@ import { Calendar, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTurnstile } from "@/components/turnstile/TurnstileProvider";
 import { parseDobDdMmYyyyToIso } from "@/lib/dateOfBirth";
 import { formatIsoToDobDdMmYyyy } from "@/lib/dateOfBirth";
 
@@ -42,6 +43,7 @@ const initialSignup: SignupForm = {
 export function AuthModal({ open, initialMode, onClose }: AuthModalProps) {
   const router = useRouter();
   const { sendPhoneOtp, verifyPhoneOtp, signInWithPassword, resetPasswordWithPhoneOtp } = useAuth();
+  const { prime: primeTurnstile } = useTurnstile();
 
   const [mode, setMode] = useState<AuthModalMode>("login");
   const [otpSent, setOtpSent] = useState(false);
@@ -68,6 +70,11 @@ export function AuthModal({ open, initialMode, onClose }: AuthModalProps) {
   const [signupOtp, setSignupOtp] = useState("");
   const [signupStep, setSignupStep] = useState<1 | 2>(1);
   const [signupDobPickerIso, setSignupDobPickerIso] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    primeTurnstile();
+  }, [open, mode, primeTurnstile]);
 
   useEffect(() => {
     if (!open) return;

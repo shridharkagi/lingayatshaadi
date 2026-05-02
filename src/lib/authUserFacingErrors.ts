@@ -10,9 +10,8 @@
  * sounds like the user did something wrong.
  */
 export const CAPTCHA_BLOCKED_MESSAGE =
-  "Couldn't verify your browser. This usually means a corporate VPN/proxy or " +
-  "strict ad-blocker is blocking our security check. Try mobile data, " +
-  "switch to a personal network, or see Help → Sign-in issues.";
+  "Couldn't verify your browser. Wait a few seconds and tap Continue again. If it keeps failing: try mobile data, " +
+  "turn off VPN/ad-blockers for this site, or see Help → Sign-in issues.";
 
 /**
  * Detect captcha-related error messages bubbling up from Supabase Auth so we

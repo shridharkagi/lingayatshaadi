@@ -236,13 +236,13 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen" style={{ background: "var(--gradient-bg-warm)" }}>
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-[var(--color-border)] shadow-[var(--shadow-soft)]">
-        <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-14 sm:h-16">
-          <Link href="/" className="flex items-center gap-2">
-            <Heart className="w-8 h-8 text-[var(--primary)] fill-[var(--primary)]" />
-            <span className="leading-tight text-[var(--primary)]">
-              <span className="block text-xl font-bold">LingayatBandhu</span>
-              <span className="block text-[11px] sm:text-xs font-semibold tracking-[0.14em] uppercase text-[var(--primary)]/85">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-[var(--color-border)] shadow-[var(--shadow-soft)]">
+        <div className="max-w-6xl mx-auto px-3.5 sm:px-4 flex items-center justify-between h-14 sm:h-16 gap-3">
+          <Link href="/" className="flex items-center gap-2 min-w-0 shrink">
+            <Heart className="w-7 h-7 sm:w-8 sm:h-8 shrink-0 text-[var(--primary)] fill-[var(--primary)]" />
+            <span className="leading-tight text-[var(--primary)] min-w-0">
+              <span className="block text-lg sm:text-xl font-bold truncate">LingayatBandhu</span>
+              <span className="block text-[10px] sm:text-xs font-semibold tracking-[0.14em] uppercase text-[var(--primary)]/85">
                 Matrimony
               </span>
             </span>
@@ -285,12 +285,13 @@ export default function LandingPage() {
               </>
             )}
           </nav>
-          {/* Mobile sticky primary CTA near the hamburger. */}
-          <div className="md:hidden flex items-center gap-1">
+          {/* Mobile: outline Register + menu — touch-friendly, visually balanced */}
+          <div className="md:hidden flex items-center gap-2 shrink-0">
             {!loading && !isLoggedIn && (
               <Button
                 size="sm"
-                className="px-3 py-1.5 text-sm rounded-full shadow-sm"
+                variant="outline"
+                className="px-3.5 py-2 min-h-[42px] rounded-full bg-white font-semibold text-sm shadow-none hover:bg-[var(--primary)]/10 hover:text-[var(--primary)] active:scale-[0.98]"
                 onClick={() => openAuthModal("signup")}
               >
                 Register
@@ -308,7 +309,7 @@ export default function LandingPage() {
             <button
               type="button"
               id="mobile-menu-btn"
-              className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-[var(--color-border)]/50 active:bg-[var(--color-border)] transition-colors touch-manipulation"
+              className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl border border-transparent hover:bg-[var(--color-border)]/40 active:bg-[var(--color-border)]/60 transition-colors touch-manipulation"
               aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
               aria-expanded={mobileMenuOpen}
             >
@@ -367,8 +368,8 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="relative min-h-[75vh] sm:min-h-[80vh] lg:min-h-[85vh] flex items-center justify-start overflow-hidden pt-16 pb-20">
+      {/* Hero — extra top padding clears fixed header; bottom padding balances CTA vs tagline */}
+      <section className="relative min-h-[72vh] sm:min-h-[78vh] lg:min-h-[82vh] flex flex-col justify-center overflow-hidden pt-[4.75rem] sm:pt-20 pb-24 sm:pb-28">
         <div className="absolute inset-0">
           <Image
             src={HERO_IMAGE}
@@ -381,18 +382,18 @@ export default function LandingPage() {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
         </div>
-        <div className="relative z-10 text-left text-white px-4 max-w-2xl mx-auto sm:mx-0 sm:ml-[4%]">
+        <div className="relative z-10 text-left text-white px-4 max-w-2xl mx-auto sm:mx-0 sm:ml-[4%] py-4">
           <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-3 sm:mb-4 drop-shadow-lg">
             Find your perfect match with LingayatBandhu Matrimony
           </h1>
-          <p className="text-lg sm:text-xl md:text-2xl text-white/95 mb-6 sm:mb-8">
+          <p className="text-lg sm:text-xl md:text-2xl text-white/95 mb-7 sm:mb-8 max-w-xl">
             Connect with compatible life partners rooted in shared faith, tradition, and community
           </p>
           {!loading && isLoggedIn ? (
             <Link href={primaryCta.href}>
               <Button
                 size="lg"
-                className="border-0 text-white text-lg px-10 py-4 rounded-full shadow-lg hover:opacity-95 transition-opacity"
+                className="border-0 text-white text-base sm:text-lg px-8 sm:px-10 py-3.5 sm:py-4 rounded-full shadow-lg hover:opacity-95 transition-opacity"
                 style={{ background: "var(--gradient-primary)" }}
               >
                 {primaryCta.label}
@@ -402,14 +403,14 @@ export default function LandingPage() {
             <Button
               size="lg"
               onClick={() => openAuthModal("signup")}
-              className="border-0 text-white text-lg px-10 py-4 rounded-full shadow-lg hover:opacity-95 transition-opacity"
+              className="border-0 text-white text-base sm:text-lg px-8 sm:px-10 py-3.5 sm:py-4 rounded-full shadow-lg hover:opacity-95 transition-opacity"
               style={{ background: "var(--gradient-primary)" }}
             >
               {primaryCta.label}
             </Button>
           )}
         </div>
-        <div className="absolute bottom-4 left-0 right-0 text-center text-white/80 text-xs sm:text-sm px-4">
+        <div className="pointer-events-none absolute bottom-5 sm:bottom-6 left-0 right-0 text-center text-white/85 text-[11px] sm:text-sm px-4 leading-snug">
           Built for Lingayat families • Verified profiles • Community-first matchmaking
         </div>
       </section>
