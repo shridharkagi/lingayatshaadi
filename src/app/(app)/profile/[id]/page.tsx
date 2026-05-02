@@ -966,6 +966,25 @@ export default function OtherProfilePage() {
     }
   };
 
+  const hasValidSubscription = !!accessState?.hasValidSubscription;
+  const viewerActiveOwnedProfiles = useMemo(() => {
+    if (!viewerOwnedProfiles) return [];
+    return viewerOwnedProfiles.filter((p) => !p.deletedAt);
+  }, [viewerOwnedProfiles]);
+
+  const viewerHasNoMatrimonialProfile =
+    isLoggedIn && viewerOwnedProfiles !== null && viewerActiveOwnedProfiles.length === 0;
+
+  const incompleteOwnedProfileForWizard = useMemo(() => {
+    const incomplete = viewerActiveOwnedProfiles.filter((p) => !computeProfileCompletion(p).isComplete);
+    if (incomplete.length === 0) return null;
+    const draft = incomplete.find((p) => p.moderationStatus === "draft");
+    return draft ?? incomplete[0];
+  }, [viewerActiveOwnedProfiles]);
+
+  const viewerHasIncompleteMatrimonialProfile =
+    viewerActiveOwnedProfiles.length > 0 && incompleteOwnedProfileForWizard !== null;
+
   if (!profile) {
     const blockingInitialList = profilesLoading && profiles.length === 0;
     if (blockingInitialList || fallbackLoading) {
@@ -1001,25 +1020,6 @@ export default function OtherProfilePage() {
       </div>
     );
   }
-
-  const hasValidSubscription = !!accessState?.hasValidSubscription;
-  const viewerActiveOwnedProfiles = useMemo(() => {
-    if (!viewerOwnedProfiles) return [];
-    return viewerOwnedProfiles.filter((p) => !p.deletedAt);
-  }, [viewerOwnedProfiles]);
-
-  const viewerHasNoMatrimonialProfile =
-    isLoggedIn && viewerOwnedProfiles !== null && viewerActiveOwnedProfiles.length === 0;
-
-  const incompleteOwnedProfileForWizard = useMemo(() => {
-    const incomplete = viewerActiveOwnedProfiles.filter((p) => !computeProfileCompletion(p).isComplete);
-    if (incomplete.length === 0) return null;
-    const draft = incomplete.find((p) => p.moderationStatus === "draft");
-    return draft ?? incomplete[0];
-  }, [viewerActiveOwnedProfiles]);
-
-  const viewerHasIncompleteMatrimonialProfile =
-    viewerActiveOwnedProfiles.length > 0 && incompleteOwnedProfileForWizard !== null;
 
   const canViewSensitiveFields = isLoggedIn && hasValidSubscription;
   const canUseContact = !!accessState?.canContact;
