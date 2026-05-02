@@ -58,7 +58,8 @@ export default function SuperAdminEditProfilePage() {
       </div>
     );
   }
-  if (error || !profile.id) {
+  // Only block the editor when the profile failed to load — save validation errors must stay inline.
+  if (!profile.id) {
     return (
       <div className="p-8">
         <p className="text-gray-500">{error || "Profile not found"}</p>

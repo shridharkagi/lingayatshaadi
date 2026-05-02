@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
-import { readFileSync, existsSync } from "fs";
-import { join } from "path";
-
-const CONFIG_PATH = join(process.cwd(), "data", "site-config.json");
+import { readSiteConfig } from "@/lib/server/siteConfig";
 
 const DEFAULT_PUBLIC_CONFIG = {
   whatsappGroupUrl: "",
@@ -11,6 +8,8 @@ const DEFAULT_PUBLIC_CONFIG = {
   whatsappDefaultMessage: "I need assistance, my name: ",
   faviconUrl: "",
   externalScripts: "",
+  externalScriptsHead: "",
+  externalScriptsBody: "",
   bridesHeroImageUrl:
     "https://images.unsplash.com/photo-1519741497674-611481863552?w=1600&q=75&fit=crop",
   groomsHeroImageUrl:
@@ -19,13 +18,20 @@ const DEFAULT_PUBLIC_CONFIG = {
 
 export async function GET() {
   try {
-    if (!existsSync(CONFIG_PATH)) {
-      return NextResponse.json(DEFAULT_PUBLIC_CONFIG);
-    }
-    const parsed = JSON.parse(readFileSync(CONFIG_PATH, "utf-8"));
+    const c = await readSiteConfig();
+    const bodyScripts = c.externalScriptsBody || c.externalScripts;
     return NextResponse.json({
       ...DEFAULT_PUBLIC_CONFIG,
-      ...(parsed || {}),
+      whatsappGroupUrl: c.whatsappGroupUrl,
+      whatsappContactNumber: c.whatsappContactNumber,
+      callContactNumber: c.callContactNumber,
+      whatsappDefaultMessage: c.whatsappDefaultMessage,
+      faviconUrl: c.faviconUrl,
+      externalScripts: bodyScripts,
+      externalScriptsHead: c.externalScriptsHead,
+      externalScriptsBody: bodyScripts,
+      bridesHeroImageUrl: c.bridesHeroImageUrl,
+      groomsHeroImageUrl: c.groomsHeroImageUrl,
     });
   } catch {
     return NextResponse.json(DEFAULT_PUBLIC_CONFIG);

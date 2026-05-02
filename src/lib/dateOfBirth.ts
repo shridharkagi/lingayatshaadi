@@ -1,5 +1,21 @@
+function validateIsoYyyyMmDd(value: string): string {
+  const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return "";
+  const yyyy = Number(m[1]);
+  const mm = Number(m[2]);
+  const dd = Number(m[3]);
+  const currentYear = new Date().getFullYear();
+  if (yyyy < 1900 || yyyy > currentYear || mm < 1 || mm > 12 || dd < 1 || dd > 31) return "";
+  const dt = new Date(Date.UTC(yyyy, mm - 1, dd));
+  if (dt.getUTCFullYear() !== yyyy || dt.getUTCMonth() !== mm - 1 || dt.getUTCDate() !== dd) return "";
+  return value;
+}
+
+/** Accepts dd/mm/yyyy or ISO yyyy-mm-dd (API/DB) and returns normalized yyyy-mm-dd. */
 export function parseDobDdMmYyyyToIso(raw: string): string {
   const value = String(raw || "").trim();
+  const asIso = validateIsoYyyyMmDd(value);
+  if (asIso) return asIso;
   const m = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (!m) return "";
   const dd = Number(m[1]);

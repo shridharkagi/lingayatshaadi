@@ -14,10 +14,14 @@ import {
   X,
 } from "lucide-react";
 
+export type ProfileApprovalModalVariant = "created" | "updated";
+
 interface ProfileCreatedApprovalModalProps {
   open: boolean;
   accountName: string;
   onClose: () => void;
+  /** First-time submit vs edit of an existing profile — copy and WhatsApp preset differ. */
+  variant?: ProfileApprovalModalVariant;
 }
 
 const SUPPORT_PHONE = "6360130905";
@@ -39,6 +43,7 @@ export function ProfileCreatedApprovalModal({
   open,
   accountName,
   onClose,
+  variant = "created",
 }: ProfileCreatedApprovalModalProps) {
   useEffect(() => {
     if (!open) return;
@@ -57,7 +62,10 @@ export function ProfileCreatedApprovalModal({
   if (!open) return null;
 
   const safeName = accountName.trim() || "User";
-  const message = `My name is ${safeName}, Please approve my profile.`;
+  const message =
+    variant === "updated"
+      ? `My name is ${safeName}. I have updated my profile — please review it for approval.`
+      : `My name is ${safeName}, Please approve my profile.`;
   const whatsappHref = `https://wa.me/91${SUPPORT_PHONE}?text=${encodeURIComponent(message)}`;
   const callHref = `tel:${SUPPORT_PHONE}`;
 
@@ -66,7 +74,7 @@ export function ProfileCreatedApprovalModal({
       className="fixed inset-0 z-[120] flex items-center justify-center bg-black/55 p-4"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="profile-created-title"
+      aria-labelledby={variant === "updated" ? "profile-updated-title" : "profile-created-title"}
       onClick={onClose}
     >
       <div
@@ -111,28 +119,50 @@ export function ProfileCreatedApprovalModal({
             </div>
 
             <h2
-              id="profile-created-title"
+              id={variant === "updated" ? "profile-updated-title" : "profile-created-title"}
               className="text-[1.35rem] font-bold leading-tight text-slate-900 sm:text-2xl"
             >
-              Profile Created Successfully!
+              {variant === "updated"
+                ? "Profile Updated Successfully!"
+                : "Profile Created Successfully!"}
             </h2>
             <div className="mx-auto mt-3 h-1 w-16 rounded-full bg-emerald-500" />
 
-            <p className="mt-4 text-sm leading-relaxed text-slate-600">
-              Your profile has been created and is currently pending approval.
-            </p>
-            <p className="mt-1 text-sm font-semibold text-emerald-600">
-              Approval may take up to 24 hours.
-            </p>
+            {variant === "updated" ? (
+              <>
+                <p className="mt-4 text-sm leading-relaxed text-slate-600">
+                  Your profile has been updated and is now under review.
+                </p>
+                <p className="mt-1 text-sm font-semibold text-emerald-600">
+                  Updated profiles may require approval again for verification.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="mt-4 text-sm leading-relaxed text-slate-600">
+                  Your profile has been created and is currently pending approval.
+                </p>
+                <p className="mt-1 text-sm font-semibold text-emerald-600">
+                  Approval may take up to 24 hours.
+                </p>
+              </>
+            )}
           </div>
 
           <div className="relative mt-5 flex items-start gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-3.5 py-3 text-left">
             <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-sm ring-1 ring-emerald-100">
               <Zap size={18} />
             </div>
-            <p className="text-sm leading-snug text-emerald-900/90">
-              Most profiles get approved faster when you request approval directly.
-            </p>
+            {variant === "updated" ? (
+              <p className="text-sm leading-snug text-emerald-900/90">
+                <span className="font-semibold">Most profiles get approved faster</span> when you
+                request approval directly.
+              </p>
+            ) : (
+              <p className="text-sm leading-snug text-emerald-900/90">
+                Most profiles get approved faster when you request approval directly.
+              </p>
+            )}
           </div>
 
           <div className="relative mt-5 grid grid-cols-3 gap-2 rounded-2xl border border-slate-100 bg-slate-50/80 px-2 py-3 text-center">
@@ -158,7 +188,13 @@ export function ProfileCreatedApprovalModal({
 
           <div className="relative mt-4 flex items-center justify-center gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 ring-1 ring-amber-100">
             <Star size={14} className="text-amber-500" fill="currentColor" />
-            <span>90% of profiles get approved within a few hours!</span>
+            {variant === "updated" ? (
+              <span className="font-semibold">
+                90% of profiles are approved within a few hours!
+              </span>
+            ) : (
+              <span>90% of profiles get approved within a few hours!</span>
+            )}
           </div>
 
           <div className="relative mt-5 flex flex-col gap-3">
@@ -202,7 +238,9 @@ export function ProfileCreatedApprovalModal({
 
           <p className="relative mt-4 flex items-center justify-center gap-2 text-center text-[11px] leading-relaxed text-slate-500">
             <Lock size={12} className="shrink-0 text-slate-400" />
-            Our team will review and approve your profile shortly.
+            {variant === "updated"
+              ? "Our team will review your updated profile and get back to you soon."
+              : "Our team will review and approve your profile shortly."}
           </p>
         </div>
       </div>

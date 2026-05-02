@@ -3,6 +3,10 @@ import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireAuthUser } from "@/lib/server/requireAuthUser";
 import { resolveAccountAccess } from "@/lib/accessPolicy";
 import { ensureFreePlanForUser } from "@/lib/server/freePlanProvisioning";
+import {
+  listOwnedProfileIdsIncludingDeleted,
+  userSubscriptionsOrFilter,
+} from "@/lib/server/subscriptionLookup";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuthUser(req);
@@ -14,18 +18,16 @@ export async function GET(req: NextRequest) {
   // Backfill: older accounts without any active plan receive Free automatically.
   await ensureFreePlanForUser(admin, auth.userId);
 
-  const [{ data: ownedProfiles, count: nonDeletedProfileCount }] = await Promise.all([
-    admin
-      .from("profiles")
-      .select("id", { count: "exact" })
-      .eq("user_id", auth.userId)
-      .is("deleted_at", null),
-  ]);
-  const ownedProfileIds = (ownedProfiles || [])
-    .map((r) => String((r as { id?: string }).id || ""))
-    .filter(Boolean);
-  const subscriptionLookupIds = Array.from(new Set([auth.userId, ...ownedProfileIds]));
-  const orFilter = subscriptionLookupIds.map((id) => `user_id.eq.${id}`).join(",");
+  const [{ data: ownedProfiles, count: nonDeletedProfileCount }, subscriptionLookupProfileIds] =
+    await Promise.all([
+      admin
+        .from("profiles")
+        .select("id", { count: "exact" })
+        .eq("user_id", auth.userId)
+        .is("deleted_at", null),
+      listOwnedProfileIdsIncludingDeleted(admin, auth.userId),
+    ]);
+  const orFilter = userSubscriptionsOrFilter(auth.userId, subscriptionLookupProfileIds);
   const { data: activeSubs } = await admin
     .from("user_subscriptions")
     .select("id")

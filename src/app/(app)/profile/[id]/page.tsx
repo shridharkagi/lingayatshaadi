@@ -43,7 +43,12 @@ import {
 } from "lucide-react";
 import { useProfiles } from "@/contexts/ProfilesContext";
 import { hasAcceptedInterest, hasSentInterest, sendInterest } from "@/lib/api/interests";
-import { getProfileById, getProfileByPublicId, profileFromSnapshot } from "@/lib/api/profiles";
+import {
+  getProfileById,
+  getProfileByPublicId,
+  listProfilesByUserId,
+  profileFromSnapshot,
+} from "@/lib/api/profiles";
 import { recordProfileView } from "@/lib/api/profileViews";
 import { addToShortlist, removeFromShortlist, isShortlisted } from "@/lib/api/shortlist";
 import { blockUser } from "@/lib/api/blocked";
@@ -297,6 +302,7 @@ export default function OtherProfilePage() {
   const [stripNoticeAutoHidden, setStripNoticeAutoHidden] = useState(false);
   const [contactHintVisible, setContactHintVisible] = useState(true);
   const [accessState, setAccessState] = useState<AccountAccessState | null>(null);
+  const [viewerOwnedProfiles, setViewerOwnedProfiles] = useState<Profile[] | null>(null);
   const [localSavedIds, setLocalSavedIds] = useState<string[]>([]);
 
   const showToast = useCallback((msg: string, type: "success" | "error" = "success") => {
@@ -319,6 +325,21 @@ export default function OtherProfilePage() {
       cancelled = true;
     };
   }, [isLoggedIn]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!isLoggedIn || !authUser?.id) {
+      setViewerOwnedProfiles(null);
+      return;
+    }
+    void listProfilesByUserId(authUser.id).then(({ data }) => {
+      if (cancelled) return;
+      setViewerOwnedProfiles(data || []);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, authUser?.id]);
 
   useEffect(() => {
     if (!isLoggedIn || actorId) return;
@@ -982,6 +1003,24 @@ export default function OtherProfilePage() {
   }
 
   const hasValidSubscription = !!accessState?.hasValidSubscription;
+  const viewerActiveOwnedProfiles = useMemo(() => {
+    if (!viewerOwnedProfiles) return [];
+    return viewerOwnedProfiles.filter((p) => !p.deletedAt);
+  }, [viewerOwnedProfiles]);
+
+  const viewerHasNoMatrimonialProfile =
+    isLoggedIn && viewerOwnedProfiles !== null && viewerActiveOwnedProfiles.length === 0;
+
+  const incompleteOwnedProfileForWizard = useMemo(() => {
+    const incomplete = viewerActiveOwnedProfiles.filter((p) => !computeProfileCompletion(p).isComplete);
+    if (incomplete.length === 0) return null;
+    const draft = incomplete.find((p) => p.moderationStatus === "draft");
+    return draft ?? incomplete[0];
+  }, [viewerActiveOwnedProfiles]);
+
+  const viewerHasIncompleteMatrimonialProfile =
+    viewerActiveOwnedProfiles.length > 0 && incompleteOwnedProfileForWizard !== null;
+
   const canViewSensitiveFields = isLoggedIn && hasValidSubscription;
   const canUseContact = !!accessState?.canContact;
   const canSendInterestNow = !!accessState?.canSendInterest;
@@ -1637,24 +1676,50 @@ export default function OtherProfilePage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-[var(--foreground)]">
-                    Upgrade your plan to view full profile details and contact information.
+                    {viewerHasNoMatrimonialProfile
+                      ? "Create your free profile or upgrade to view full details and contact information."
+                      : viewerHasIncompleteMatrimonialProfile
+                        ? "Complete your profile registration or upgrade to unlock full details."
+                        : "Upgrade your plan to view full profile details and contact information."}
                   </p>
                   <p className="text-xs sm:text-sm text-gray-600 mt-0.5">
-                    Upgrade to reveal sensitive details, or contact support for help.
+                    {viewerHasNoMatrimonialProfile || viewerHasIncompleteMatrimonialProfile
+                      ? "You can still upgrade for immediate access to sensitive fields on all profiles."
+                      : "Upgrade to reveal sensitive details, or contact support for help."}
                   </p>
                 </div>
               </div>
-              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-stretch">
+                {viewerHasNoMatrimonialProfile && (
+                  <Link
+                    href="/account?createProfile=1"
+                    className="inline-flex w-full min-h-[44px] flex-1 items-center justify-center rounded-lg bg-[var(--primary)] px-3 py-2.5 text-center text-xs font-semibold leading-snug text-white shadow-sm transition hover:brightness-105 sm:min-w-[min(100%,220px)] sm:max-w-full sm:flex-none sm:text-sm"
+                  >
+                    Create your profile now for free…
+                  </Link>
+                )}
+                {viewerHasIncompleteMatrimonialProfile && incompleteOwnedProfileForWizard && (
+                  <Link
+                    href={`/profile/complete?profileId=${encodeURIComponent(incompleteOwnedProfileForWizard.id)}`}
+                    className="inline-flex w-full min-h-[44px] flex-1 items-center justify-center rounded-lg bg-[var(--primary)] px-3 py-2.5 text-center text-xs font-semibold leading-snug text-white shadow-sm transition hover:brightness-105 sm:min-w-[min(100%,220px)] sm:max-w-full sm:flex-none sm:text-sm"
+                  >
+                    Complete profile registration now
+                  </Link>
+                )}
                 <Link
                   href="/membership"
-                  className="inline-flex items-center justify-center px-3 py-2 rounded-lg bg-[var(--primary)] text-white text-sm font-medium"
+                  className={`inline-flex w-full min-h-[44px] flex-1 items-center justify-center rounded-lg px-3 py-2.5 text-center text-sm font-semibold shadow-sm transition sm:min-w-[min(100%,160px)] sm:flex-none ${
+                    viewerHasNoMatrimonialProfile || viewerHasIncompleteMatrimonialProfile
+                      ? "border-2 border-[var(--primary)] bg-white text-[var(--primary)] hover:bg-[var(--primary)]/5"
+                      : "bg-[var(--primary)] text-white hover:brightness-105"
+                  }`}
                 >
                   Upgrade Plan
                 </Link>
                 <button
                   type="button"
                   onClick={openSupportPopup}
-                  className="inline-flex items-center justify-center px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 bg-white"
+                  className="inline-flex w-full min-h-[44px] flex-1 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-center text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 sm:min-w-[min(100%,160px)] sm:flex-none"
                 >
                   Contact Support
                 </button>

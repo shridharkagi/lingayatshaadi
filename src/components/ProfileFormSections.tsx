@@ -120,7 +120,17 @@ function DobInputWithPicker({
 
   useEffect(() => {
     const v = String(value || "");
-    setManual(/^\d{4}-\d{2}-\d{2}$/.test(v) ? formatIsoToDobDdMmYyyy(v) : v);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+      const ddmm = formatIsoToDobDdMmYyyy(v);
+      if (ddmm) {
+        setManual(ddmm);
+        onChange(ddmm);
+        return;
+      }
+    }
+    setManual(v);
+    // Sync parent when API sends ISO — only `value` in deps (onChange identity changes each render).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
   return (

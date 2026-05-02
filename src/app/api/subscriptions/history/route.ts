@@ -1,24 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireAuthUser } from "@/lib/server/requireAuthUser";
+import {
+  listOwnedProfileIdsIncludingDeleted,
+  userSubscriptionsOrFilter,
+} from "@/lib/server/subscriptionLookup";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuthUser(req);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const admin = createSupabaseAdmin();
-  const { data: ownedProfiles } = await admin
-    .from("profiles")
-    .select("id")
-    .eq("user_id", auth.userId)
-    .is("deleted_at", null)
-    .limit(500);
-  const ownedProfileIds = (ownedProfiles || [])
-    .map((r) => String((r as { id?: string }).id || ""))
-    .filter(Boolean);
+  const ownedProfileIds = await listOwnedProfileIdsIncludingDeleted(admin, auth.userId);
   const contactViewerOrFilter = ownedProfileIds.map((id) => `viewer_id.eq.${id}`).join(",");
-  const lookupIds = Array.from(new Set([auth.userId, ...ownedProfileIds]));
-  const orFilter = lookupIds.map((id) => `user_id.eq.${id}`).join(",");
+  const orFilter = userSubscriptionsOrFilter(auth.userId, ownedProfileIds);
 
   const subsWithNotesRes = await admin
     .from("user_subscriptions")

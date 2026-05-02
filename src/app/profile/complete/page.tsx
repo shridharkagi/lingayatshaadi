@@ -994,7 +994,9 @@ function ProfileCompleteInner() {
     }
 
     if (hasUrlProfileId && !isDraftFlow) {
-      router.push("/account");
+      router.push(
+        `/account?profileUpdated=1&updatedProfileId=${encodeURIComponent(saved.id)}`,
+      );
       return;
     }
     router.push(`/account?profileCreated=1&createdProfileId=${encodeURIComponent(saved.id)}`);

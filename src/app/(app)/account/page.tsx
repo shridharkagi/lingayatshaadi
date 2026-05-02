@@ -146,6 +146,9 @@ export default function AccountPage() {
   const [deletionSubmitErr, setDeletionSubmitErr] = useState("");
   const [membershipsNowMs, setMembershipsNowMs] = useState(0);
   const [showCreatedModal, setShowCreatedModal] = useState(false);
+  const [profileApprovalModalVariant, setProfileApprovalModalVariant] = useState<
+    "created" | "updated"
+  >("created");
 
   const loadPendingDeletionRequests = useCallback(async () => {
     const res = await adminFetch("/api/profile-deletion-request");
@@ -198,13 +201,27 @@ export default function AccountPage() {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const isCreated = params.get("profileCreated") === "1";
-    if (!isCreated) return;
-    const createdProfileId = params.get("createdProfileId") || "generic";
-    const onceKey = `profile-created-modal:${createdProfileId}`;
-    const seen = window.sessionStorage.getItem(onceKey) === "1";
-    if (!seen) {
-      setShowCreatedModal(true);
-      window.sessionStorage.setItem(onceKey, "1");
+    const isUpdated = params.get("profileUpdated") === "1";
+    if (!isCreated && !isUpdated) return;
+
+    if (isCreated) {
+      const createdProfileId = params.get("createdProfileId") || "generic";
+      const onceKey = `profile-created-modal:${createdProfileId}`;
+      const seen = window.sessionStorage.getItem(onceKey) === "1";
+      if (!seen) {
+        setProfileApprovalModalVariant("created");
+        setShowCreatedModal(true);
+        window.sessionStorage.setItem(onceKey, "1");
+      }
+    } else if (isUpdated) {
+      const updatedProfileId = params.get("updatedProfileId") || "generic";
+      const onceKey = `profile-updated-modal:${updatedProfileId}`;
+      const seen = window.sessionStorage.getItem(onceKey) === "1";
+      if (!seen) {
+        setProfileApprovalModalVariant("updated");
+        setShowCreatedModal(true);
+        window.sessionStorage.setItem(onceKey, "1");
+      }
     }
     router.replace("/account");
   }, [router]);
@@ -1040,6 +1057,7 @@ export default function AccountPage() {
 
       <ProfileCreatedApprovalModal
         open={showCreatedModal}
+        variant={profileApprovalModalVariant}
         accountName={accountMeta?.fullName || authUser?.email || "User"}
         onClose={() => setShowCreatedModal(false)}
       />

@@ -8,6 +8,8 @@
   "whatsappDefaultMessage": "I need assistance, my name: ",
   "faviconUrl": "",
   "externalScripts": "",
+  "externalScriptsHead": "",
+  "externalScriptsBody": "",
   "bridesHeroImageUrl": "https://images.unsplash.com/photo-1519741497674-611481863552?w=1600&q=75&fit=crop",
   "groomsHeroImageUrl": "https://images.unsplash.com/photo-1606800052052-a08af7148866?w=1600&q=70&fit=crop"
 }

@@ -11,7 +11,8 @@ export default function SuperAdminSettingsPage() {
   const [callContact, setCallContact] = useState("");
   const [whatsappMessage, setWhatsappMessage] = useState("");
   const [faviconUrl, setFaviconUrl] = useState("");
-  const [externalScripts, setExternalScripts] = useState("");
+  const [externalScriptsHead, setExternalScriptsHead] = useState("");
+  const [externalScriptsBody, setExternalScriptsBody] = useState("");
   const [robotsTxt, setRobotsTxt] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
   const [seoKeywords, setSeoKeywords] = useState("");
@@ -41,8 +42,12 @@ export default function SuperAdminSettingsPage() {
   }, [config.faviconUrl]);
 
   useEffect(() => {
-    setExternalScripts(config.externalScripts || "");
-  }, [config.externalScripts]);
+    setExternalScriptsHead(config.externalScriptsHead || "");
+  }, [config.externalScriptsHead]);
+
+  useEffect(() => {
+    setExternalScriptsBody(config.externalScriptsBody || config.externalScripts || "");
+  }, [config.externalScriptsBody, config.externalScripts]);
 
   useEffect(() => {
     setBridesHeroImageUrl(config.bridesHeroImageUrl || "");
@@ -72,7 +77,9 @@ export default function SuperAdminSettingsPage() {
         callContactNumber: callContact,
         whatsappDefaultMessage: whatsappMessage,
         faviconUrl,
-        externalScripts,
+        externalScriptsHead,
+        externalScriptsBody,
+        externalScripts: externalScriptsBody,
         bridesHeroImageUrl,
         groomsHeroImageUrl,
       };
@@ -217,15 +224,30 @@ export default function SuperAdminSettingsPage() {
 
         <h3 className="text-lg font-semibold text-gray-900">External Scripts</h3>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Chatbot / Analytics Scripts</label>
+          <label className="block text-sm font-medium text-gray-700">Scripts in &lt;head&gt;</label>
           <p className="text-xs text-gray-500 mt-0.5 mb-1">
-            Paste full script tags (e.g. Google Analytics, chatbot widget) or script URLs. One per line for multiple URLs.
+            Runs early in the document head — e.g. Google Analytics gtag config, meta pixels. Paste full{" "}
+            <code className="text-xs">&lt;script&gt;</code> blocks or one HTTPS script URL per line.
           </p>
           <textarea
-            value={externalScripts}
-            onChange={(e) => setExternalScripts(e.target.value)}
-            placeholder={'<script src="https://..."></script>\n<!-- or paste script URL -->'}
-            rows={6}
+            value={externalScriptsHead}
+            onChange={(e) => setExternalScriptsHead(e.target.value)}
+            placeholder={'<script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXX"></script>'}
+            rows={5}
+            className="mt-1 w-full px-4 py-2 border rounded-lg font-mono text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Scripts at start of &lt;body&gt;</label>
+          <p className="text-xs text-gray-500 mt-0.5 mb-1">
+            Injected right after the page opens — chat widgets, Tag Manager noscript, or extra loaders. Same format as
+            above.
+          </p>
+          <textarea
+            value={externalScriptsBody}
+            onChange={(e) => setExternalScriptsBody(e.target.value)}
+            placeholder={'<script>...</script>\n<!-- or paste script URL -->'}
+            rows={5}
             className="mt-1 w-full px-4 py-2 border rounded-lg font-mono text-sm"
           />
         </div>

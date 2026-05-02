@@ -12,6 +12,7 @@ import {
   type SearchFiltersState,
 } from "@/components/SearchFilters";
 import { useAuth } from "@/contexts/AuthContext";
+import { listProfilesByUserId } from "@/lib/api/profiles";
 import { BottomNav } from "@/components/ui/BottomNav";
 import { useAuthModal } from "@/contexts/AuthModalContext";
 import { ViewerForensicWatermark } from "@/components/ViewerForensicWatermark";
@@ -69,9 +70,11 @@ export function ProfilesView({
   heroImage = DEFAULT_HERO_IMAGE,
   itemNoun = "profiles",
 }: ProfilesViewProps) {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, authUser } = useAuth();
   const [accessState, setAccessState] = useState<AccountAccessState | null>(null);
   const { openAuthModal } = useAuthModal();
+  const [ownedProfilesLoaded, setOwnedProfilesLoaded] = useState(false);
+  const [hasAnyOwnedProfile, setHasAnyOwnedProfile] = useState(false);
 
   const lockedProfileType = lockedGender
     ? lockedGender === "female"
@@ -112,6 +115,29 @@ export function ProfilesView({
       cancelled = true;
     };
   }, [isLoggedIn]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!isLoggedIn || !authUser?.id) {
+      setOwnedProfilesLoaded(true);
+      setHasAnyOwnedProfile(false);
+      return;
+    }
+    setOwnedProfilesLoaded(false);
+    void listProfilesByUserId(authUser.id).then(({ data }) => {
+      if (cancelled) return;
+      const rows = data || [];
+      const hasLive = rows.some((p) => !p.deletedAt);
+      setHasAnyOwnedProfile(hasLive);
+      setOwnedProfilesLoaded(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, authUser?.id]);
+
+  const showCreateProfileStrip =
+    !isLoggedIn || (ownedProfilesLoaded && !hasAnyOwnedProfile);
 
   useEffect(() => {
     if (filterOpen) {
@@ -230,31 +256,24 @@ export function ProfilesView({
             {title}
           </h1>
           <p className="text-sm sm:text-base text-white/90 max-w-2xl">{subtitle}</p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {isLoggedIn ? (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {isLoggedIn && (
               <Link
                 href="/account"
                 className="px-3 py-1.5 rounded-full bg-white/20 hover:bg-white/30 text-xs sm:text-sm font-medium transition"
               >
                 My Account
               </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={() => openAuthModal("signup")}
-                className="px-3 py-1.5 rounded-full bg-white/20 hover:bg-white/30 text-xs sm:text-sm font-medium transition"
-              >
-                Create Profile
-              </button>
             )}
-            {isLoggedIn ? (
+            {isLoggedIn && (
               <Link
                 href="/search"
                 className="px-3 py-1.5 rounded-full bg-black/20 hover:bg-black/30 text-xs sm:text-sm font-medium transition"
               >
                 Advanced Search
               </Link>
-            ) : (
+            )}
+            {!isLoggedIn && (
               <button
                 type="button"
                 onClick={() => openAuthModal("login")}
@@ -264,11 +283,38 @@ export function ProfilesView({
               </button>
             )}
           </div>
+          {showCreateProfileStrip && (
+            <div className="mt-3 flex max-w-xl flex-row flex-wrap items-center gap-2.5 rounded-2xl border border-white/20 bg-black/30 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md sm:gap-3 sm:py-2 sm:pl-3.5 sm:pr-3">
+              <p className="min-w-0 flex-1 text-[11px] leading-snug text-white/90 sm:text-xs">
+                List your profile — quick setup, family-friendly privacy.
+              </p>
+              {isLoggedIn ? (
+                <Link
+                  href="/account?createProfile=1"
+                  className="inline-flex min-h-0 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-[var(--primary)] px-3.5 py-1.5 text-[11px] font-semibold text-white shadow-sm ring-1 ring-white/10 transition hover:brightness-105 sm:px-4 sm:py-2 sm:text-xs"
+                >
+                  Create your profile
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => openAuthModal("signup")}
+                  className="inline-flex min-h-0 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-[var(--primary)] px-3.5 py-1.5 text-[11px] font-semibold text-white shadow-sm ring-1 ring-white/10 transition hover:brightness-105 sm:px-4 sm:py-2 sm:text-xs"
+                >
+                  Create your profile
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </section>
 
-      {/* Sticky search + filter bar */}
-      <div className="sticky top-14 sm:top-16 z-30 -mt-7 sm:-mt-9 px-4">
+      {/* Sticky search + filter bar — less overlap when CTA strip is shown */}
+      <div
+        className={`sticky top-14 sm:top-16 z-30 px-4 ${
+          showCreateProfileStrip ? "-mt-4 sm:-mt-6" : "-mt-7 sm:-mt-9"
+        }`}
+      >
         <div className="max-w-6xl mx-auto">
           <div className="bg-white/95 backdrop-blur rounded-2xl shadow-lg border border-[var(--color-border)] p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
             <div className="relative flex-1">

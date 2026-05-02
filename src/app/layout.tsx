@@ -1,8 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import { readFileSync, existsSync } from "fs";
-import { join } from "path";
 import "./globals.css";
 import { getPublicSiteUrl } from "@/lib/siteUrl";
+import { readSiteConfig } from "@/lib/server/siteConfig";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AppConfigProvider } from "@/contexts/AppConfigContext";
 import { ContactFloat } from "@/components/ui/ContactFloat";
@@ -10,86 +9,75 @@ import { ConfigInjector } from "@/components/ConfigInjector";
 import { AuthModalProvider } from "@/contexts/AuthModalContext";
 import { TurnstileProvider } from "@/components/turnstile/TurnstileProvider";
 import { InstallPWAButton } from "@/components/pwa/InstallPWAButton";
-function getSeoConfig() {
-  try {
-    const path = join(process.cwd(), "data", "site-config.json");
-    if (existsSync(path)) {
-      const data = JSON.parse(readFileSync(path, "utf-8"));
-      return {
-        description: data.seoDescription || "Premium matrimonial platform for the Lingayat community",
-        keywords: data.seoKeywords || "Lingayat matrimony, LingayatBandhu, Lingayat marriage",
-      };
-    }
-  } catch {
-    // ignore
-  }
-  return {
-    description: "Premium matrimonial platform for the Lingayat community",
-    keywords: "Lingayat matrimony, LingayatBandhu, Lingayat marriage",
-  };
-}
 
-const seo = getSeoConfig();
 const siteUrl = getPublicSiteUrl();
 
-export const metadata: Metadata = {
-  title: "LingayatBandhu — Find your Lingayat match",
-  description: seo.description,
-  manifest: "/manifest.json",
-  keywords: seo.keywords,
-  authors: [{ name: "LingayatBandhu" }],
-  creator: "LingayatBandhu",
-  publisher: "LingayatBandhu",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "LingayatBandhu",
-  },
-  icons: {
-    icon: "/favicon.ico",
-    shortcut: "/favicon.ico",
-    apple: "/icons/icon-192x192.png",
-  },
-  formatDetection: {
-    email: false,
-    address: false,
-    telephone: false,
-  },
-  openGraph: {
-    type: "website",
-    locale: "en_IN",
-    url: siteUrl,
-    siteName: "LingayatBandhu",
+export async function generateMetadata(): Promise<Metadata> {
+  const seo = await readSiteConfig();
+  const description =
+    seo.seoDescription?.trim() || "Premium matrimonial platform for the Lingayat community";
+  const keywords =
+    seo.seoKeywords?.trim() || "Lingayat matrimony, LingayatBandhu, Lingayat marriage";
+
+  return {
     title: "LingayatBandhu — Find your Lingayat match",
-    description: seo.description,
-    images: [
-      {
-        url: "/og/lingayatbandhu-og-home-v2.png",
-        width: 1200,
-        height: 630,
-        alt: "LingayatBandhu — Lingayat matrimony",
-      },
-    ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "LingayatBandhu — Find your Lingayat match",
-    description: seo.description,
-    images: ["/og/lingayatbandhu-og-home-v2.png"],
-  },
-  metadataBase: new URL(siteUrl),
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
+    description,
+    manifest: "/manifest.json",
+    keywords,
+    authors: [{ name: "LingayatBandhu" }],
+    creator: "LingayatBandhu",
+    publisher: "LingayatBandhu",
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: "default",
+      title: "LingayatBandhu",
+    },
+    icons: {
+      icon: "/favicon.ico",
+      shortcut: "/favicon.ico",
+      apple: "/icons/icon-192x192.png",
+    },
+    formatDetection: {
+      email: false,
+      address: false,
+      telephone: false,
+    },
+    openGraph: {
+      type: "website",
+      locale: "en_IN",
+      url: siteUrl,
+      siteName: "LingayatBandhu",
+      title: "LingayatBandhu — Find your Lingayat match",
+      description,
+      images: [
+        {
+          url: "/og/lingayatbandhu-og-home-v2.png",
+          width: 1200,
+          height: 630,
+          alt: "LingayatBandhu — Lingayat matrimony",
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "LingayatBandhu — Find your Lingayat match",
+      description,
+      images: ["/og/lingayatbandhu-og-home-v2.png"],
+    },
+    metadataBase: new URL(siteUrl),
+    robots: {
       index: true,
       follow: true,
-      "max-video-preview": -1,
-      "max-image-preview": "large",
-      "max-snippet": -1,
+      googleBot: {
+        index: true,
+        follow: true,
+        "max-video-preview": -1,
+        "max-image-preview": "large",
+        "max-snippet": -1,
+      },
     },
-  },
-};
+  };
+}
 
 export const viewport: Viewport = {
   width: "device-width",

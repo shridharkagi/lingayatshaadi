@@ -17,7 +17,11 @@ export interface AppConfig {
   planOverrides: Record<string, Partial<MembershipPlan>>;
   /** Favicon URL - if set, overrides default favicon */
   faviconUrl: string;
-  /** External scripts (chatbot, analytics) - raw HTML script tags or URLs */
+  /** Injected into document head (e.g. gtag config, meta pixels) */
+  externalScriptsHead: string;
+  /** Injected at start of body (widgets, deferred loaders) */
+  externalScriptsBody: string;
+  /** @deprecated same as body scripts — kept for older cached localStorage */
   externalScripts: string;
   /** robots.txt content */
   robotsTxt: string;
@@ -39,6 +43,8 @@ const defaultConfig: AppConfig = {
   enabledPlanIds: ALL_PLAN_IDS,
   planOverrides: {},
   faviconUrl: "",
+  externalScriptsHead: "",
+  externalScriptsBody: "",
   externalScripts: "",
   robotsTxt: "User-agent: *\nAllow: /",
   seoDescription: "Premium matrimonial platform for the Lingayat community",
@@ -69,7 +75,20 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
           enabledPlanIds: Array.isArray(parsed.enabledPlanIds) ? parsed.enabledPlanIds : ALL_PLAN_IDS,
           planOverrides: parsed.planOverrides && typeof parsed.planOverrides === "object" ? parsed.planOverrides : {},
           faviconUrl: typeof parsed.faviconUrl === "string" ? parsed.faviconUrl : "",
-          externalScripts: typeof parsed.externalScripts === "string" ? parsed.externalScripts : "",
+          externalScriptsHead:
+            typeof parsed.externalScriptsHead === "string" ? parsed.externalScriptsHead : "",
+          externalScriptsBody:
+            typeof parsed.externalScriptsBody === "string"
+              ? parsed.externalScriptsBody
+              : typeof parsed.externalScripts === "string"
+                ? parsed.externalScripts
+                : "",
+          externalScripts:
+            typeof parsed.externalScriptsBody === "string"
+              ? parsed.externalScriptsBody
+              : typeof parsed.externalScripts === "string"
+                ? parsed.externalScripts
+                : "",
           robotsTxt: typeof parsed.robotsTxt === "string" ? parsed.robotsTxt : defaultConfig.robotsTxt,
           seoDescription: typeof parsed.seoDescription === "string" ? parsed.seoDescription : defaultConfig.seoDescription,
           seoKeywords: typeof parsed.seoKeywords === "string" ? parsed.seoKeywords : defaultConfig.seoKeywords,

@@ -61,18 +61,22 @@ export default function MembershipPage() {
 
   const enabledPlans = useMemo(() => plans.filter((p) => p.is_active), [plans]);
 
-  const handleFreePlanActivate = () => {
-    alert("Please contact support to activate your Free plan for the first time.");
+  const openWhatsAppToSupport = (message: string): boolean => {
+    let d = (config.whatsappContactNumber || config.callContactNumber || "6360130905").replace(/\D/g, "");
+    if (d.length === 10) d = `91${d}`;
+    if (!d) return false;
+    window.open(`https://wa.me/${d}?text=${encodeURIComponent(message)}`, "_blank");
+    return true;
+  };
+
+  const handleFreePlanWhatsApp = () => {
+    const msg = `Hi, I'm ${accountName}. I'd like to get started with the Free plan on LingayatBandhu — please help me activate it.`;
+    if (!openWhatsAppToSupport(msg)) window.open(`tel:${supportNumber}`, "_self");
   };
 
   const handleUpgradeContact = (plan: Plan) => {
     const msg = `Hi, I want to upgrade to ${plan.name} (₹${plan.price}) plan. Please assist with manual payment and activation.`;
-    const whatsapp = config.whatsappContactNumber?.replace(/\D/g, "");
-    if (whatsapp) {
-      window.open(`https://wa.me/${whatsapp}?text=${encodeURIComponent(msg)}`, "_blank");
-      return;
-    }
-    window.open(`tel:${supportNumber}`, "_self");
+    if (!openWhatsAppToSupport(msg)) window.open(`tel:${supportNumber}`, "_self");
   };
 
   const submitUpgradeRequest = async () => {
@@ -172,11 +176,21 @@ export default function MembershipPage() {
                 </ul>
                 <div className="mt-auto pt-3">
                   {Number(plan.price || 0) === 0 ? (
-                    <Button fullWidth className="!py-2 text-sm" onClick={handleFreePlanActivate}>
+                    <Button
+                      fullWidth
+                      size="sm"
+                      className="!min-h-11 !py-0 !px-2 !text-[13px] !leading-tight !font-semibold whitespace-nowrap flex items-center justify-center"
+                      onClick={handleFreePlanWhatsApp}
+                    >
                       Get Started
                     </Button>
                   ) : (
-                    <Button fullWidth className="!py-2 text-sm" onClick={() => handleUpgradeContact(plan)}>
+                    <Button
+                      fullWidth
+                      size="sm"
+                      className="!min-h-11 !py-0 !px-2 !text-[13px] !leading-tight !font-semibold whitespace-nowrap flex items-center justify-center"
+                      onClick={() => handleUpgradeContact(plan)}
+                    >
                       Upgrade
                     </Button>
                   )}
