@@ -1081,11 +1081,16 @@ export default function OtherProfilePage() {
     : maskCompanyName
       ? maskString(profile.companyName, 2)
       : "";
-  const displayAnnualIncome = showAnnualIncome
+  const displayAnnualIncomeFromSiteRules = showAnnualIncome
     ? profile.annualIncome || ""
     : maskAnnualIncome
       ? MASKED_VALUE
       : "";
+  /** Other members do not see income when the owner hides it; owner & superadmin still do. */
+  const displayAnnualIncome =
+    profile.showAnnualIncome === false && !isOwnerViewer && !viewerIsAdmin
+      ? ""
+      : displayAnnualIncomeFromSiteRules;
 
   const aboutMeTruncated = truncateToWords(profile.aboutMe, 100);
   const aboutMeWords = wordCount(profile.aboutMe);

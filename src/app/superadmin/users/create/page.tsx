@@ -29,6 +29,7 @@ const initialProfile: Partial<Profile> = {
   profession: "",
   companyName: "",
   annualIncome: "",
+  showAnnualIncome: true,
   fatherName: "",
   fatherOccupation: "",
   motherName: "",

@@ -154,6 +154,20 @@ export default function EditProfilePage() {
           <Input label="Profession" value={user.profession} onChange={(e) => handleUpdate("profession", e.target.value)} maxLength={100} />
           <Input label="Company Name" value={user.companyName} onChange={(e) => handleUpdate("companyName", e.target.value)} maxLength={100} />
           <Input label="Annual Income" placeholder="e.g. 10-12 Lakhs" value={user.annualIncome} onChange={(e) => handleUpdate("annualIncome", e.target.value)} maxLength={50} />
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+            <span className="font-medium text-sm">Show annual income on profile</span>
+            <button
+              type="button"
+              onClick={() =>
+                updateProfile({ showAnnualIncome: !(user.showAnnualIncome ?? true) })
+              }
+              className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                user.showAnnualIncome ?? true ? "bg-[var(--primary)] text-white" : "bg-gray-200 text-gray-600"
+              }`}
+            >
+              {user.showAnnualIncome ?? true ? "Visible" : "Hidden"}
+            </button>
+          </div>
         </Section>
 
         <Section title="Family Details">
