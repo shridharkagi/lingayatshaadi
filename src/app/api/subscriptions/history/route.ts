@@ -17,7 +17,9 @@ export async function GET(req: NextRequest) {
 
   const subsWithNotesRes = await admin
     .from("user_subscriptions")
-    .select("id, user_id, status, starts_at, expires_at, created_at, plan_name_snapshot, price_snapshot, currency_snapshot, total_contact_views_snapshot, daily_contact_view_limit_snapshot, notes")
+    .select(
+      "id, user_id, plan_id, status, starts_at, expires_at, created_at, plan_name_snapshot, price_snapshot, currency_snapshot, total_contact_views_snapshot, daily_contact_view_limit_snapshot, notes"
+    )
     .or(orFilter)
     .order("created_at", { ascending: false })
     .limit(100);
@@ -26,7 +28,9 @@ export async function GET(req: NextRequest) {
       ? subsWithNotesRes
       : await admin
           .from("user_subscriptions")
-          .select("id, user_id, status, starts_at, expires_at, created_at, plan_name_snapshot, price_snapshot, currency_snapshot, total_contact_views_snapshot, daily_contact_view_limit_snapshot")
+          .select(
+            "id, user_id, plan_id, status, starts_at, expires_at, created_at, plan_name_snapshot, price_snapshot, currency_snapshot, total_contact_views_snapshot, daily_contact_view_limit_snapshot"
+          )
           .or(orFilter)
           .order("created_at", { ascending: false })
           .limit(100);
@@ -78,6 +82,23 @@ export async function GET(req: NextRequest) {
   });
 
   const views = (contactViews || []) as Array<{ viewer_id?: string; viewed_at?: string }>;
+
+  const rawSubs = (subsRes.data || []) as Array<{ plan_id?: string | null; plan_name_snapshot?: string | null }>;
+  const planIds = Array.from(
+    new Set(
+      rawSubs
+        .map((s) => String(s.plan_id || "").trim())
+        .filter((pid) => pid.length > 0)
+    )
+  );
+  let planNameById = new Map<string, string>();
+  if (planIds.length > 0) {
+    const { data: planRows } = await admin.from("subscription_plans").select("id, name").in("id", planIds);
+    planNameById = new Map(
+      (planRows || []).map((r) => [String((r as { id?: string }).id || ""), String((r as { name?: string }).name || "")])
+    );
+  }
+
   const subscriptionsWithUsage = (subsRes.data || []).map((s) => {
     const sub = s as {
       user_id?: string;
@@ -100,7 +121,11 @@ export async function GET(req: NextRequest) {
             return Number.isFinite(viewedTs) && viewedTs >= startTs && viewedTs <= endTs;
           }).length
         : 0;
-    return { ...s, contacts_used_count };
+    const pid = String((s as { plan_id?: string | null }).plan_id || "").trim();
+    const fromPlanTable = pid ? planNameById.get(pid) : undefined;
+    const snap = String((s as { plan_name_snapshot?: string | null }).plan_name_snapshot || "").trim();
+    const plan_name_resolved = snap || (fromPlanTable?.trim() ?? "") || "Membership plan";
+    return { ...s, contacts_used_count, plan_name_resolved };
   });
 
   return NextResponse.json({ subscriptions: subscriptionsWithUsage, transactions: maskedTxns });

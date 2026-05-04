@@ -7,6 +7,10 @@ export type AuthUserLite = {
   phone?: string | null;
   created_at?: string | null;
   user_metadata?: Record<string, unknown> | null;
+  /** From auth.users.raw_app_meta_data (service role / RPC only). */
+  app_metadata?: Record<string, unknown> | null;
+  /** GoTrue ban expiry; active ban blocks sign-in. */
+  banned_until?: string | null;
 };
 
 async function listUsersPageWithRetry(
@@ -17,7 +21,16 @@ async function listUsersPageWithRetry(
   let lastErr: string | null = null;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
-    if (!error) return (data.users || []) as AuthUserLite[];
+    if (!error)
+      return (data.users || []).map((u) => ({
+        id: u.id,
+        email: u.email ?? null,
+        phone: u.phone ?? null,
+        created_at: u.created_at,
+        user_metadata: (u.user_metadata as Record<string, unknown>) ?? null,
+        app_metadata: (u.app_metadata as Record<string, unknown>) ?? null,
+        banned_until: u.banned_until ?? null,
+      }));
     lastErr = error.message || "Unknown listUsers error";
     // Short backoff for transient GoTrue/network hiccups.
     await new Promise((resolve) => setTimeout(resolve, attempt * 120));
@@ -125,20 +138,38 @@ async function listUsersFromAuthTableFallback(admin: SupabaseClient): Promise<Au
     phone?: string | null;
     created_at?: string | null;
     raw_user_meta_data?: Record<string, unknown> | null;
+    raw_app_meta_data?: Record<string, unknown> | null;
+    banned_until?: string | null;
   };
+  const SELECT_CHAIN = [
+    "id, email, phone, created_at, raw_user_meta_data, raw_app_meta_data, banned_until",
+    "id, email, phone, created_at, raw_user_meta_data, raw_app_meta_data",
+    "id, email, phone, created_at, raw_user_meta_data",
+  ];
+
   const users: AuthUserLite[] = [];
   const pageSize = 1000;
   for (let page = 0; page < 300; page += 1) {
     const from = page * pageSize;
     const to = from + pageSize - 1;
-    const { data, error } = await admin
-      .schema("auth")
-      .from("users")
-      .select("id, email, phone, created_at, raw_user_meta_data")
-      .order("created_at", { ascending: true })
-      .range(from, to);
-    if (error) throw new Error(error.message);
-    const batch = (data || []) as AuthRow[];
+    let batch: AuthRow[] | null = null;
+    let lastErr: string | null = null;
+    for (const selectStr of SELECT_CHAIN) {
+      const { data, error } = await admin
+        .schema("auth")
+        .from("users")
+        .select(selectStr)
+        .order("created_at", { ascending: true })
+        .range(from, to);
+      if (!error && data) {
+        batch = data as AuthRow[];
+        break;
+      }
+      lastErr = error?.message || null;
+    }
+    if (!batch) {
+      throw new Error(lastErr || "auth schema select failed");
+    }
     if (!batch.length) break;
     for (const row of batch) {
       const id = String(row.id || "").trim();
@@ -149,6 +180,8 @@ async function listUsersFromAuthTableFallback(admin: SupabaseClient): Promise<Au
         phone: row.phone || null,
         created_at: row.created_at || null,
         user_metadata: row.raw_user_meta_data || null,
+        app_metadata: row.raw_app_meta_data || null,
+        banned_until: row.banned_until || null,
       });
     }
     if (batch.length < pageSize) break;
@@ -458,6 +491,7 @@ async function listUsersFromRpc(admin: SupabaseClient): Promise<AuthUserLite[] |
     phone?: string | null;
     created_at?: string | null;
     raw_user_meta_data?: Record<string, unknown> | null;
+    raw_app_meta_data?: Record<string, unknown> | null;
   };
   try {
     const { data, error } = await admin.rpc("list_all_auth_users");
@@ -481,6 +515,7 @@ async function listUsersFromRpc(admin: SupabaseClient): Promise<AuthUserLite[] |
         phone: raw.phone || null,
         created_at: raw.created_at || null,
         user_metadata: raw.raw_user_meta_data || null,
+        app_metadata: raw.raw_app_meta_data || null,
       });
     }
     return out;

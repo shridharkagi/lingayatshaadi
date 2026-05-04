@@ -258,12 +258,14 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[var(--color-bg)] flex flex-col">
       <header className="sticky top-0 z-50 bg-white border-b border-[var(--color-border)] shadow-[var(--shadow-soft)]">
-        <div className="flex items-center justify-between px-4 h-14">
-          <Link href="/" className="flex items-center gap-2">
-            <Heart className="w-7 h-7 text-[var(--primary)] fill-[var(--primary)]" />
-            <span className="leading-tight text-[var(--primary)]">
-              <span className="block text-lg font-bold">LingayatBandhu</span>
-              <span className="block text-[10px] font-semibold tracking-[0.14em] uppercase text-[var(--primary)]/85">
+        <div className="flex items-center justify-between px-3 sm:px-4 h-14 gap-2 min-w-0">
+          <Link href="/" className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 pr-1">
+            <Heart className="w-6 h-6 sm:w-7 sm:h-7 shrink-0 text-[var(--primary)] fill-[var(--primary)]" />
+            <span className="leading-tight text-[var(--primary)] min-w-0">
+              <span className="block text-[0.95rem] sm:text-lg font-bold truncate max-w-[58vw] sm:max-w-none">
+                LingayatBandhu
+              </span>
+              <span className="block text-[9px] sm:text-[10px] font-semibold tracking-[0.12em] uppercase text-[var(--primary)]/85 truncate">
                 Matrimony
               </span>
             </span>

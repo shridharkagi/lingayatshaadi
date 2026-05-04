@@ -107,9 +107,12 @@ export default function MembershipPage() {
       setError(json.error || "Failed to submit request");
       return;
     }
-    setRequestSuccess("Upgrade request submitted. Support will contact you soon.");
+    setRequestSuccess("Upgrade request submitted. Opening WhatsApp with your request…");
     setRequestWhatsAppUrl(json.whatsappPrefillUrl || null);
     setRequestNote("");
+    if (json.whatsappPrefillUrl && typeof window !== "undefined") {
+      window.open(json.whatsappPrefillUrl, "_blank", "noopener,noreferrer");
+    }
   };
 
   return (

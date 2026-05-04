@@ -8,8 +8,8 @@ import { ProfileFormSections } from "@/components/ProfileFormSections";
 import { getMemberIdDisplay } from "@/lib/memberId";
 import { useState, useEffect } from "react";
 import { Profile } from "@/types";
-import { getProfileById, updateProfileById } from "@/lib/api/profiles";
-import { parseDobDdMmYyyyToIso } from "@/lib/dateOfBirth";
+import { adminFetch } from "@/lib/api/adminClient";
+import { validateMatrimonyDob } from "@/lib/dateOfBirth";
 
 export default function SuperAdminEditProfilePage() {
   const params = useParams();
@@ -26,13 +26,14 @@ export default function SuperAdminEditProfilePage() {
       if (!id) return;
       setLoading(true);
       setError(null);
-      const { data, error } = await getProfileById(id);
+      const res = await adminFetch(`/api/superadmin/users/${encodeURIComponent(id)}`);
+      const json = (await res.json()) as { profile?: Partial<Profile>; error?: string };
       if (cancelled) return;
-      if (error || !data) {
-        setError(error || "Profile not found");
+      if (!res.ok || !json.profile?.id) {
+        setError(json.error || "Profile not found");
         setProfile({});
       } else {
-        setProfile({ ...data });
+        setProfile({ ...json.profile });
       }
       setLoading(false);
     })();
@@ -71,20 +72,29 @@ export default function SuperAdminEditProfilePage() {
   const handleSave = async () => {
     setSaving(true);
     setError(null);
-    const normalizedDob = parseDobDdMmYyyyToIso(String(profile.dateOfBirth || ""));
-    if (profile.dateOfBirth && !normalizedDob) {
-      setSaving(false);
-      setError("Date of birth must be in dd/mm/yyyy format.");
-      return;
+    let normalizedDob: string | undefined;
+    if (profile.dateOfBirth) {
+      const mat = validateMatrimonyDob(String(profile.dateOfBirth));
+      if (!mat.ok) {
+        setSaving(false);
+        setError(mat.error);
+        return;
+      }
+      normalizedDob = mat.iso;
     }
     const payload: Partial<Profile> = {
       ...profile,
       ...(normalizedDob ? { dateOfBirth: normalizedDob } : {}),
     };
-    const { error } = await updateProfileById(id, payload, { skipModeration: true });
+    const res = await adminFetch(`/api/superadmin/users/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profile: payload }),
+    });
+    const json = (await res.json()) as { error?: string };
     setSaving(false);
-    if (error) {
-      setError(error);
+    if (!res.ok) {
+      setError(json.error || "Save failed");
       return;
     }
     router.push("/superadmin/moderation");

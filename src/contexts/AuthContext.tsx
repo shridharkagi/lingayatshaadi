@@ -16,6 +16,7 @@ import {
   isAuthEmailRateLimitedMessage,
   isCaptchaErrorMessage,
 } from "@/lib/authUserFacingErrors";
+import { ACCOUNT_SUSPENDED_LOGIN_MESSAGE, isAccountAuthSuspended } from "@/lib/auth/accountStatus";
 import { withTimeout } from "@/lib/withTimeout";
 import { useTurnstile } from "@/components/turnstile/TurnstileProvider";
 import type { User } from "@supabase/supabase-js";
@@ -307,6 +308,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const friendlyAuthError = (raw: string | undefined, fallback: string): string => {
     if (!raw) return fallback;
     if (isCaptchaErrorMessage(raw)) return CAPTCHA_BLOCKED_MESSAGE;
+    if (/banned|suspend|not allowed to sign in|user is suspended|disabled/i.test(raw)) {
+      return ACCOUNT_SUSPENDED_LOGIN_MESSAGE;
+    }
     return raw;
   };
 
@@ -476,6 +480,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           error: friendlyAuthError(error.message, "Invalid mobile number or password"),
         };
       }
+      const { data: fresh } = await supabase.auth.getUser();
+      if (
+        fresh.user &&
+        isAccountAuthSuspended(fresh.user.app_metadata as Record<string, unknown>, fresh.user.banned_until)
+      ) {
+        await supabase.auth.signOut();
+        return { error: ACCOUNT_SUSPENDED_LOGIN_MESSAGE };
+      }
       return {};
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -509,6 +521,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return {
             error: friendlyAuthError(error.message, "Invalid email or password"),
           };
+        }
+        const { data: fresh } = await supabase.auth.getUser();
+        if (
+          fresh.user &&
+          isAccountAuthSuspended(fresh.user.app_metadata as Record<string, unknown>, fresh.user.banned_until)
+        ) {
+          await supabase.auth.signOut();
+          return { error: ACCOUNT_SUSPENDED_LOGIN_MESSAGE };
         }
         return {};
       } catch (e) {

@@ -9,6 +9,7 @@ import { ensureAccountCodeForUser } from "@/lib/server/accountCodes";
 import { findAuthUserByPhone } from "@/lib/server/authUsers";
 import { issueMagicLinkSession } from "@/lib/server/issueMagicLinkSession";
 import { ensureFreePlanForUser } from "@/lib/server/freePlanProvisioning";
+import { ACCOUNT_SUSPENDED_LOGIN_MESSAGE, isAccountAuthSuspended } from "@/lib/auth/accountStatus";
 
 export const runtime = "nodejs";
 
@@ -250,6 +251,22 @@ async function handleLoginOrReset({
   // account, or (b) match no row at all and (with the old magiclink flow)
   // create a brand-new duplicate. Either way it is unsafe. Surface a clear
   // admin-actionable error instead so we can repair the data.
+  const { data: authFull } = await admin.auth.admin.getUserById(existing.id);
+  const authRow = authFull?.user;
+  if (
+    authRow &&
+    isAccountAuthSuspended(
+      authRow.app_metadata as Record<string, unknown> | undefined,
+      authRow.banned_until
+    )
+  ) {
+    logTiming(reqId, "response_error", routeStart, { status: 403, reason: "account_suspended" });
+    return NextResponse.json(
+      { error: ACCOUNT_SUSPENDED_LOGIN_MESSAGE, code: "account_suspended" },
+      { status: 403 }
+    );
+  }
+
   const sessionEmail = (existing.email && existing.email.trim()) || "";
   if (!sessionEmail) {
     console.error(

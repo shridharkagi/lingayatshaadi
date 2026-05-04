@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireAuthUser } from "@/lib/server/requireAuthUser";
+import { readSiteConfig } from "@/lib/server/siteConfig";
 
 async function notifyByEmail(payload: {
   to: string;
@@ -56,7 +57,12 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = createSupabaseAdmin();
-  const supportWhatsAppNumber = "6360130905";
+  const site = await readSiteConfig();
+  let supportWhatsAppDigits = (site.whatsappContactNumber || site.callContactNumber || "6360130905").replace(
+    /\D/g,
+    ""
+  );
+  if (supportWhatsAppDigits.length === 10) supportWhatsAppDigits = `91${supportWhatsAppDigits}`;
   const [{ data: plan, error: planErr }, { data: profile }] = await Promise.all([
     admin
       .from("subscription_plans")
@@ -136,7 +142,7 @@ export async function POST(req: NextRequest) {
       : { sent: false, reason: "SUBSCRIPTION_ADMIN_EMAIL not set" };
 
   const whatsappResult = await notifyWhatsAppWebhook({
-    support_number: supportWhatsAppNumber,
+    support_number: supportWhatsAppDigits,
     template: "upgrade_request",
     request_id: requestRow.id,
     user_id: auth.userId,
@@ -155,7 +161,7 @@ Plan: ${plan.name} (${plan.code})
 Price: INR ${Number(plan.price || 0)}
 Callback: ${body.callbackNumber}
 Note: ${body.note?.trim() || "-"}`;
-  const whatsappPrefillUrl = `https://wa.me/${supportWhatsAppNumber}?text=${encodeURIComponent(prefilledWhatsAppMessage)}`;
+  const whatsappPrefillUrl = `https://wa.me/${supportWhatsAppDigits}?text=${encodeURIComponent(prefilledWhatsAppMessage)}`;
 
   await admin
     .from("subscription_upgrade_requests")

@@ -81,6 +81,7 @@ import { hasMeaningfulPreferences } from "@/lib/partnerPreferenceDefaults";
 import { computeProfileCompletion } from "@/lib/profileCompletion";
 import { buildProfileSeoTitle } from "@/lib/profileSeo";
 import { buildProfileShareFooter, buildProfileShareText, getShortProfilePath } from "@/lib/profileShare";
+import { formatHeightForDisplay } from "@/lib/formatHeight";
 import { getAccountAccessState } from "@/lib/api/accessState";
 import { maskBirthDateKeepYear, maskLastName, maskLastNameKeepPrefix, MASKED_VALUE, type AccountAccessState } from "@/lib/accessPolicy";
 import { WhatsAppGroupCta } from "@/components/whatsapp/WhatsAppGroupCta";
@@ -1793,49 +1794,49 @@ export default function OtherProfilePage() {
               </div>
 
               <div className="mt-2.5 space-y-2">
-                <div className="grid grid-cols-3 md:grid-cols-6 gap-2 auto-rows-[56px] sm:auto-rows-[60px]">
-                  <div className="col-span-2 md:col-span-4 rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                <div className="grid grid-cols-3 md:grid-cols-6 gap-2 [grid-auto-rows:minmax(min-content,auto)]">
+                  <div className="col-span-2 md:col-span-4 rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
                     <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                       Full Name
                     </p>
-                    <p className="mt-0.5 text-[0.88rem] font-semibold text-[#2d241d] break-words">{displayName}</p>
+                    <p className="mt-0.5 text-[0.88rem] font-semibold text-[#2d241d] break-words leading-snug">{displayName}</p>
                   </div>
 
-                  <div className="col-span-1 md:col-span-2 rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                  <div className="col-span-1 md:col-span-2 rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
                     <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                       Height
                     </p>
-                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d]">{profile.height}&quot;</p>
+                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] leading-snug">{formatHeightForDisplay(profile.height)}</p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 auto-rows-[56px] sm:auto-rows-[60px]">
-                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 [grid-auto-rows:minmax(min-content,auto)]">
+                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
                     <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                       Birth Date
                     </p>
-                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d]">{displayDateOfBirth}</p>
+                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] leading-snug">{displayDateOfBirth}</p>
                   </div>
 
-                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
                     <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                       Marital Status
                     </p>
-                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d]">{profile.maritalStatus}</p>
+                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] leading-snug break-words">{profile.maritalStatus}</p>
                   </div>
 
-                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
                     <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                       Caste
                     </p>
-                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d]">{profile.caste}</p>
+                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] leading-snug break-words">{profile.caste}</p>
                   </div>
 
-                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
                     <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                       Sub-Caste
                     </p>
-                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">{displaySubCaste || "—"}</p>
+                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">{displaySubCaste || "—"}</p>
                   </div>
                 </div>
               </div>
@@ -1862,37 +1863,37 @@ export default function OtherProfilePage() {
                 <p className="text-xs sm:text-sm text-gray-500">Family</p>
               </div>
               <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
-                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 min-h-[56px]">
+                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
                   <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                     Father
                   </p>
-                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">
+                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">
                     {displayFatherName || "—"}
                     {profile.fatherOccupation ? ` (${profile.fatherOccupation})` : ""}
                   </p>
                 </div>
 
-                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 min-h-[56px]">
+                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
                   <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                     Mother
                   </p>
-                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">
+                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">
                     {displayMotherName || "—"}
                     {profile.motherOccupation ? ` (${profile.motherOccupation})` : ""}
                   </p>
                 </div>
 
-                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 min-h-[56px]">
+                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
                   <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                     Food
                   </p>
-                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">
+                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">
                     {profile.foodHabits || "—"}
                   </p>
                 </div>
 
                 {displaySibling && (
-                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 min-h-[56px]">
+                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
                     <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                       Sibling
                     </p>
@@ -1916,9 +1917,9 @@ export default function OtherProfilePage() {
               <Calendar size={18} className="text-gray-400 flex-shrink-0" />
               <p className="text-xs sm:text-sm text-gray-500">Birth & Astrology</p>
             </div>
-            <div className="grid grid-cols-2 gap-2 auto-rows-[56px] sm:auto-rows-[60px]">
+            <div className="grid grid-cols-2 gap-2 [grid-auto-rows:minmax(min-content,auto)]">
               {displayTimeOfBirth && (
-                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
                   <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                     Time of Birth
                   </p>
@@ -1928,31 +1929,31 @@ export default function OtherProfilePage() {
                 </div>
               )}
               {profile.placeOfBirth && (
-                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
                   <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                     Place of Birth
                   </p>
-                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">
+                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">
                     {profile.placeOfBirth}
                   </p>
                 </div>
               )}
               {profile.rashi && (
-                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
                   <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                     Zodiac Sign
                   </p>
-                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">
+                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">
                     {profile.rashi}
                   </p>
                 </div>
               )}
               {profile.nakshatra && (
-                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
+                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
                   <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                     Nakshatra
                   </p>
-                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">
+                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">
                     {profile.nakshatra}
                   </p>
                 </div>
@@ -2136,29 +2137,29 @@ export default function OtherProfilePage() {
             <p className="text-xs sm:text-sm text-gray-500">Address</p>
           </div>
           <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
-            <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 min-h-[56px]">
+            <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
               <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                 City
               </p>
-              <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">{profile.city || "—"}</p>
+              <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">{profile.city || "—"}</p>
             </div>
-            <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 min-h-[56px]">
+            <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
               <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                 District
               </p>
-              <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">{profile.district || "—"}</p>
+              <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">{profile.district || "—"}</p>
             </div>
-            <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 min-h-[56px]">
+            <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
               <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                 State
               </p>
-              <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">{profile.state || "—"}</p>
+              <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">{profile.state || "—"}</p>
             </div>
-            <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 min-h-[56px]">
+            <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
               <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                 Country
               </p>
-              <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">{profile.country || "—"}</p>
+              <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">{profile.country || "—"}</p>
             </div>
           </div>
         </div>

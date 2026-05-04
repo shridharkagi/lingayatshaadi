@@ -27,6 +27,9 @@ import {
   Clock,
   AlertCircle,
   HeartHandshake,
+  Cloud,
+  CloudOff,
+  Loader2,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -63,8 +66,8 @@ import {
   updateDraft,
   findDraftForUser,
 } from "@/lib/api/drafts";
-import { Cloud, CloudOff, Loader2 } from "lucide-react";
-import { formatIsoToDobDdMmYyyy, parseDobDdMmYyyyToIso } from "@/lib/dateOfBirth";
+import { DobSplitFields } from "@/components/ui/DobSplitFields";
+import { validateMatrimonyDob } from "@/lib/dateOfBirth";
 
 interface StepDef {
   id: number;
@@ -500,97 +503,6 @@ function TimeOfBirthPicker({
   );
 }
 
-function DateOfBirthSelect({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (next: string) => void;
-}) {
-  const [initialYear, initialMonth, initialDay] = (value || "").split("-");
-  const [day, setDay] = useState(initialDay || "");
-  const [month, setMonth] = useState(initialMonth || "");
-  const [year, setYear] = useState(initialYear || "");
-  const [manualDob, setManualDob] = useState(formatIsoToDobDdMmYyyy(value || ""));
-
-  useEffect(() => {
-    const [y, m, d] = (value || "").split("-");
-    setYear(y || "");
-    setMonth(m || "");
-    setDay(d || "");
-    setManualDob(formatIsoToDobDdMmYyyy(value || ""));
-  }, [value]);
-
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 60 }, (_, i) => String(currentYear - 18 - i));
-  const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
-  const maxDay = Number(year) && Number(month) ? new Date(Number(year), Number(month), 0).getDate() : 31;
-  const days = Array.from({ length: maxDay }, (_, i) => String(i + 1).padStart(2, "0"));
-
-  const setPart = (nextYear: string, nextMonth: string, nextDay: string) => {
-    setYear(nextYear);
-    setMonth(nextMonth);
-    setDay(nextDay);
-    if (nextYear && nextMonth && nextDay) {
-      onChange(`${nextYear}-${nextMonth}-${nextDay}`);
-    }
-  };
-
-  return (
-    <div className="space-y-2">
-      <input
-        type="text"
-        value={manualDob}
-        onChange={(e) => setManualDob(e.target.value)}
-        onBlur={(e) => {
-          const normalized = parseDobDdMmYyyyToIso(e.target.value);
-          if (normalized) onChange(normalized);
-        }}
-        placeholder="dd/mm/yyyy"
-        className={selectClass}
-      />
-      <div className="grid grid-cols-3 gap-2">
-      <select
-        value={day || ""}
-        onChange={(e) => setPart(year || "", month || "", e.target.value)}
-        className={selectClass}
-      >
-        <option value="">DD</option>
-        {days.map((d) => (
-          <option key={d} value={d}>
-            {d}
-          </option>
-        ))}
-      </select>
-      <select
-        value={month || ""}
-        onChange={(e) => setPart(year || "", e.target.value, day || "")}
-        className={selectClass}
-      >
-        <option value="">MM</option>
-        {months.map((m) => (
-          <option key={m} value={m}>
-            {m}
-          </option>
-        ))}
-      </select>
-      <select
-        value={year || ""}
-        onChange={(e) => setPart(e.target.value, month || "", day || "")}
-        className={selectClass}
-      >
-        <option value="">YYYY</option>
-        {years.map((y) => (
-          <option key={y} value={y}>
-            {y}
-          </option>
-        ))}
-      </select>
-      </div>
-    </div>
-  );
-}
-
 function ProfileCompleteInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -876,8 +788,9 @@ function ProfileCompleteInner() {
         setError("Full Name, Date of Birth, and Gender are required.");
         return;
       }
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) {
-        setError("Date of Birth format should be dd/mm/yyyy.");
+      const dobStep1 = validateMatrimonyDob(dateOfBirth);
+      if (!dobStep1.ok) {
+        setError(dobStep1.error);
         return;
       }
     }
@@ -922,8 +835,9 @@ function ProfileCompleteInner() {
       setStep(1);
       return;
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) {
-      setError("Date of Birth format should be dd/mm/yyyy.");
+    const dobFinal = validateMatrimonyDob(dateOfBirth);
+    if (!dobFinal.ok) {
+      setError(dobFinal.error);
       setStep(1);
       return;
     }
@@ -1213,9 +1127,10 @@ function ProfileCompleteInner() {
                   </div>
                 </IconField>
                 <IconField icon={Calendar} label="Date of Birth" required>
-                  <DateOfBirthSelect
+                  <DobSplitFields
+                    label={false}
                     value={profile.dateOfBirth || ""}
-                    onChange={(next) => update("dateOfBirth", next)}
+                    onChange={(iso) => update("dateOfBirth", iso)}
                   />
                 </IconField>
                 <IconField icon={Heart} label="Marital Status">

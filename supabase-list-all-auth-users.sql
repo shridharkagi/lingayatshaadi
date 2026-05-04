@@ -23,6 +23,11 @@
 --   supabase-find-auth-user-by-phone.sql). Apply both for a fully working
 --   superadmin user list and phone-based account lookup.
 -- =============================================================================
+--
+-- Re-applying this file after changing RETURNS TABLE (...) requires DROP first:
+-- Postgres error 42P13 — CREATE OR REPLACE cannot change the function result type.
+
+drop function if exists public.list_all_auth_users();
 
 create or replace function public.list_all_auth_users()
 returns table (
@@ -30,25 +35,22 @@ returns table (
   email text,
   phone text,
   created_at timestamptz,
-  raw_user_meta_data jsonb
+  raw_user_meta_data jsonb,
+  raw_app_meta_data jsonb
 )
 language sql
 security definer
 set search_path = public, auth, pg_temp
 stable
 as $$
-  -- auth.users.email and auth.users.phone are declared as varchar(255), so we
-  -- explicitly cast to text here. RETURNS TABLE does an exact type check and
-  -- would otherwise raise "structure of query does not match function result
-  -- type". We deliberately do NOT filter banned/deleted rows here so the
-  -- superadmin UI can still surface them; the admin layer can decide what to
-  -- show. Keeping the function tolerant to schema variations across gotrue
-  -- versions also avoids surprises on upgrade.
+  -- Includes raw_app_meta_data for account-level suspend flags (no banned_until
+  -- here — column varies by GoTrue version; ban state may still exist from API).
   select u.id,
          u.email::text,
          u.phone::text,
          u.created_at,
-         u.raw_user_meta_data
+         u.raw_user_meta_data,
+         coalesce(u.raw_app_meta_data, '{}'::jsonb)
   from auth.users u
   order by u.created_at asc nulls last;
 $$;

@@ -7,7 +7,7 @@ import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ProfileFormSections } from "@/components/ProfileFormSections";
 import { Profile } from "@/types";
-import { parseDobDdMmYyyyToIso } from "@/lib/dateOfBirth";
+import { validateMatrimonyDob } from "@/lib/dateOfBirth";
 import { adminFetch } from "@/lib/api/adminClient";
 
 const initialProfile: Partial<Profile> = {
@@ -57,7 +57,6 @@ export default function SuperAdminCreateProfilePage() {
   const [saving, setSaving] = useState(false);
 
   const handleCreate = async () => {
-    const normalizedDob = parseDobDdMmYyyyToIso(profile.dateOfBirth || "");
     if (!profile.fullName?.trim()) {
       setError("Full name is required");
       return;
@@ -66,10 +65,12 @@ export default function SuperAdminCreateProfilePage() {
       setError("Gender is required");
       return;
     }
-    if (!normalizedDob) {
-      setError("Date of birth is required in dd/mm/yyyy format");
+    const matDob = validateMatrimonyDob(String(profile.dateOfBirth || ""));
+    if (!matDob.ok) {
+      setError(matDob.error);
       return;
     }
+    const normalizedDob = matDob.iso;
     setError("");
     setSaving(true);
     try {
@@ -149,7 +150,7 @@ export default function SuperAdminCreateProfilePage() {
         <ul className="mt-3 space-y-2 text-xs text-gray-600">
           <li>Full name, Gender, DOB are mandatory.</li>
           <li>New profile is auto-linked to your superadmin account.</li>
-          <li>DOB accepts only `dd/mm/yyyy` format.</li>
+          <li>Date of birth: use DD, MM, YYYY fields (must be 18+).</li>
           <li>Height now uses slider for faster mobile entry.</li>
           <li>Gender uses quick radio-style chips.</li>
         </ul>

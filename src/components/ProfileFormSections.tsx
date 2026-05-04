@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { Input } from "@/components/ui/Input";
 import { HobbiesSelector } from "@/components/ui/HobbiesSelector";
 import { PhotoUpload } from "@/components/PhotoUpload";
@@ -17,7 +17,6 @@ import { SingleRangeSlider } from "@/components/ui/RangeSlider";
 import {
   BadgeCheck,
   Briefcase,
-  Calendar,
   Camera,
   FileCheck2,
   Heart,
@@ -27,7 +26,7 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
-import { formatIsoToDobDdMmYyyy, parseDobDdMmYyyyToIso } from "@/lib/dateOfBirth";
+import { DobSplitFields } from "@/components/ui/DobSplitFields";
 import { TagPillInput } from "@/components/ui/TagPillInput";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { getIndiaDistrictsForState } from "@/data/indiaDistricts";
@@ -41,7 +40,7 @@ function Section({
   title: string;
   subtitle?: string;
   icon?: LucideIcon;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div className="rounded-2xl border border-[var(--border)] bg-white p-4 sm:p-5 shadow-sm space-y-4">
@@ -106,80 +105,6 @@ function parseAnnualIncomeLakhs(raw: string | undefined): number {
 
 function formatAnnualIncomeLakhs(value: number): string {
   return `${value} Lakhs`;
-}
-
-function DobInputWithPicker({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (next: string) => void;
-}) {
-  const pickerRef = useRef<HTMLInputElement | null>(null);
-  const [manual, setManual] = useState(String(value || ""));
-
-  useEffect(() => {
-    const v = String(value || "");
-    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
-      const ddmm = formatIsoToDobDdMmYyyy(v);
-      if (ddmm) {
-        setManual(ddmm);
-        onChange(ddmm);
-        return;
-      }
-    }
-    setManual(v);
-    // Sync parent when API sends ISO — only `value` in deps (onChange identity changes each render).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value]);
-
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
-      <div className="relative">
-        <input
-          type="text"
-          value={manual}
-          onChange={(e) => {
-            const next = e.target.value;
-            setManual(next);
-            // Keep parent state in sync as user types so submit handlers
-            // don't read stale/empty DOB when user clicks save immediately.
-            onChange(next);
-          }}
-          onBlur={() => {
-            const iso = parseDobDdMmYyyyToIso(manual);
-            if (iso) {
-              const normalized = formatIsoToDobDdMmYyyy(iso);
-              setManual(normalized);
-              onChange(normalized);
-            }
-          }}
-          placeholder="dd/mm/yyyy"
-          className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-        />
-        <button
-          type="button"
-          onClick={() => pickerRef.current?.showPicker?.()}
-          className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-gray-500 hover:bg-gray-100"
-          aria-label="Open date picker"
-        >
-          <Calendar size={16} />
-        </button>
-        <input
-          ref={pickerRef}
-          type="date"
-          className="sr-only"
-          onChange={(e) => {
-            const ddmmyyyy = formatIsoToDobDdMmYyyy(e.target.value);
-            if (!ddmmyyyy) return;
-            setManual(ddmmyyyy);
-            onChange(ddmmyyyy);
-          }}
-        />
-      </div>
-    </div>
-  );
 }
 
 const LANGUAGE_SUGGESTIONS = [
@@ -421,9 +346,10 @@ export function ProfileFormSections({
             <option value="Awaiting Divorce">Awaiting Divorce</option>
           </select>
         </div>
-        <DobInputWithPicker
+        <DobSplitFields
+          label="Date of Birth"
           value={profile.dateOfBirth || ""}
-          onChange={(next) => update("dateOfBirth", next)}
+          onChange={(iso) => update("dateOfBirth", iso)}
         />
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Height</label>

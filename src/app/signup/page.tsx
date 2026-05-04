@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Calendar, Heart } from "lucide-react";
+import { Heart } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { DobSplitFields } from "@/components/ui/DobSplitFields";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTurnstile } from "@/components/turnstile/TurnstileProvider";
-import { parseDobDdMmYyyyToIso } from "@/lib/dateOfBirth";
-import { formatIsoToDobDdMmYyyy } from "@/lib/dateOfBirth";
+import { validateMatrimonyDob } from "@/lib/dateOfBirth";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -32,8 +32,6 @@ export default function SignupPage() {
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const [resendIn, setResendIn] = useState(0);
-  const [dobPickerIso, setDobPickerIso] = useState("");
-
   useEffect(() => {
     if (authLoading) return;
     if (!isLoggedIn) return;
@@ -63,22 +61,22 @@ export default function SignupPage() {
   const phoneE164 = () => `+91${form.mobile.replace(/\D/g, "")}`;
 
   const redirectAfterSignup = () => {
-    router.replace("/account?createProfile=1");
+    router.replace("/account?createProfile=1&signupWelcome=1");
     // Fallback for dev-mode HMR compile stalls during navigation.
     window.setTimeout(() => {
       if (window.location.pathname === "/signup") {
-        window.location.assign("/account?createProfile=1");
+        window.location.assign("/account?createProfile=1&signupWelcome=1");
       }
     }, 1200);
   };
 
   const sendSignupOtp = async () => {
     if (loading) return;
-    const normalizedDob = parseDobDdMmYyyyToIso(form.dateOfBirth);
+    const dobCheck = validateMatrimonyDob(form.dateOfBirth);
     if (!form.gender) return setError("Please select gender");
     if (!form.firstName.trim()) return setError("First name is required");
     if (!form.city.trim()) return setError("City is required");
-    if (!normalizedDob) return setError("Date of birth must be in dd/mm/yyyy format");
+    if (!dobCheck.ok) return setError(dobCheck.error);
     if (form.mobile.replace(/\D/g, "").length !== 10)
       return setError("Enter a valid 10-digit mobile number");
     if (!form.password || form.password.length < 8)
@@ -97,7 +95,7 @@ export default function SignupPage() {
       setError(result.error);
       if (result.retryAfter) setResendIn(result.retryAfter);
     } else {
-      setForm((f) => ({ ...f, dateOfBirth: normalizedDob }));
+      setForm((f) => ({ ...f, dateOfBirth: dobCheck.iso }));
       setStep(2);
       const cooldown = result.cooldownSeconds ?? 30;
       setResendIn(cooldown);
@@ -213,39 +211,17 @@ export default function SignupPage() {
                 autoComplete="address-level2"
               />
 
-              <Input
-                label={<>Date of Birth <span className="text-red-500">*</span></>}
-                type="text"
-                placeholder="dd/mm/yyyy"
+              <DobSplitFields
+                label={
+                  <>
+                    Date of Birth <span className="text-red-500">*</span>
+                  </>
+                }
+                required
+                compact
                 value={form.dateOfBirth}
-                onChange={(e) => updateForm("dateOfBirth", e.target.value)}
-                className={inputClass}
+                onChange={(iso) => updateForm("dateOfBirth", iso)}
               />
-              <div className="-mt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const el = document.getElementById("signup-dob-picker") as HTMLInputElement | null;
-                    el?.showPicker?.();
-                  }}
-                  className="inline-flex items-center gap-1.5 text-xs text-[var(--primary)] font-medium"
-                >
-                  <Calendar size={13} />
-                  Select from calendar
-                </button>
-                <input
-                  id="signup-dob-picker"
-                  type="date"
-                  value={dobPickerIso}
-                  onChange={(e) => {
-                    const ddmmyyyy = formatIsoToDobDdMmYyyy(e.target.value);
-                    if (!ddmmyyyy) return;
-                    setDobPickerIso(e.target.value);
-                    updateForm("dateOfBirth", ddmmyyyy);
-                  }}
-                  className="sr-only"
-                />
-              </div>
 
               <Input
                 label={<>Mobile Number <span className="text-red-500">*</span></>}

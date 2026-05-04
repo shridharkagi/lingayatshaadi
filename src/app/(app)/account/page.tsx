@@ -27,7 +27,9 @@ import {
 import type { ComponentType, SVGProps } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/Input";
+import { DobSplitFields } from "@/components/ui/DobSplitFields";
 import { isSyntheticAuthEmail } from "@/lib/phoneAuth";
+import { validateMatrimonyDob } from "@/lib/dateOfBirth";
 import { adminFetch } from "@/lib/api/adminClient";
 import type { User } from "@supabase/supabase-js";
 import { listProfilesByUserId, updateProfileById } from "@/lib/api/profiles";
@@ -41,6 +43,7 @@ import {
 import { BrideIcon, GroomIcon } from "@/components/ui/icons/BrideGroomIcons";
 import { MAX_ACTIVE_OR_PENDING_PROFILES } from "@/lib/accessPolicy";
 import { ProfileCreatedApprovalModal } from "@/components/modals/ProfileCreatedApprovalModal";
+import { SignupWelcomeModal } from "@/components/modals/SignupWelcomeModal";
 
 type RelationshipValue = NonNullable<Profile["relationship"]>;
 type SimpleIcon = ComponentType<SVGProps<SVGSVGElement> & { size?: number }>;
@@ -146,6 +149,7 @@ export default function AccountPage() {
   const [deletionSubmitErr, setDeletionSubmitErr] = useState("");
   const [membershipsNowMs, setMembershipsNowMs] = useState(0);
   const [showCreatedModal, setShowCreatedModal] = useState(false);
+  const [showSignupWelcomeModal, setShowSignupWelcomeModal] = useState(false);
   const [profileApprovalModalVariant, setProfileApprovalModalVariant] = useState<
     "created" | "updated"
   >("created");
@@ -224,6 +228,21 @@ export default function AccountPage() {
       }
     }
     router.replace("/account");
+  }, [router]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("signupWelcome") !== "1") return;
+    const keepCreate = params.get("createProfile") === "1" ? "?createProfile=1" : "";
+    const onceKey = "signup-welcome-modal-shown";
+    if (window.sessionStorage.getItem(onceKey) === "1") {
+      router.replace(`/account${keepCreate}`);
+      return;
+    }
+    setShowSignupWelcomeModal(true);
+    window.sessionStorage.setItem(onceKey, "1");
+    router.replace(`/account${keepCreate}`);
   }, [router]);
 
   useEffect(() => {
@@ -344,13 +363,19 @@ export default function AccountPage() {
     if (!metaForm.firstName.trim()) return setMetaError("First name is required");
     if (!metaForm.city.trim()) return setMetaError("City is required");
     if (!metaForm.gender) return setMetaError("Gender is required");
+    let metaDobIso: string | undefined;
+    if (metaForm.dateOfBirth) {
+      const d = validateMatrimonyDob(metaForm.dateOfBirth);
+      if (!d.ok) return setMetaError(d.error);
+      metaDobIso = d.iso;
+    }
     setSavingMeta(true);
     const result = await updateAccountMeta({
       firstName: metaForm.firstName.trim(),
       lastName: metaForm.lastName.trim() || undefined,
       city: metaForm.city.trim(),
       gender: metaForm.gender as "male" | "female",
-      dateOfBirth: metaForm.dateOfBirth || undefined,
+      dateOfBirth: metaDobIso,
     });
     setSavingMeta(false);
     if (result.error) {
@@ -694,12 +719,10 @@ export default function AccountPage() {
                 value={metaForm.city}
                 onChange={(e) => setMetaForm((m) => ({ ...m, city: e.target.value }))}
               />
-              <Input
+              <DobSplitFields
                 label="Date of Birth"
-                type="date"
                 value={metaForm.dateOfBirth}
-                onChange={(e) => setMetaForm((m) => ({ ...m, dateOfBirth: e.target.value }))}
-                max={new Date().toISOString().slice(0, 10)}
+                onChange={(iso) => setMetaForm((m) => ({ ...m, dateOfBirth: iso }))}
               />
 
               {hasRealVerifiedEmail ? (
@@ -924,7 +947,11 @@ export default function AccountPage() {
                   >
                     <div className="min-w-0">
                       <p className="font-medium text-sm text-[var(--foreground)]">
-                        {String(s.plan_name_snapshot || "Plan")}
+                        {String(
+                          (s as { plan_name_resolved?: string }).plan_name_resolved ||
+                            (s as { plan_name_snapshot?: string }).plan_name_snapshot ||
+                            "Membership plan"
+                        )}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">
                         {formatMembershipDate(s.starts_at)} – {formatMembershipDate(s.expires_at)}
@@ -947,9 +974,11 @@ export default function AccountPage() {
                       <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-700">
                         Daily: {Number((s as { daily_contact_view_limit_snapshot?: number }).daily_contact_view_limit_snapshot || 0)}/day
                       </span>
-                      {txn && (
+                      {txn &&
+                        String((txn as { payment_mode?: string }).payment_mode || "").trim() &&
+                        String((txn as { payment_mode?: string }).payment_mode) !== "free_auto" && (
                         <span className="text-gray-500 w-full sm:w-auto sm:max-w-[200px] truncate">
-                          {String(txn.payment_mode || "—")}
+                          {String((txn as { payment_mode?: string }).payment_mode)}
                         </span>
                       )}
                       {String((s as { notes?: string | null }).notes || "").trim() && (
@@ -1054,6 +1083,8 @@ export default function AccountPage() {
           onSelectEdit={handleSaveRelationshipEdit}
         />
       )}
+
+      <SignupWelcomeModal open={showSignupWelcomeModal} onClose={() => setShowSignupWelcomeModal(false)} />
 
       <ProfileCreatedApprovalModal
         open={showCreatedModal}

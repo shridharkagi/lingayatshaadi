@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { DobSplitFields } from "@/components/ui/DobSplitFields";
 import { HobbiesSelector } from "@/components/ui/HobbiesSelector";
 import { SubCasteSelector } from "@/components/ui/SubCasteSelector";
 import { useAuth } from "@/contexts/AuthContext";
 import { PROFESSION_TYPES, FOOD_HABITS_OPTIONS } from "@/data/constants";
 import { sanitizeText } from "@/lib/security";
+import { validateMatrimonyDob } from "@/lib/dateOfBirth";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -104,7 +106,11 @@ export default function EditProfilePage() {
               <option value="Awaiting Divorce">Awaiting Divorce</option>
             </select>
           </div>
-          <Input label="Date of Birth" type="date" value={user.dateOfBirth || ""} onChange={(e) => updateProfile({ dateOfBirth: e.target.value })} />
+          <DobSplitFields
+            label="Date of Birth"
+            value={user.dateOfBirth || ""}
+            onChange={(iso) => updateProfile({ dateOfBirth: iso || undefined })}
+          />
           <Input label="Height (ft)" placeholder="e.g. 5.8" value={user.height} onChange={(e) => handleUpdate("height", e.target.value)} maxLength={4} />
           <Input label="Languages Known" placeholder="e.g. Kannada, Hindi, English" value={user.languagesKnown || ""} onChange={(e) => handleUpdate("languagesKnown", e.target.value)} maxLength={200} />
           <Input label="Mother Tongue" placeholder="e.g. Kannada" value={user.motherTongue || ""} onChange={(e) => handleUpdate("motherTongue", e.target.value)} maxLength={50} />
@@ -201,13 +207,18 @@ export default function EditProfilePage() {
               setError("Required fields missing.");
               return;
             }
+            const dobSave = validateMatrimonyDob(user.dateOfBirth);
+            if (!dobSave.ok) {
+              setError(dobSave.error);
+              return;
+            }
             setSaving(true);
             setError("");
             const result = await saveProfile({
               ...user,
               email: user.email,
               fullName: user.fullName,
-              dateOfBirth: user.dateOfBirth,
+              dateOfBirth: dobSave.iso,
               gender: user.gender,
             });
             setSaving(false);

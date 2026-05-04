@@ -27,12 +27,14 @@ export function ProfilesPageHeader() {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-[var(--color-border)] shadow-[var(--shadow-soft)]">
-      <div className="max-w-6xl mx-auto px-3.5 sm:px-4 flex items-center justify-between h-14 sm:h-16 gap-2">
-        <Link href="/" className="flex items-center gap-2">
-          <Heart className="w-8 h-8 text-[var(--primary)] fill-[var(--primary)]" aria-hidden />
-          <span className="leading-tight text-[var(--primary)]">
-            <span className="block text-xl font-bold">LingayatBandhu</span>
-            <span className="block text-[11px] sm:text-xs font-semibold tracking-[0.14em] uppercase text-[var(--primary)]/85">
+      <div className="max-w-6xl mx-auto px-2.5 sm:px-4 flex items-center justify-between h-14 sm:h-16 gap-1.5 sm:gap-2 min-w-0">
+        <Link href="/" className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 pr-1">
+          <Heart className="w-7 h-7 sm:w-8 sm:h-8 shrink-0 text-[var(--primary)] fill-[var(--primary)]" aria-hidden />
+          <span className="leading-tight text-[var(--primary)] min-w-0">
+            <span className="block text-[0.95rem] sm:text-xl font-bold truncate max-w-[56vw] sm:max-w-none">
+              LingayatBandhu
+            </span>
+            <span className="block text-[9px] sm:text-xs font-semibold tracking-[0.12em] sm:tracking-[0.14em] uppercase text-[var(--primary)]/85 truncate">
               Matrimony
             </span>
           </span>

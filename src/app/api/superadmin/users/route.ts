@@ -4,8 +4,10 @@ import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
 import { generatePublicIdFromExistingIds } from "@/lib/memberId";
 import { listAllAuthUsers, type AuthUserLite } from "@/lib/server/authUsers";
 import { resolveAccountCodeMap } from "@/lib/server/accountCodes";
+import { isAccountAuthSuspended } from "@/lib/auth/accountStatus";
 
 type Range = "all" | "today" | "last7" | "last30" | "this_month";
+type AccountFilter = "all" | "active" | "suspended" | "deleted";
 
 function getFloor(range: Range): string | null {
   const now = new Date();
@@ -28,23 +30,67 @@ export async function GET(req: NextRequest) {
   const auth = await requireSuperAdmin(req);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-  const url = new URL(req.url);
-  const userId = url.searchParams.get("userId");
-  const signupRange = (url.searchParams.get("signupRange") || "all") as Range;
-  const activityRange = (url.searchParams.get("activityRange") || "all") as Range;
-  const customFrom = url.searchParams.get("customFrom");
-  const customTo = url.searchParams.get("customTo");
-
-  const admin = createSupabaseAdmin();
-  let listedUsers: AuthUserLite[] = [];
   try {
-    listedUsers = await listAllAuthUsers(admin);
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Database error finding users" },
-      { status: 500 }
-    );
-  }
+    const url = new URL(req.url);
+    const userId = url.searchParams.get("userId");
+    const signupRange = (url.searchParams.get("signupRange") || "all") as Range;
+    const activityRange = (url.searchParams.get("activityRange") || "all") as Range;
+    const customFrom = url.searchParams.get("customFrom");
+    const customTo = url.searchParams.get("customTo");
+    const accountFilterRaw = url.searchParams.get("accountFilter") || "all";
+    const accountFilter = (
+      ["all", "active", "suspended", "deleted"].includes(accountFilterRaw) ? accountFilterRaw : "all"
+    ) as AccountFilter;
+
+    const admin = createSupabaseAdmin();
+
+    if (accountFilter === "deleted") {
+      const { data, error } = await admin
+        .from("admin_audit_logs")
+        .select("id, entity_id, created_at, actor_user_id, meta")
+        .eq("action_type", "account.delete")
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      let deletedAccounts = (data || []).map((row) => {
+        const m = (row.meta as Record<string, unknown> | null) || {};
+        return {
+          auditLogId: String(row.id),
+          formerAuthUserId: String(row.entity_id || ""),
+          deletedAt: row.created_at as string,
+          deleteReason: typeof m.delete_reason === "string" ? m.delete_reason : null,
+          emailSnapshot: m.email_snapshot != null ? String(m.email_snapshot) : null,
+          phoneSnapshot: m.phone_snapshot != null ? String(m.phone_snapshot) : null,
+          deletedByActorId: (row.actor_user_id as string | null) ?? null,
+        };
+      });
+      const signupFloorDel = getFloor(signupRange);
+      if (signupFloorDel) {
+        deletedAccounts = deletedAccounts.filter(
+          (d) => new Date(d.deletedAt).getTime() >= new Date(signupFloorDel).getTime()
+        );
+      } else {
+        if (customFrom) {
+          deletedAccounts = deletedAccounts.filter(
+            (d) => new Date(d.deletedAt).getTime() >= new Date(customFrom).getTime()
+          );
+        }
+        if (customTo) {
+          const toEndTs = new Date(customTo).getTime() + 24 * 60 * 60 * 1000 - 1;
+          deletedAccounts = deletedAccounts.filter(
+            (d) => new Date(d.deletedAt).getTime() <= toEndTs
+          );
+        }
+      }
+      if (userId) {
+        const one = deletedAccounts.find((d) => d.formerAuthUserId === userId);
+        if (!one) return NextResponse.json({ error: "User not found" }, { status: 404 });
+        return NextResponse.json({ user: one, accountFilter: "deleted" });
+      }
+      return NextResponse.json({ users: [], deletedAccounts, accountFilter: "deleted" });
+    }
+
+    const listedUsers = await listAllAuthUsers(admin);
 
   const allUsersForCodes = listedUsers.map((u) => ({
     id: u.id,
@@ -64,8 +110,16 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  if (accountFilter === "active") {
+    users = users.filter((u) => !isAccountAuthSuspended(u.app_metadata, u.banned_until));
+  } else if (accountFilter === "suspended") {
+    users = users.filter((u) => isAccountAuthSuspended(u.app_metadata, u.banned_until));
+  }
+
   const userIds = users.map((u) => u.id);
-  if (userIds.length === 0) return NextResponse.json({ users: [] });
+  if (userIds.length === 0) {
+    return NextResponse.json({ users: [], accountFilter });
+  }
   const { data: profiles, error: pErr } = await admin
     .from("profiles")
     .select(
@@ -376,8 +430,19 @@ export async function GET(req: NextRequest) {
     const currentPlanSummary = activeSub
       ? `${planDisplayName || "Active plan"} · till ${new Date(String(activeSub.expires_at || "")).toLocaleDateString("en-IN")}`
       : null;
+    const appMeta = (u.app_metadata || {}) as Record<string, unknown>;
+    const suspendedAt =
+      typeof appMeta.suspended_at === "string" ? appMeta.suspended_at : null;
+    const suspendReason =
+      typeof appMeta.suspend_reason === "string" ? appMeta.suspend_reason : null;
     return {
       id: u.id,
+      accountSuspended: isAccountAuthSuspended(
+        u.app_metadata as Record<string, unknown> | undefined,
+        u.banned_until
+      ),
+      suspendedAt,
+      suspendReason,
       accountHolderName: resolveAccountHolderName(u, map.get(u.id) || []),
       email: u.email || null,
       phone: u.phone || null,
@@ -429,7 +494,14 @@ export async function GET(req: NextRequest) {
   if (userId) {
     const one = filtered.find((u) => u.id === userId);
     if (!one) return NextResponse.json({ error: "User not found" }, { status: 404 });
-    return NextResponse.json({ user: one });
+    return NextResponse.json({ user: one, accountFilter });
   }
-  return NextResponse.json({ users: filtered });
+  return NextResponse.json({ users: filtered, accountFilter });
+  } catch (err) {
+    console.error("[GET /api/superadmin/users]", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Database error loading users" },
+      { status: 500 }
+    );
+  }
 }

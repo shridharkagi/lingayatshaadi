@@ -237,12 +237,14 @@ export default function LandingPage() {
     <div className="min-h-screen" style={{ background: "var(--gradient-bg-warm)" }}>
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-[var(--color-border)] shadow-[var(--shadow-soft)]">
-        <div className="max-w-6xl mx-auto px-3.5 sm:px-4 flex items-center justify-between h-14 sm:h-16 gap-3">
-          <Link href="/" className="flex items-center gap-2 min-w-0 shrink">
-            <Heart className="w-7 h-7 sm:w-8 sm:h-8 shrink-0 text-[var(--primary)] fill-[var(--primary)]" />
+        <div className="max-w-6xl mx-auto px-2.5 sm:px-4 flex items-center justify-between h-14 sm:h-16 gap-2 min-w-0">
+          <Link href="/" className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 pr-1">
+            <Heart className="w-6 h-6 sm:w-8 sm:h-8 shrink-0 text-[var(--primary)] fill-[var(--primary)]" />
             <span className="leading-tight text-[var(--primary)] min-w-0">
-              <span className="block text-lg sm:text-xl font-bold truncate">LingayatBandhu</span>
-              <span className="block text-[10px] sm:text-xs font-semibold tracking-[0.14em] uppercase text-[var(--primary)]/85">
+              <span className="block text-[0.95rem] sm:text-lg md:text-xl font-bold truncate max-w-[58vw] sm:max-w-none">
+                LingayatBandhu
+              </span>
+              <span className="block text-[9px] sm:text-xs font-semibold tracking-[0.12em] sm:tracking-[0.14em] uppercase text-[var(--primary)]/85 truncate">
                 Matrimony
               </span>
             </span>
@@ -286,12 +288,12 @@ export default function LandingPage() {
             )}
           </nav>
           {/* Mobile: outline Register + menu — touch-friendly, visually balanced */}
-          <div className="md:hidden flex items-center gap-2 shrink-0">
+          <div className="md:hidden flex items-center gap-1 sm:gap-2 shrink-0">
             {!loading && !isLoggedIn && (
               <Button
                 size="sm"
                 variant="outline"
-                className="px-3.5 py-2 min-h-[42px] rounded-full bg-white font-semibold text-sm shadow-none hover:bg-[var(--primary)]/10 hover:text-[var(--primary)] active:scale-[0.98]"
+                className="px-2.5 sm:px-3.5 py-1.5 sm:py-2 min-h-[40px] sm:min-h-[42px] rounded-full bg-white font-semibold text-xs sm:text-sm shadow-none hover:bg-[var(--primary)]/10 hover:text-[var(--primary)] active:scale-[0.98] max-[360px]:px-2"
                 onClick={() => openAuthModal("signup")}
               >
                 Register
@@ -390,10 +392,10 @@ export default function LandingPage() {
             Connect with compatible life partners rooted in shared faith, tradition, and community
           </p>
           {!loading && isLoggedIn ? (
-            <Link href={primaryCta.href}>
+            <Link href={primaryCta.href} className="inline-flex w-full max-w-[min(100%,280px)] sm:max-w-none sm:w-auto">
               <Button
                 size="lg"
-                className="border-0 text-white text-base sm:text-lg px-8 sm:px-10 py-3.5 sm:py-4 rounded-full shadow-lg hover:opacity-95 transition-opacity"
+                className="w-full sm:w-auto border-0 text-white text-sm sm:text-base md:text-lg px-6 sm:px-8 md:px-10 py-2.5 sm:py-3.5 md:py-4 rounded-full shadow-lg hover:opacity-95 transition-opacity"
                 style={{ background: "var(--gradient-primary)" }}
               >
                 {primaryCta.label}
@@ -403,7 +405,7 @@ export default function LandingPage() {
             <Button
               size="lg"
               onClick={() => openAuthModal("signup")}
-              className="border-0 text-white text-base sm:text-lg px-8 sm:px-10 py-3.5 sm:py-4 rounded-full shadow-lg hover:opacity-95 transition-opacity"
+              className="w-full max-w-[min(100%,280px)] sm:max-w-none sm:w-auto border-0 text-white text-sm sm:text-base md:text-lg px-6 sm:px-8 md:px-10 py-2.5 sm:py-3.5 md:py-4 rounded-full shadow-lg hover:opacity-95 transition-opacity"
               style={{ background: "var(--gradient-primary)" }}
             >
               {primaryCta.label}

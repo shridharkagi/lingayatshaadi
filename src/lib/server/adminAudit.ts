@@ -18,7 +18,10 @@ export type AdminAuditAction =
   | "subscription.adjust_manual"
   | "subscription.refund_manual"
   | "subscription.upgrade_request_status"
-  | "subscription.plan_update";
+  | "subscription.plan_update"
+  | "account.suspend"
+  | "account.unsuspend"
+  | "account.delete";
 
 export async function logAdminAudit(params: {
   actorUserId: string;

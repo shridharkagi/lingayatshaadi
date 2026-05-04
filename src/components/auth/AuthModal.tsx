@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Calendar, X } from "lucide-react";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { DobSplitFields } from "@/components/ui/DobSplitFields";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTurnstile } from "@/components/turnstile/TurnstileProvider";
-import { parseDobDdMmYyyyToIso } from "@/lib/dateOfBirth";
-import { formatIsoToDobDdMmYyyy } from "@/lib/dateOfBirth";
+import { validateMatrimonyDob } from "@/lib/dateOfBirth";
 
 type AuthModalMode = "login" | "signup";
 
@@ -69,8 +69,6 @@ export function AuthModal({ open, initialMode, onClose }: AuthModalProps) {
   const [signup, setSignup] = useState<SignupForm>(initialSignup);
   const [signupOtp, setSignupOtp] = useState("");
   const [signupStep, setSignupStep] = useState<1 | 2>(1);
-  const [signupDobPickerIso, setSignupDobPickerIso] = useState("");
-
   useEffect(() => {
     if (!open) return;
     primeTurnstile();
@@ -243,13 +241,13 @@ export function AuthModal({ open, initialMode, onClose }: AuthModalProps) {
 
   const sendSignupOtp = async () => {
     if (loading) return;
-    const normalizedDob = parseDobDdMmYyyyToIso(signup.dateOfBirth);
+    const dobCheck = validateMatrimonyDob(signup.dateOfBirth);
     setError("");
     setInfo("");
     if (!signup.gender) return setError("Please select gender");
     if (!signup.firstName.trim()) return setError("First name is required");
     if (!signup.city.trim()) return setError("City is required");
-    if (!normalizedDob) return setError("Date of birth must be in dd/mm/yyyy format");
+    if (!dobCheck.ok) return setError(dobCheck.error);
     if (signup.mobile.length !== 10) return setError("Enter a valid 10-digit mobile number");
     if (!signup.password || signup.password.length < 8) return setError("Password must be at least 8 characters");
     if (signup.password !== signup.confirmPassword) return setError("Passwords do not match");
@@ -265,7 +263,7 @@ export function AuthModal({ open, initialMode, onClose }: AuthModalProps) {
       return;
     }
     setSignupStep(2);
-    setSignup((s) => ({ ...s, dateOfBirth: normalizedDob }));
+    setSignup((s) => ({ ...s, dateOfBirth: dobCheck.iso }));
     setInfo("OTP sent. It is valid for 10 minutes.");
     setResendIn(result.cooldownSeconds ?? 30);
   };
@@ -567,39 +565,12 @@ export function AuthModal({ open, initialMode, onClose }: AuthModalProps) {
                       </div>
                     </div>
 
-                    <Input
+                    <DobSplitFields
                       compact
                       label="Date of Birth"
-                      type="text"
-                      placeholder="dd/mm/yyyy"
                       value={signup.dateOfBirth}
-                      onChange={(e) => setSignup((s) => ({ ...s, dateOfBirth: e.target.value }))}
+                      onChange={(iso) => setSignup((s) => ({ ...s, dateOfBirth: iso }))}
                     />
-                    <div className="-mt-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const el = document.getElementById("auth-signup-dob-picker") as HTMLInputElement | null;
-                          el?.showPicker?.();
-                        }}
-                        className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs text-[var(--primary)] font-medium"
-                      >
-                        <Calendar size={13} />
-                        Select from calendar
-                      </button>
-                      <input
-                        id="auth-signup-dob-picker"
-                        type="date"
-                        value={signupDobPickerIso}
-                        onChange={(e) => {
-                          const ddmmyyyy = formatIsoToDobDdMmYyyy(e.target.value);
-                          if (!ddmmyyyy) return;
-                          setSignupDobPickerIso(e.target.value);
-                          setSignup((s) => ({ ...s, dateOfBirth: ddmmyyyy }));
-                        }}
-                        className="sr-only"
-                      />
-                    </div>
 
                     <Input
                       compact

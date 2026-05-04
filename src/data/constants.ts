@@ -116,8 +116,8 @@ export const PROFESSION_TYPES = [
 export const SUB_CASTE_OPTIONS = [
   "Agasa", "Akkasali", "Aradhya", "Balegala", "Banagar", "Banajiga", "Bhandari", "Bilijedaru",
   "Bilimagga", "Chaturtha", "Dikshwant", "Ganiga", "Gowda (Gowdike)", "Gowli", "Gurav", "Hadapada",
-  "Hatgar", "Hugar/Hoogara", "Jadaru", "Jangama", "Kudu Vokkaliga", "Kumbar/Kumbara", "Kumbhar",
-  "Kuruhina", "Lolagonda", "Madivala", "Malgar", "Mali", "Neelagar", "Neygi", "Nolamba",
+  "Hugar/Hoogara", "Jangama", "Kudu Vokkaliga", "Kumbar/Kumbara", "Kumbhar",
+  "Lolagonda", "Madivala", "Malgar", "Mali", "Neelagar", "Neygi", "Nolamba",
   "Panchamasali", "Pattasali", "Reddy/Reddi", "Sadar", "Sajjan/Sajjanaganigar", "Setty", "Shilwant",
   "Shiva", "Simpi", "Vani", "Others",
 ] as const;
