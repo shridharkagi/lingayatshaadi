@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { readSiteConfig } from "@/lib/server/siteConfig";
+import { DEFAULT_DATA_VISIBILITY_CONFIG } from "@/lib/dataVisibility";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const DEFAULT_PUBLIC_CONFIG = {
   whatsappGroupUrl: "",
@@ -15,6 +19,7 @@ const DEFAULT_PUBLIC_CONFIG = {
     "https://images.unsplash.com/photo-1519741497674-611481863552?w=1600&q=75&fit=crop",
   groomsHeroImageUrl:
     "https://images.unsplash.com/photo-1606800052052-a08af7148866?w=1600&q=70&fit=crop",
+  profileFieldVisibility: DEFAULT_DATA_VISIBILITY_CONFIG,
 };
 
 export async function GET() {
@@ -34,8 +39,11 @@ export async function GET() {
       externalScriptsBodyEnd: c.externalScriptsBodyEnd ?? "",
       bridesHeroImageUrl: c.bridesHeroImageUrl,
       groomsHeroImageUrl: c.groomsHeroImageUrl,
-    });
+      profileFieldVisibility: c.profileFieldVisibility,
+    }, { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } });
   } catch {
-    return NextResponse.json(DEFAULT_PUBLIC_CONFIG);
+    return NextResponse.json(DEFAULT_PUBLIC_CONFIG, {
+      headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+    });
   }
 }

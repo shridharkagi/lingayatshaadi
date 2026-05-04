@@ -84,6 +84,7 @@ import { buildProfileShareFooter, buildProfileShareText, getShortProfilePath } f
 import { formatHeightForDisplay } from "@/lib/formatHeight";
 import { getAccountAccessState } from "@/lib/api/accessState";
 import { maskBirthDateKeepYear, maskLastName, maskLastNameKeepPrefix, MASKED_VALUE, type AccountAccessState } from "@/lib/accessPolicy";
+import { normalizeDataVisibilityConfig, resolveViewerTier } from "@/lib/dataVisibility";
 import { WhatsAppGroupCta } from "@/components/whatsapp/WhatsAppGroupCta";
 
 /** Session-only: user dismissed the confidential-use strip for this browser session. */
@@ -1023,25 +1024,68 @@ export default function OtherProfilePage() {
   }
 
   const canViewSensitiveFields = isLoggedIn && hasValidSubscription;
+  const viewerTier = resolveViewerTier(isLoggedIn, hasValidSubscription);
+  const visibility = normalizeDataVisibilityConfig(config.profileFieldVisibility);
+  const getRule = (field: keyof typeof visibility) => visibility[field][viewerTier];
   const canUseContact = !!accessState?.canContact;
   const canSendInterestNow = !!accessState?.canSendInterest;
-  const displayName = canViewSensitiveFields
-    ? profile.fullName
-    : isLoggedIn
-      ? maskLastName(profile.fullName)
-      : maskString(profile.fullName, 5);
-  const displaySubCaste = canViewSensitiveFields ? profile.subCaste : maskString(profile.subCaste, 3);
-  const displayFatherName = canViewSensitiveFields ? profile.fatherName : maskString(profile.fatherName, 4);
-  const displayMotherName = canViewSensitiveFields ? profile.motherName : maskString(profile.motherName, 4);
-  const displaySibling = canViewSensitiveFields ? profile.siblingDetails : maskString(profile.siblingDetails, 2);
-  const displayDateOfBirth = canViewSensitiveFields
-    ? formatDateDDMMYYYY(profile.dateOfBirth)
-    : maskBirthDateKeepYear(profile.dateOfBirth);
+  const displayName =
+    getRule("fullName") === "show"
+      ? profile.fullName
+      : getRule("fullName") === "mask"
+        ? (isLoggedIn ? maskLastName(profile.fullName) : maskString(profile.fullName, 5))
+        : "";
+  const displaySubCaste =
+    getRule("subCaste") === "show"
+      ? profile.subCaste
+      : getRule("subCaste") === "mask"
+        ? maskString(profile.subCaste, 3)
+        : "";
+  const displayFatherName =
+    getRule("fatherName") === "show"
+      ? profile.fatherName
+      : getRule("fatherName") === "mask"
+        ? maskString(profile.fatherName, 4)
+        : "";
+  const displayMotherName =
+    getRule("motherName") === "show"
+      ? profile.motherName
+      : getRule("motherName") === "mask"
+        ? maskString(profile.motherName, 4)
+        : "";
+  const displaySibling =
+    getRule("siblingDetails") === "show"
+      ? profile.siblingDetails
+      : getRule("siblingDetails") === "mask"
+        ? maskString(profile.siblingDetails, 2)
+        : "";
+  const displayDateOfBirth =
+    getRule("dateOfBirth") === "show"
+      ? formatDateDDMMYYYY(profile.dateOfBirth)
+      : getRule("dateOfBirth") === "mask"
+        ? maskBirthDateKeepYear(profile.dateOfBirth)
+        : "";
   const displayTimeOfBirth = profile.timeOfBirth
-    ? canViewSensitiveFields
+    ? getRule("timeOfBirth") === "show"
       ? profile.timeOfBirth
-      : "****"
+      : getRule("timeOfBirth") === "mask"
+        ? "****"
+        : ""
     : "";
+  const showCompanyName = getRule("companyName") === "show";
+  const showAnnualIncome = getRule("annualIncome") === "show";
+  const maskCompanyName = getRule("companyName") === "mask";
+  const maskAnnualIncome = getRule("annualIncome") === "mask";
+  const displayCompanyName = showCompanyName
+    ? profile.companyName || ""
+    : maskCompanyName
+      ? maskString(profile.companyName, 2)
+      : "";
+  const displayAnnualIncome = showAnnualIncome
+    ? profile.annualIncome || ""
+    : maskAnnualIncome
+      ? MASKED_VALUE
+      : "";
 
   const aboutMeTruncated = truncateToWords(profile.aboutMe, 100);
   const aboutMeWords = wordCount(profile.aboutMe);
@@ -1795,12 +1839,14 @@ export default function OtherProfilePage() {
 
               <div className="mt-2.5 space-y-2">
                 <div className="grid grid-cols-3 md:grid-cols-6 gap-2 [grid-auto-rows:minmax(min-content,auto)]">
-                  <div className="col-span-2 md:col-span-4 rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
-                    <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
-                      Full Name
-                    </p>
-                    <p className="mt-0.5 text-[0.88rem] font-semibold text-[#2d241d] break-words leading-snug">{displayName}</p>
-                  </div>
+                  {displayName && (
+                    <div className="col-span-2 md:col-span-4 rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
+                      <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                        Full Name
+                      </p>
+                      <p className="mt-0.5 text-[0.88rem] font-semibold text-[#2d241d] break-words leading-snug">{displayName}</p>
+                    </div>
+                  )}
 
                   <div className="col-span-1 md:col-span-2 rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
                     <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
@@ -1811,12 +1857,12 @@ export default function OtherProfilePage() {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2 [grid-auto-rows:minmax(min-content,auto)]">
-                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
+                  {displayDateOfBirth && <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
                     <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                       Birth Date
                     </p>
                     <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] leading-snug">{displayDateOfBirth}</p>
-                  </div>
+                  </div>}
 
                   <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
                     <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
@@ -1832,12 +1878,12 @@ export default function OtherProfilePage() {
                     <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] leading-snug break-words">{profile.caste}</p>
                   </div>
 
-                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
+                  {displaySubCaste && <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
                     <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
                       Sub-Caste
                     </p>
-                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">{displaySubCaste || "—"}</p>
-                  </div>
+                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">{displaySubCaste}</p>
+                  </div>}
                 </div>
               </div>
             </div>
@@ -1851,37 +1897,42 @@ export default function OtherProfilePage() {
                   key context without leaking company details publicly. */}
               <p>
                 {profile.profession || "—"}
-                {canViewSensitiveFields && profile.companyName ? ` at ${profile.companyName}` : ""}
+                {displayCompanyName ? ` at ${displayCompanyName}` : ""}
               </p>
               {/* Annual income (package) is a sensitive field — hidden for
                   non-logged-in viewers to discourage scraping. */}
-              {canViewSensitiveFields && profile.annualIncome && <p>{profile.annualIncome}</p>}
+              {displayAnnualIncome && <p>{displayAnnualIncome}</p>}
             </DetailSection>
+            {getRule("familyDetails") !== "hide" && (
             <div className="py-4">
               <div className="flex items-center gap-2">
                 <Users size={18} className="text-gray-400 flex-shrink-0" />
                 <p className="text-xs sm:text-sm text-gray-500">Family</p>
               </div>
               <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
-                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
-                  <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
-                    Father
-                  </p>
-                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">
-                    {displayFatherName || "—"}
-                    {profile.fatherOccupation ? ` (${profile.fatherOccupation})` : ""}
-                  </p>
-                </div>
+                {displayFatherName && (
+                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
+                    <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                      Father
+                    </p>
+                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">
+                      {displayFatherName}
+                      {profile.fatherOccupation ? ` (${profile.fatherOccupation})` : ""}
+                    </p>
+                  </div>
+                )}
 
-                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
-                  <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
-                    Mother
-                  </p>
-                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">
-                    {displayMotherName || "—"}
-                    {profile.motherOccupation ? ` (${profile.motherOccupation})` : ""}
-                  </p>
-                </div>
+                {displayMotherName && (
+                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
+                    <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                      Mother
+                    </p>
+                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">
+                      {displayMotherName}
+                      {profile.motherOccupation ? ` (${profile.motherOccupation})` : ""}
+                    </p>
+                  </div>
+                )}
 
                 <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
                   <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
@@ -1904,13 +1955,14 @@ export default function OtherProfilePage() {
                 )}
               </div>
             </div>
+            )}
           </div>
         </div>
 
         {/* Horoscope block: Time of Birth is considered sensitive and is
             hidden for non-logged-in viewers. We still show the card if any
             of the remaining astrology fields are present. */}
-        {(profile.rashi || profile.nakshatra || profile.timeOfBirth || profile.placeOfBirth || profile.horoscopeOtherDetails) && (
+        {getRule("horoscopeDetails") !== "hide" && (profile.rashi || profile.nakshatra || profile.timeOfBirth || profile.placeOfBirth || profile.horoscopeOtherDetails) && (
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <h3 className="font-semibold text-[var(--foreground)] mb-1">Horoscope Details</h3>
             <div className="flex items-center gap-2 mb-2">
@@ -2129,7 +2181,7 @@ export default function OtherProfilePage() {
         })()}
       </div>
 
-      <div className="bg-white rounded-2xl p-4 shadow-sm">
+      {getRule("contactDetails") !== "hide" && <div className="bg-white rounded-2xl p-4 shadow-sm">
         <h3 className="font-semibold text-[var(--foreground)] mb-3">Contact Information</h3>
         <div className="py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
@@ -2180,11 +2232,13 @@ export default function OtherProfilePage() {
                   Login to View Contact
                 </button>
               </div>
-            ) : !canUseContact ? (
+            ) : !canUseContact || getRule("contactDetails") === "mask" ? (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
                 <p className="text-sm font-medium text-amber-900">Contact Details</p>
                 <p className="mt-1 text-xs text-amber-900/90">
-                  Upgrade to view phone and WhatsApp details for this profile.
+                  {getRule("contactDetails") === "mask"
+                    ? "Contact details are masked for your current access tier."
+                    : "Upgrade to view phone and WhatsApp details for this profile."}
                 </p>
                 <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <Link
@@ -2265,7 +2319,7 @@ export default function OtherProfilePage() {
             </div>
           </div>
         </div>
-      </div>
+      </div>}
 
       <div className="space-y-4 mt-4">
         {hasMultiplePhotos && (

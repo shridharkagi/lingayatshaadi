@@ -1,6 +1,11 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from "fs";
 import { join } from "path";
 import { createSupabaseAdminSafe } from "@/lib/supabase";
+import {
+  type DataVisibilityConfig,
+  DEFAULT_DATA_VISIBILITY_CONFIG,
+  normalizeDataVisibilityConfig,
+} from "@/lib/dataVisibility";
 
 const CONFIG_PATH = join(process.cwd(), "data", "site-config.json");
 const SITE_SETTINGS_ROW_ID = "default";
@@ -22,6 +27,7 @@ export type SiteConfig = {
   externalScriptsBodyEnd: string;
   bridesHeroImageUrl: string;
   groomsHeroImageUrl: string;
+  profileFieldVisibility: DataVisibilityConfig;
 };
 
 export const DEFAULT_SITE_CONFIG: SiteConfig = {
@@ -41,6 +47,7 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
     "https://images.unsplash.com/photo-1519741497674-611481863552?w=1600&q=75&fit=crop",
   groomsHeroImageUrl:
     "https://images.unsplash.com/photo-1606800052052-a08af7148866?w=1600&q=70&fit=crop",
+  profileFieldVisibility: DEFAULT_DATA_VISIBILITY_CONFIG,
 };
 
 function asRecord(v: unknown): Record<string, unknown> | null {
@@ -53,6 +60,7 @@ export function normalizeSiteConfig(raw: Record<string, unknown> | null | undefi
   if (!merged.externalScriptsBody?.trim() && merged.externalScripts?.trim()) {
     merged.externalScriptsBody = merged.externalScripts;
   }
+  merged.profileFieldVisibility = normalizeDataVisibilityConfig(merged.profileFieldVisibility);
   return merged;
 }
 
@@ -68,6 +76,30 @@ export function readSiteConfigFromFile(): SiteConfig {
   return { ...DEFAULT_SITE_CONFIG };
 }
 
+function persistSiteConfigToFile(config: SiteConfig): void {
+  try {
+    const dir = join(process.cwd(), "data");
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+    const nextJson = JSON.stringify(config, null, 2);
+    if (existsSync(CONFIG_PATH)) {
+      try {
+        const currentJson = readFileSync(CONFIG_PATH, "utf-8");
+        if (currentJson === nextJson) return;
+      } catch {
+        // If reading fails, continue with a write attempt.
+      }
+    }
+    // Atomic replace prevents readers from seeing partially-written JSON.
+    const tmpPath = `${CONFIG_PATH}.tmp`;
+    writeFileSync(tmpPath, nextJson, "utf-8");
+    renameSync(tmpPath, CONFIG_PATH);
+  } catch {
+    // Best-effort cache only.
+  }
+}
+
 export async function readSiteConfig(): Promise<SiteConfig> {
   const admin = createSupabaseAdminSafe();
   if (admin) {
@@ -78,7 +110,9 @@ export async function readSiteConfig(): Promise<SiteConfig> {
       .maybeSingle();
     if (!error && data?.config) {
       const parsed = asRecord(data.config);
-      if (parsed) return normalizeSiteConfig(parsed);
+      if (parsed) {
+        return normalizeSiteConfig(parsed);
+      }
     }
   }
   return readSiteConfigFromFile();
@@ -103,6 +137,8 @@ export async function mergeAndPersistSiteConfig(partial: Partial<SiteConfig>): P
     if (error) {
       return { ok: false, error: `Could not save to database: ${error.message}` };
     }
+    // Keep file fallback in sync with latest DB config.
+    persistSiteConfigToFile(updated);
     return { ok: true };
   }
 

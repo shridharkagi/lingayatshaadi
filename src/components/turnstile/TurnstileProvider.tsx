@@ -91,8 +91,8 @@ const TurnstileContext = createContext<TurnstileContextValue | null>(null);
 // Keep submit latency tight: wait briefly for widget bootstrap, then proceed.
 // (Challenge execution timeout remains higher below.)
 /** Mobile / LTE often needs longer than desktop for api.js + widget bootstrap */
-const WIDGET_READY_WAIT_MS = 8000;
-const CHALLENGE_WAIT_MS = 22000;
+const WIDGET_READY_WAIT_MS = 12000;
+const CHALLENGE_WAIT_MS = 30000;
 // Cloudflare tokens are valid ~5 min. Keep our cache shorter so a primed
 // token never arrives at Supabase already-expired.
 const PRIMED_TOKEN_TTL_MS = 4 * 60 * 1000;

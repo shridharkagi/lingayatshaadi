@@ -71,14 +71,14 @@ export function ProfileCreatedApprovalModal({
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/55 p-4"
+      className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto bg-black/55 p-3 sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby={variant === "updated" ? "profile-updated-title" : "profile-created-title"}
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-black/5 transition-all duration-200 ease-out"
+        className="relative my-auto w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-black/5 transition-all duration-200 ease-out max-h-[92dvh] sm:max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -90,7 +90,7 @@ export function ProfileCreatedApprovalModal({
           <X size={18} />
         </button>
 
-        <div className="relative px-5 pb-5 pt-7 sm:px-7 sm:pb-6 sm:pt-8">
+        <div className="relative overflow-y-auto px-4 pb-4 pt-6 sm:px-7 sm:pb-6 sm:pt-8 max-h-[92dvh] sm:max-h-[90vh]">
           {/* Decorative sparkles */}
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
             <div className="absolute -left-10 -top-10 h-40 w-40 rounded-full bg-emerald-50 blur-2xl" />
@@ -120,7 +120,7 @@ export function ProfileCreatedApprovalModal({
 
             <h2
               id={variant === "updated" ? "profile-updated-title" : "profile-created-title"}
-              className="text-[1.35rem] font-bold leading-tight text-slate-900 sm:text-2xl"
+              className="text-[1.2rem] font-bold leading-tight text-slate-900 sm:text-2xl"
             >
               {variant === "updated"
                 ? "Profile Updated Successfully!"
@@ -165,22 +165,22 @@ export function ProfileCreatedApprovalModal({
             )}
           </div>
 
-          <div className="relative mt-5 grid grid-cols-3 gap-2 rounded-2xl border border-slate-100 bg-slate-50/80 px-2 py-3 text-center">
+          <div className="relative mt-5 grid grid-cols-3 gap-1.5 rounded-2xl border border-slate-100 bg-slate-50/80 px-2 py-2.5 text-center sm:gap-2 sm:py-3">
             <div className="flex flex-col items-center gap-1 border-r border-slate-200/80 px-1">
               <ShieldCheck className="text-emerald-600" size={18} />
-              <span className="text-[11px] font-semibold leading-tight text-slate-800">
+              <span className="text-[10px] font-semibold leading-tight text-slate-800 sm:text-[11px]">
                 Secure &amp; Verified
               </span>
             </div>
             <div className="flex flex-col items-center gap-1 border-r border-slate-200/80 px-1">
               <Clock className="text-emerald-600" size={18} />
-              <span className="text-[11px] font-semibold leading-tight text-slate-800">
+              <span className="text-[10px] font-semibold leading-tight text-slate-800 sm:text-[11px]">
                 Faster Activation
               </span>
             </div>
             <div className="flex flex-col items-center gap-1 px-1">
               <Award className="text-emerald-600" size={18} />
-              <span className="text-[11px] font-semibold leading-tight text-slate-800">
+              <span className="text-[10px] font-semibold leading-tight text-slate-800 sm:text-[11px]">
                 Trusted Support
               </span>
             </div>
@@ -197,12 +197,12 @@ export function ProfileCreatedApprovalModal({
             )}
           </div>
 
-          <div className="relative mt-5 flex flex-col gap-3">
+          <div className="relative mt-5 flex flex-col gap-2.5 sm:gap-3">
             <a
               href={whatsappHref}
               target="_blank"
               rel="noopener noreferrer"
-              className="group inline-flex items-center justify-between gap-3 rounded-2xl bg-[#25D366] px-4 py-3.5 text-sm font-bold text-white shadow-[0_12px_28px_rgba(37,211,102,0.35)] transition hover:brightness-105"
+              className="group inline-flex items-center justify-between gap-2.5 rounded-2xl bg-[#25D366] px-3.5 py-3 text-sm font-bold text-white shadow-[0_12px_28px_rgba(37,211,102,0.35)] transition hover:brightness-105 sm:gap-3 sm:px-4 sm:py-3.5"
             >
               <span className="inline-flex items-center gap-3">
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
@@ -218,7 +218,7 @@ export function ProfileCreatedApprovalModal({
 
             <a
               href={callHref}
-              className="group inline-flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-slate-50"
+              className="group inline-flex items-center justify-between gap-2.5 rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-slate-50 sm:gap-3 sm:px-4 sm:py-3.5"
             >
               <span className="inline-flex items-center gap-3">
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">

@@ -16,12 +16,14 @@ import {
   isAuthEmailRateLimitedMessage,
   isCaptchaErrorMessage,
 } from "@/lib/authUserFacingErrors";
+import { isTurnstileClientConfigured } from "@/lib/turnstileConfig";
 import { ACCOUNT_SUSPENDED_LOGIN_MESSAGE, isAccountAuthSuspended } from "@/lib/auth/accountStatus";
 import { withTimeout } from "@/lib/withTimeout";
 import { useTurnstile } from "@/components/turnstile/TurnstileProvider";
 import type { User } from "@supabase/supabase-js";
 
-const GET_SESSION_TIMEOUT_MS = 20_000;
+const GET_SESSION_TIMEOUT_MS = 8_000;
+const AUTH_BOOTSTRAP_FAILSAFE_MS = 9_000;
 const SIGN_IN_TIMEOUT_MS = 30_000;
 const SET_SESSION_PER_ATTEMPT_MS = 12_000;
 const PHONE_AUTH_FETCH_MS = 28_000;
@@ -219,6 +221,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
       return;
     }
+    // Never let auth bootstrap leave the UI in a perpetual loading state.
+    const failSafe = window.setTimeout(() => {
+      setLoading(false);
+    }, AUTH_BOOTSTRAP_FAILSAFE_MS);
 
     withTimeout(supabase.auth.getSession(), GET_SESSION_TIMEOUT_MS, "getSession")
       .then(({ data: { session } }) => {
@@ -241,6 +247,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .finally(() => {
         // Keep bootstrap deterministic: even if auth state callback is delayed,
         // pages depending on authLoading should not hang on a perpetual spinner.
+        window.clearTimeout(failSafe);
         setLoading(false);
       });
 
@@ -261,7 +268,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      window.clearTimeout(failSafe);
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Supabase Auth has its own built-in CAPTCHA (Dashboard → Authentication →
@@ -286,14 +296,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     blocked: boolean;
   }> => {
     /** Slow networks / cold widget load often fail once; retry before telling users they're "blocked". */
-    const backoffMs = [0, 450, 900];
+    const backoffMs = [0, 500, 1000, 1800];
     let lastErr: unknown;
+    const turnstileConfigured = isTurnstileClientConfigured();
     for (let attempt = 0; attempt < backoffMs.length; attempt++) {
       if (backoffMs[attempt] > 0) {
         await new Promise((r) => setTimeout(r, backoffMs[attempt]));
       }
       try {
         const token = await getTurnstileToken();
+        // Treat empty token as retriable when Turnstile is configured: this usually
+        // means cold widget/script load race, not a real user failure.
+        if (!token && turnstileConfigured) {
+          lastErr = new Error("turnstile token empty");
+          continue;
+        }
         return { token, blocked: false };
       } catch (e) {
         lastErr = e;
@@ -301,6 +318,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     const reason = lastErr instanceof Error ? lastErr.message : String(lastErr);
     console.warn("[auth] captcha token unavailable after retries:", reason);
+    // Localhost often runs with production Turnstile keys where hostname
+    // validation fails; don't hard-block local dev login on client-side token
+    // acquisition failure. Supabase/Auth server will still enforce if needed.
+    if (typeof window !== "undefined") {
+      const host = window.location.hostname;
+      const isLocalHost = host === "localhost" || host === "127.0.0.1" || host === "::1";
+      if (isLocalHost || /invalid-domain/i.test(reason)) {
+        return { token: "", blocked: false };
+      }
+    }
     return { token: "", blocked: true };
   };
 
@@ -427,24 +454,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       //      the current email format nor the phone column matches.
       const [emailCurrent, emailLegacy] = syntheticEmailCandidatesForPhone(parsed.digits10);
       const attempts: Array<{
-        kind: "email_current" | "phone" | "email_legacy";
+        kind: "phone" | "email_current" | "email_legacy";
         run: (captchaToken: string) =>
           ReturnType<NonNullable<typeof supabase>["auth"]["signInWithPassword"]>;
       }> = [
-        {
-          kind: "email_current",
-          run: (captchaToken) =>
-            supabase.auth.signInWithPassword({
-              email: emailCurrent,
-              password,
-              options: { captchaToken },
-            }),
-        },
         {
           kind: "phone",
           run: (captchaToken) =>
             supabase.auth.signInWithPassword({
               phone: parsed.e164,
+              password,
+              options: { captchaToken },
+            }),
+        },
+        {
+          kind: "email_current",
+          run: (captchaToken) =>
+            supabase.auth.signInWithPassword({
+              email: emailCurrent,
               password,
               options: { captchaToken },
             }),

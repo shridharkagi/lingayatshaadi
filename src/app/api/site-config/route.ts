@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
 import type { SiteConfig } from "@/lib/server/siteConfig";
 import { mergeAndPersistSiteConfig, readSiteConfig } from "@/lib/server/siteConfig";
+import { normalizeDataVisibilityConfig } from "@/lib/dataVisibility";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
   const auth = await requireSuperAdmin(request);
@@ -9,7 +13,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
   const config = await readSiteConfig();
-  return NextResponse.json(config);
+  return NextResponse.json(config, {
+    headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -42,13 +48,20 @@ export async function POST(request: NextRequest) {
     }
     if (typeof body.bridesHeroImageUrl === "string") patch.bridesHeroImageUrl = body.bridesHeroImageUrl;
     if (typeof body.groomsHeroImageUrl === "string") patch.groomsHeroImageUrl = body.groomsHeroImageUrl;
+    if (body.profileFieldVisibility && typeof body.profileFieldVisibility === "object") {
+      patch.profileFieldVisibility = normalizeDataVisibilityConfig(body.profileFieldVisibility);
+    }
 
     const result = await mergeAndPersistSiteConfig(patch);
     if (!result.ok) {
       console.error("Site config save error:", result.error);
       return NextResponse.json({ error: result.error }, { status: 500 });
     }
-    return NextResponse.json({ success: true });
+    const fresh = await readSiteConfig();
+    return NextResponse.json(
+      { success: true, config: fresh },
+      { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+    );
   } catch (err) {
     console.error("Site config save error:", err);
     return NextResponse.json({ error: "Failed to save" }, { status: 500 });

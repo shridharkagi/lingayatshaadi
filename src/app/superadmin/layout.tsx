@@ -12,6 +12,7 @@ import {
   Shield,
   BarChart3,
   Settings,
+  Eye,
   ClipboardCheck,
   Trash2,
   History,
@@ -35,6 +36,7 @@ const navItems = [
   { href: "/superadmin/trash", icon: Trash2, label: "Trash" },
   { href: "/superadmin/admin-logs", icon: History, label: "Admin Logs" },
   { href: "/superadmin/settings", icon: Settings, label: "Settings" },
+  { href: "/superadmin/data-visibility", icon: Eye, label: "Data Visibility" },
 ];
 
 export default function SuperAdminLayout({

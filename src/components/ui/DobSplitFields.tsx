@@ -84,8 +84,8 @@ export function DobSplitFields({
     : "block text-sm font-medium text-gray-700 mb-1";
 
   const inputClass = compact
-    ? "min-w-0 rounded-xl border bg-white px-3 py-2 text-center text-[16px] tabular-nums outline-none transition focus:ring-1 focus:ring-[var(--primary)]/30 sm:px-4 sm:py-2.5 sm:text-base"
-    : "min-w-0 rounded-xl border bg-white px-4 py-3 text-center text-[16px] tabular-nums outline-none transition focus:ring-1 focus:ring-[var(--primary)]/30 sm:text-base";
+    ? "min-w-0 rounded-xl border bg-white px-2.5 py-2 text-center font-sans text-[16px] tabular-nums [font-feature-settings:'tnum'_1,'lnum'_1] outline-none transition focus:ring-1 focus:ring-[var(--primary)]/30 sm:px-3.5 sm:py-2.5 sm:text-base"
+    : "min-w-0 rounded-xl border bg-white px-3 py-3 text-center font-sans text-[16px] tabular-nums [font-feature-settings:'tnum'_1,'lnum'_1] outline-none transition focus:ring-1 focus:ring-[var(--primary)]/30 sm:text-base";
 
   const msg = externalError || internalError;
   const segBorder = (seg: Segment) => {
@@ -170,7 +170,7 @@ export function DobSplitFields({
 
       <div
         ref={wrapRef}
-        className="flex flex-wrap items-center gap-1.5 sm:gap-2"
+        className="flex flex-wrap items-center gap-2 sm:gap-2.5"
         onBlur={(e) => {
           if (!e.currentTarget.contains(e.relatedTarget as Node)) {
             setTouched(true);
@@ -183,6 +183,9 @@ export function DobSplitFields({
           id={`${baseId}-dd`}
           type="text"
           inputMode="numeric"
+          pattern="[0-9]*"
+          lang="en"
+          dir="ltr"
           autoComplete="bday-day"
           placeholder="DD"
           maxLength={2}
@@ -202,7 +205,7 @@ export function DobSplitFields({
           onKeyDown={(e) => {
             if (e.key === "Backspace" && !dd) mmRef.current?.focus();
           }}
-          className={`${segBorder("d")} w-[3.1rem] sm:w-14`}
+          className={`${segBorder("d")} w-[3.6rem] sm:w-[3.8rem]`}
         />
         <span className="text-gray-400 select-none" aria-hidden>
           /
@@ -212,6 +215,9 @@ export function DobSplitFields({
           id={`${baseId}-mm`}
           type="text"
           inputMode="numeric"
+          pattern="[0-9]*"
+          lang="en"
+          dir="ltr"
           autoComplete="bday-month"
           placeholder="MM"
           maxLength={2}
@@ -229,7 +235,7 @@ export function DobSplitFields({
           onKeyDown={(e) => {
             if (e.key === "Backspace" && !mm) ddRef.current?.focus();
           }}
-          className={`${segBorder("m")} w-[3.1rem] sm:w-14`}
+          className={`${segBorder("m")} w-[3.6rem] sm:w-[3.8rem]`}
         />
         <span className="text-gray-400 select-none" aria-hidden>
           /
@@ -239,6 +245,9 @@ export function DobSplitFields({
           id={`${baseId}-yyyy`}
           type="text"
           inputMode="numeric"
+          pattern="[0-9]*"
+          lang="en"
+          dir="ltr"
           autoComplete="bday-year"
           placeholder="YYYY"
           maxLength={4}
@@ -255,7 +264,7 @@ export function DobSplitFields({
           onKeyDown={(e) => {
             if (e.key === "Backspace" && !yyyy) mmRef.current?.focus();
           }}
-          className={`${segBorder("y")} w-[4.75rem] sm:w-[5.5rem]`}
+          className={`${segBorder("y")} w-[6rem] sm:w-[6.25rem]`}
         />
 
         {showCalendarHint && (

@@ -2,6 +2,11 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import type { MembershipPlan } from "@/types";
+import {
+  type DataVisibilityConfig,
+  DEFAULT_DATA_VISIBILITY_CONFIG,
+  normalizeDataVisibilityConfig,
+} from "@/lib/dataVisibility";
 
 const CONFIG_KEY = "lingayat_bandhu_config";
 const LEGACY_CONFIG_KEY = "lingayat_shaadi_config";
@@ -35,6 +40,8 @@ export interface AppConfig {
   bridesHeroImageUrl: string;
   /** Hero image URL for Grooms listing page */
   groomsHeroImageUrl: string;
+  /** Field visibility policy by viewer tier for profile detail page */
+  profileFieldVisibility: DataVisibilityConfig;
 }
 
 const defaultConfig: AppConfig = {
@@ -56,6 +63,7 @@ const defaultConfig: AppConfig = {
     "https://images.unsplash.com/photo-1519741497674-611481863552?w=1600&q=75&fit=crop",
   groomsHeroImageUrl:
     "https://images.unsplash.com/photo-1606800052052-a08af7148866?w=1600&q=70&fit=crop",
+  profileFieldVisibility: DEFAULT_DATA_VISIBILITY_CONFIG,
 };
 
 const AppConfigContext = createContext<{
@@ -105,6 +113,7 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
             typeof parsed.groomsHeroImageUrl === "string"
               ? parsed.groomsHeroImageUrl
               : defaultConfig.groomsHeroImageUrl,
+          profileFieldVisibility: normalizeDataVisibilityConfig(parsed.profileFieldVisibility),
         }));
       }
     } catch {
@@ -119,7 +128,11 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
       .then((serverConfig: Partial<AppConfig> | null) => {
         if (cancelled || !serverConfig) return;
         setConfig((prev) => {
-          const next = { ...prev, ...serverConfig };
+          const next = {
+            ...prev,
+            ...serverConfig,
+            profileFieldVisibility: normalizeDataVisibilityConfig(serverConfig.profileFieldVisibility),
+          };
           try {
             localStorage.setItem(CONFIG_KEY, JSON.stringify(next));
           } catch {

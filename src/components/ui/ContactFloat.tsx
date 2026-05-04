@@ -17,9 +17,11 @@ export function ContactFloat() {
   const hasWhatsApp = !!config.whatsappContactNumber?.trim();
   const hasWhatsAppGroup = !!config.whatsappGroupUrl?.trim();
 
-  // Hide on message/chat pages to avoid overlapping with message input
+  // Hide on message/chat pages and superadmin pages to avoid covering controls.
   const isMessagePage = pathname && pathname.startsWith("/messages/");
-  const shouldHide = (!hasCall && !hasWhatsApp && !hasWhatsAppGroup) || Boolean(isMessagePage);
+  const isSuperAdminPage = pathname && pathname.startsWith("/superadmin");
+  const shouldHide =
+    (!hasCall && !hasWhatsApp && !hasWhatsAppGroup) || Boolean(isMessagePage) || Boolean(isSuperAdminPage);
 
   const whatsappNumber = config.whatsappContactNumber?.replace(/\D/g, "");
 

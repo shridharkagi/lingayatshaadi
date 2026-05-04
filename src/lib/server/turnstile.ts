@@ -38,7 +38,7 @@ export type TurnstileVerifyResult =
 
 const TURNSTILE_VERIFY_URL =
   "https://challenges.cloudflare.com/turnstile/v0/siteverify";
-const VERIFY_TIMEOUT_MS = 4000;
+const VERIFY_TIMEOUT_MS = 10000;
 
 function envBool(name: string, def = false): boolean {
   const raw = (process.env[name] ?? "").trim().toLowerCase();
@@ -116,6 +116,24 @@ async function callSiteVerify(
   }
 }
 
+async function callSiteVerifyWithRetry(
+  token: string,
+  secret: string,
+  remoteIp?: string
+): Promise<{
+  success: boolean;
+  errorCodes?: string[];
+  raw?: unknown;
+  transportError?: string;
+}> {
+  const first = await callSiteVerify(token, secret, remoteIp);
+  if (first.success) return first;
+  // Retry once on transport-level instability (timeouts / 5xx / DNS hiccups).
+  if (!first.transportError) return first;
+  await new Promise((r) => setTimeout(r, 350));
+  return callSiteVerify(token, secret, remoteIp);
+}
+
 /**
  * Verify a Turnstile token. Honors mode and bypass. Never throws.
  *
@@ -157,7 +175,7 @@ export async function verifyTurnstileToken(
     };
   }
 
-  const verify = await callSiteVerify(trimmed, secret, remoteIp);
+  const verify = await callSiteVerifyWithRetry(trimmed, secret, remoteIp);
   if (verify.success) {
     return { ok: true, mode, bypassed: false };
   }
