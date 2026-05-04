@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireAuthUser } from "@/lib/server/requireAuthUser";
+import {
+  listOwnedProfileIdsIncludingDeleted,
+  userSubscriptionsOrFilter,
+} from "@/lib/server/subscriptionLookup";
 
 const DAILY_LIMIT_MESSAGE =
   "You have reached today's contact view limit. Please try again tomorrow.";
@@ -52,10 +56,12 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   if (!existing) {
+    const subscriptionLookupProfileIds = await listOwnedProfileIdsIncludingDeleted(admin, auth.userId);
+    const orFilter = userSubscriptionsOrFilter(auth.userId, subscriptionLookupProfileIds);
     const { data: subRows } = await admin
       .from("user_subscriptions")
       .select("id, total_contact_views_snapshot, daily_contact_view_limit_snapshot")
-      .or(`user_id.eq.${auth.userId},user_id.eq.${body.viewerProfileId}`)
+      .or(orFilter)
       .eq("status", "active")
       .lte("starts_at", nowIso)
       .gte("expires_at", nowIso)

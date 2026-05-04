@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireAuthUser } from "@/lib/server/requireAuthUser";
+import {
+  listOwnedProfileIdsIncludingDeleted,
+  userSubscriptionsOrFilter,
+} from "@/lib/server/subscriptionLookup";
 
 function getIstDayBoundsUtc(now = new Date()) {
   const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
@@ -38,6 +42,8 @@ export async function POST(req: NextRequest) {
 
   const nowIso = new Date().toISOString();
   const { startUtc, endUtc } = getIstDayBoundsUtc();
+  const subscriptionLookupProfileIds = await listOwnedProfileIdsIncludingDeleted(admin, auth.userId);
+  const orFilter = userSubscriptionsOrFilter(auth.userId, subscriptionLookupProfileIds);
 
   const [{ count: totalUsed }, { count: todayUsed }, { data: subRows }] = await Promise.all([
     admin
@@ -53,7 +59,7 @@ export async function POST(req: NextRequest) {
     admin
       .from("user_subscriptions")
       .select("id, total_contact_views_snapshot, daily_contact_view_limit_snapshot")
-      .or(`user_id.eq.${auth.userId},user_id.eq.${body.viewerProfileId}`)
+      .or(orFilter)
       .eq("status", "active")
       .lte("starts_at", nowIso)
       .gte("expires_at", nowIso)
