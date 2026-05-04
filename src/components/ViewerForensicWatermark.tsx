@@ -4,15 +4,21 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { adminFetch } from "@/lib/api/adminClient";
 
+/** Fewer, wider-spaced tiles (3×3) so the page stays readable; forensic id still repeats across the viewport. */
 const TILE_LAYOUT: { top: string; left: string }[] = (() => {
   const out: { top: string; left: string }[] = [];
-  for (let row = 0; row < 5; row++) {
-    for (let col = 0; col < 5; col++) {
-      out.push({ top: `${6 + row * 19}%`, left: `${1 + col * 20}%` });
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 3; col++) {
+      out.push({
+        top: `${10 + row * 40}%`,
+        left: `${8 + col * 42}%`,
+      });
     }
   }
   return out;
 })();
+
+const WATERMARK_SITE_LINE = "www.lingayatbandhu.com";
 
 export interface ViewerForensicWatermarkProps {
   /** When false, nothing is rendered. */
@@ -22,11 +28,11 @@ export interface ViewerForensicWatermarkProps {
 }
 
 /**
- * Forensic overlay: account code (U…) + viewer first name + local time.
+ * Forensic overlay: site URL + account code (U…) + local time (two lines).
  * Use on pages that show other members' sensitive listing or profile data.
  */
 export function ViewerForensicWatermark({ active = true, tiled = true }: ViewerForensicWatermarkProps) {
-  const { isLoggedIn, accountMeta, user } = useAuth();
+  const { isLoggedIn } = useAuth();
   const [accountCode, setAccountCode] = useState<string | null>(null);
 
   useEffect(() => {
@@ -46,13 +52,6 @@ export function ViewerForensicWatermark({ active = true, tiled = true }: ViewerF
     };
   }, [isLoggedIn, active]);
 
-  const firstName = useMemo(() => {
-    const a = accountMeta?.firstName?.trim();
-    if (a) return a;
-    const parts = user?.fullName?.trim().split(/\s+/).filter(Boolean);
-    return parts?.[0] ?? "";
-  }, [accountMeta?.firstName, user?.fullName]);
-
   const timeStr = useMemo(
     () =>
       new Date().toLocaleString(undefined, {
@@ -62,10 +61,13 @@ export function ViewerForensicWatermark({ active = true, tiled = true }: ViewerF
     []
   );
 
-  if (!active || !isLoggedIn || !accountCode) return null;
+  if (!active || !isLoggedIn) return null;
 
-  const parts = [accountCode, firstName || undefined, timeStr].filter(Boolean) as string[];
-  const line = parts.join(" · ");
+  /** Placeholder until the fast single-user API returns (avoid blank watermark on load). */
+  const secondLine =
+    accountCode != null && accountCode !== ""
+      ? `${accountCode} · ${timeStr}`
+      : `— · ${timeStr}`;
 
   return (
     <>
@@ -77,20 +79,24 @@ export function ViewerForensicWatermark({ active = true, tiled = true }: ViewerF
           {TILE_LAYOUT.map((pos, i) => (
             <span
               key={i}
-              className="absolute text-[9px] sm:text-[10px] font-medium text-gray-700/[0.11] dark:text-gray-300/[0.14] select-none whitespace-nowrap -rotate-[17deg] tracking-tight"
+              className="absolute inline-flex flex-col gap-0 text-[9px] sm:text-[10px] font-medium text-gray-700/[0.16] dark:text-gray-300/[0.2] select-none -rotate-[17deg] tracking-tight leading-tight"
               style={{ top: pos.top, left: pos.left }}
             >
-              {line}
+              <span className="whitespace-nowrap">{WATERMARK_SITE_LINE}</span>
+              <span className="whitespace-nowrap">{secondLine}</span>
             </span>
           ))}
         </div>
       )}
       <div
-        className="pointer-events-none fixed bottom-0 left-0 right-0 z-[23] px-2 py-1.5 sm:py-2 bg-black/50 text-white/92 text-[10px] sm:text-[11px] text-center font-medium leading-snug max-w-[100vw] backdrop-blur-[3px]"
+        className="pointer-events-none fixed bottom-0 left-0 right-0 z-[23] px-2 py-1.5 sm:py-2 bg-black/45 text-white/88 text-[10px] sm:text-[11px] text-center font-medium leading-snug max-w-[100vw] backdrop-blur-[2px]"
         role="status"
         aria-live="polite"
       >
-        {line}
+        <div className="flex flex-col items-center gap-0.5">
+          <span>{WATERMARK_SITE_LINE}</span>
+          <span>{secondLine}</span>
+        </div>
       </div>
     </>
   );

@@ -13,13 +13,14 @@ import {
   INDIAN_STATES,
   PROFESSION_TYPES,
 } from "@/data/constants";
-import { SingleRangeSlider } from "@/components/ui/RangeSlider";
+import { DualRangeSlider, SingleRangeSlider } from "@/components/ui/RangeSlider";
 import {
   BadgeCheck,
   Briefcase,
   Camera,
   FileCheck2,
   Heart,
+  HeartHandshake,
   MapPin,
   Sparkles,
   UserRound,
@@ -27,6 +28,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { DobSplitFields } from "@/components/ui/DobSplitFields";
+import { PartnerPreferencesForm } from "@/components/PartnerPreferencesForm";
 import { TagPillInput } from "@/components/ui/TagPillInput";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { getIndiaDistrictsForState } from "@/data/indiaDistricts";
@@ -69,8 +71,11 @@ interface ProfileFormSectionsProps {
 
 const HEIGHT_INCH_MIN = 48;
 const HEIGHT_INCH_MAX = 84;
-const ANNUAL_INCOME_MIN_LAKHS = 1;
+/** Lakhs; 0 allowed for admin range slider (e.g. 0–6 default band). */
+const ANNUAL_INCOME_MIN_LAKHS = 0;
 const ANNUAL_INCOME_MAX_LAKHS = 100;
+/** When income is unset, superadmin slider starts here (saved as `0-6 Lakhs` once updated). */
+const DEFAULT_ANNUAL_INCOME_RANGE = { lo: 0, hi: 6 } as const;
 
 function inchesToFeetInches(total: number): string {
   const ft = Math.floor(total / 12);
@@ -95,16 +100,49 @@ function parseHeightToInches(raw: string | undefined): number {
 }
 
 function parseAnnualIncomeLakhs(raw: string | undefined): number {
-  if (!raw) return 10;
+  if (!raw?.trim()) return DEFAULT_ANNUAL_INCOME_RANGE.lo;
   const m = raw.match(/(\d+(\.\d+)?)/);
-  if (!m) return 10;
+  if (!m) return DEFAULT_ANNUAL_INCOME_RANGE.lo;
   const n = Number(m[1]);
-  if (!Number.isFinite(n)) return 10;
+  if (!Number.isFinite(n)) return DEFAULT_ANNUAL_INCOME_RANGE.lo;
   return Math.min(ANNUAL_INCOME_MAX_LAKHS, Math.max(ANNUAL_INCOME_MIN_LAKHS, Math.round(n)));
 }
 
 function formatAnnualIncomeLakhs(value: number): string {
   return `${value} Lakhs`;
+}
+
+/** Parse stored annual income string into a min/max band (lakhs) for the admin range slider. */
+function parseAnnualIncomeRange(raw: string | undefined): { lo: number; hi: number } {
+  const s = String(raw || "").trim();
+  if (!s) return { lo: DEFAULT_ANNUAL_INCOME_RANGE.lo, hi: DEFAULT_ANNUAL_INCOME_RANGE.hi };
+  const range = s.match(/(\d+)\s*-\s*(\d+)/);
+  if (range) {
+    let lo = Number(range[1]);
+    let hi = Number(range[2]);
+    if (!Number.isFinite(lo)) lo = ANNUAL_INCOME_MIN_LAKHS;
+    if (!Number.isFinite(hi)) hi = ANNUAL_INCOME_MAX_LAKHS;
+    lo = Math.min(ANNUAL_INCOME_MAX_LAKHS, Math.max(ANNUAL_INCOME_MIN_LAKHS, Math.round(lo)));
+    hi = Math.min(ANNUAL_INCOME_MAX_LAKHS, Math.max(ANNUAL_INCOME_MIN_LAKHS, Math.round(hi)));
+    if (hi < lo) [lo, hi] = [hi, lo];
+    if (hi === lo) hi = Math.min(lo + 1, ANNUAL_INCOME_MAX_LAKHS);
+    return { lo, hi };
+  }
+  const single = parseAnnualIncomeLakhs(s);
+  if (single >= ANNUAL_INCOME_MAX_LAKHS) {
+    return { lo: ANNUAL_INCOME_MAX_LAKHS - 1, hi: ANNUAL_INCOME_MAX_LAKHS };
+  }
+  return {
+    lo: single,
+    hi: Math.min(single + 1, ANNUAL_INCOME_MAX_LAKHS),
+  };
+}
+
+function formatAnnualIncomeRange(lo: number, hi: number): string {
+  const l = Math.min(lo, hi);
+  const h = Math.max(lo, hi);
+  if (l === h) return `${l} Lakhs`;
+  return `${l}-${h} Lakhs`;
 }
 
 const LANGUAGE_SUGGESTIONS = [
@@ -266,6 +304,7 @@ export function ProfileFormSections({
   const normalizedCountry = (profile.country || "").trim().toLowerCase();
   const isIndiaSelected = normalizedCountry === "" || normalizedCountry === "india";
   const districtOptions = isIndiaSelected ? getIndiaDistrictsForState(profile.state || "") : [];
+  const annualIncomeSliderRange = parseAnnualIncomeRange(profile.annualIncome);
 
   return (
     <div className="space-y-6">
@@ -442,16 +481,22 @@ export function ProfileFormSections({
         <Input label="Profession" placeholder="e.g. Software Engineer, Senior CA" value={profile.profession || ""} onChange={(e) => update("profession", e.target.value)} />
         <Input label="Company Name" value={profile.companyName || ""} onChange={(e) => update("companyName", e.target.value)} />
         {adminMode ? (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Annual Income</label>
-            <SingleRangeSlider
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Annual Income (range)</label>
+            <DualRangeSlider
               min={ANNUAL_INCOME_MIN_LAKHS}
               max={ANNUAL_INCOME_MAX_LAKHS}
-              value={parseAnnualIncomeLakhs(profile.annualIncome)}
-              onChange={(v) => update("annualIncome", formatAnnualIncomeLakhs(v))}
+              step={1}
+              valueMin={annualIncomeSliderRange.lo}
+              valueMax={annualIncomeSliderRange.hi}
+              onChange={(lo, hi) => update("annualIncome", formatAnnualIncomeRange(lo, hi))}
               format={formatAnnualIncomeLakhs}
-              ariaLabel="Annual Income"
+              ariaLabelMin="Annual income minimum (lakhs)"
+              ariaLabelMax="Annual income maximum (lakhs)"
             />
+            <p className="mt-1.5 text-xs text-gray-500">
+              Stored as <span className="font-mono">{profile.annualIncome || "—"}</span> · use both handles for a band (e.g. 10–25 Lakhs).
+            </p>
           </div>
         ) : (
           <Input
@@ -461,7 +506,70 @@ export function ProfileFormSections({
             onChange={(e) => update("annualIncome", e.target.value)}
           />
         )}
+        <div className="md:col-span-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-[var(--border)] bg-gray-50/80 px-4 py-3">
+          <div>
+            <p className="text-sm font-medium text-gray-900">Show annual income on profile</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              When off, other members won&apos;t see your income range; you and admins still do.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={profile.showAnnualIncome ?? true}
+            onClick={() => update("showAnnualIncome", !(profile.showAnnualIncome ?? true))}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 focus:ring-offset-2 ${
+              profile.showAnnualIncome ?? true ? "bg-[var(--primary)]" : "bg-gray-300"
+            }`}
+            aria-label="Show annual income on public profile"
+          >
+            <span
+              aria-hidden
+              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+                profile.showAnnualIncome ?? true ? "translate-x-5" : "translate-x-0"
+              }`}
+            />
+          </button>
+        </div>
       </Section>
+
+      {adminMode && (
+        <Section title="Partner Preferences" subtitle="What this profile is looking for in a match" icon={HeartHandshake}>
+          <div className="md:col-span-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-[var(--border)] bg-gray-50/80 px-4 py-3">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Show preferences on public profile</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                When on, visitors who can see this profile may see the partner-preferences summary.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={profile.showPartnerPreferences ?? true}
+              onClick={() => update("showPartnerPreferences", !(profile.showPartnerPreferences ?? true))}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 focus:ring-offset-2 ${
+                profile.showPartnerPreferences ?? true ? "bg-[var(--primary)]" : "bg-gray-300"
+              }`}
+              aria-label="Show partner preferences on public profile"
+            >
+              <span
+                aria-hidden
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+                  profile.showPartnerPreferences ?? true ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+          <div className="md:col-span-2">
+            <PartnerPreferencesForm
+              value={profile.partnerPreference ?? {}}
+              onChange={(next) => onChange({ partnerPreference: next })}
+              hideHeader
+              description="Admin can set or update match preferences on behalf of the member."
+            />
+          </div>
+        </Section>
+      )}
 
       <Section title="Family Details" subtitle="Parents, siblings and family context" icon={Users}>
         <Input label="Father's Name" value={profile.fatherName || ""} onChange={(e) => update("fatherName", e.target.value)} />

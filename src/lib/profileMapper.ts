@@ -72,6 +72,7 @@ export function toProfileRow(p: Partial<Profile>): ProfileRow {
   if (p.partnerPreference != null) row.partner_preference = p.partnerPreference;
   // Display-only privacy flag — never gate the matching algorithm on this.
   if (p.showPartnerPreferences != null) row.show_partner_preferences = p.showPartnerPreferences;
+  if (p.showAnnualIncome != null) row.show_annual_income = p.showAnnualIncome;
   if (p.preferencesUpdatedAt != null) row.preferences_updated_at = p.preferencesUpdatedAt;
   // Moderation (Batch 5). Note that `profileStatus` (legacy verified/pending
   // admin flag) already maps to `profile_status`, so we keep them separate.
@@ -157,6 +158,8 @@ export function fromProfileRow(row: ProfileRow): Profile {
     showPartnerPreferences: row.show_partner_preferences == null
       ? true
       : Boolean(row.show_partner_preferences),
+    showAnnualIncome:
+      row.show_annual_income == null ? true : Boolean(row.show_annual_income),
     preferencesUpdatedAt: row.preferences_updated_at
       ? new Date(row.preferences_updated_at as string).toISOString()
       : undefined,

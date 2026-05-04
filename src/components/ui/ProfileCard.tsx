@@ -18,9 +18,14 @@ interface ProfileCardProps {
 
 function ProfileCardComponent({ profile, displayName, variant = "card" }: ProfileCardProps) {
   const name = displayName ?? profile.fullName;
+  const profileHref = `/profile/${getProfileSlug(profile)}`;
 
   return (
-    <div className="bg-white rounded-xl overflow-hidden shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-card)] transition-all duration-200 border border-[var(--color-border)] h-full lg:hover:-translate-y-0.5">
+    <Link
+      href={profileHref}
+      className="block bg-white rounded-xl overflow-hidden shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-card)] transition-all duration-200 border border-[var(--color-border)] h-full lg:hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]/40"
+      aria-label={`Open profile of ${name || "member"}`}
+    >
       {/* Mobile / List: horizontal layout - image left, details right */}
       <div className={`flex flex-row ${variant === "list" ? "" : "lg:hidden"}`}>
         <div className="relative w-[42%] min-w-[42%] max-w-[208px] aspect-[3/4] bg-gray-200 flex-shrink-0 overflow-hidden">
@@ -63,12 +68,12 @@ function ProfileCardComponent({ profile, displayName, variant = "card" }: Profil
               </div>
             )}
           </div>
-          <Link
-            href={`/profile/${getProfileSlug(profile)}`}
-            className="mt-3 inline-flex w-fit py-2 px-4 rounded-md font-medium text-xs sm:text-sm bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] transition-colors"
+          <span
+            className="mt-3 inline-flex w-fit py-2 px-4 rounded-md font-medium text-xs sm:text-sm bg-[var(--color-primary)] text-white"
+            aria-hidden
           >
             View Profile
-          </Link>
+          </span>
         </div>
       </div>
 
@@ -112,15 +117,15 @@ function ProfileCardComponent({ profile, displayName, variant = "card" }: Profil
               )}
             </div>
           )}
-          <Link
-            href={`/profile/${getProfileSlug(profile)}`}
-            className="mt-3 inline-flex w-fit py-2 px-4 rounded-lg font-semibold text-[13px] bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] transition-colors"
+          <span
+            className="mt-3 inline-flex w-fit py-2 px-4 rounded-lg font-semibold text-[13px] bg-[var(--color-primary)] text-white"
+            aria-hidden
           >
             View Profile
-          </Link>
+          </span>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 

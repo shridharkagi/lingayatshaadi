@@ -133,6 +133,11 @@ export interface Profile {
    */
   showPartnerPreferences?: boolean;
   /**
+   * When false, annual income is not shown on the public profile to other
+   * members. Owner and superadmin still see the value. Defaults to true.
+   */
+  showAnnualIncome?: boolean;
+  /**
    * ISO timestamp of the most recent explicit save of partnerPreference.
    * Undefined / null means the user has never opened-and-saved the form,
    * which lets the UI tell auto-defaulted values apart from real intent.
