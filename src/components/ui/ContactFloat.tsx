@@ -69,11 +69,11 @@ export function ContactFloat() {
         type="button"
         id="contact-float-btn"
         onClick={() => setPopupOpen(true)}
-        className="fixed bottom-24 right-4 z-50 flex items-center justify-center w-14 h-14 rounded-full bg-[var(--primary)] text-white shadow-lg hover:scale-105 active:scale-95 transition-transform lg:bottom-6 lg:right-6 cursor-pointer touch-manipulation"
+        className="fixed bottom-24 right-4 z-50 flex items-center justify-center w-10 h-10 rounded-full bg-[var(--primary)] text-white shadow-md hover:scale-105 active:scale-95 transition-transform lg:bottom-6 lg:right-6 lg:w-14 lg:h-14 lg:shadow-lg cursor-pointer touch-manipulation"
         title="Contact us"
         aria-label="Contact us"
       >
-        <Phone size={20} />
+        <Phone size={14} className="lg:w-5 lg:h-5" />
       </button>
 
       {popupOpen && (

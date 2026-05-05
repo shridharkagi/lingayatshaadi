@@ -10,6 +10,69 @@
   "externalScripts": "",
   "externalScriptsHead": "",
   "externalScriptsBody": "",
+  "externalScriptsBodyEnd": "",
   "bridesHeroImageUrl": "https://images.unsplash.com/photo-1519741497674-611481863552?w=1600&q=75&fit=crop",
-  "groomsHeroImageUrl": "https://images.unsplash.com/photo-1606800052052-a08af7148866?w=1600&q=70&fit=crop"
+  "groomsHeroImageUrl": "https://images.unsplash.com/photo-1606800052052-a08af7148866?w=1600&q=70&fit=crop",
+  "profileFieldVisibility": {
+    "fullName": {
+      "non_logged_in": "mask",
+      "logged_in_unpaid": "mask",
+      "logged_in_paid": "show"
+    },
+    "dateOfBirth": {
+      "non_logged_in": "mask",
+      "logged_in_unpaid": "mask",
+      "logged_in_paid": "show"
+    },
+    "subCaste": {
+      "non_logged_in": "show",
+      "logged_in_unpaid": "mask",
+      "logged_in_paid": "show"
+    },
+    "fatherName": {
+      "non_logged_in": "mask",
+      "logged_in_unpaid": "mask",
+      "logged_in_paid": "show"
+    },
+    "motherName": {
+      "non_logged_in": "mask",
+      "logged_in_unpaid": "mask",
+      "logged_in_paid": "show"
+    },
+    "siblingDetails": {
+      "non_logged_in": "show",
+      "logged_in_unpaid": "mask",
+      "logged_in_paid": "show"
+    },
+    "timeOfBirth": {
+      "non_logged_in": "mask",
+      "logged_in_unpaid": "mask",
+      "logged_in_paid": "show"
+    },
+    "companyName": {
+      "non_logged_in": "show",
+      "logged_in_unpaid": "mask",
+      "logged_in_paid": "show"
+    },
+    "annualIncome": {
+      "non_logged_in": "show",
+      "logged_in_unpaid": "hide",
+      "logged_in_paid": "show"
+    },
+    "familyDetails": {
+      "non_logged_in": "show",
+      "logged_in_unpaid": "show",
+      "logged_in_paid": "show"
+    },
+    "horoscopeDetails": {
+      "non_logged_in": "show",
+      "logged_in_unpaid": "show",
+      "logged_in_paid": "show"
+    },
+    "contactDetails": {
+      "non_logged_in": "hide",
+      "logged_in_unpaid": "hide",
+      "logged_in_paid": "show"
+    }
+  }
 }

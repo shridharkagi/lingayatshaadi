@@ -137,6 +137,14 @@ const communityLinks = [
   "Lingayat Families",
 ];
 
+const homeProfileCategories = [
+  { title: "Brides", href: "/brides", image: "/home-categories/brides.png" },
+  { title: "Grooms", href: "/grooms", image: "/home-categories/grooms.png" },
+  { title: "Lingayat\nPanchamasali", href: "/profiles", image: "/home-categories/panchamasali.png" },
+  { title: "Lingayat\nBanajiga", href: "/profiles", image: "/home-categories/banajiga.png" },
+  { title: "Lingayat\nOthers", href: "/profiles", image: "/home-categories/others.png" },
+];
+
 export default function LandingPage() {
   const { isLoggedIn, profileComplete, loading } = useAuth();
   const { openAuthModal } = useAuthModal();
@@ -371,7 +379,7 @@ export default function LandingPage() {
       </header>
 
       {/* Hero — extra top padding clears fixed header; bottom padding balances CTA vs tagline */}
-      <section className="relative min-h-[72vh] sm:min-h-[78vh] lg:min-h-[82vh] flex flex-col justify-center overflow-hidden pt-[4.75rem] sm:pt-20 pb-24 sm:pb-28">
+      <section className="relative min-h-[72vh] sm:min-h-[78vh] lg:min-h-[82vh] flex flex-col justify-center overflow-hidden pt-[4.75rem] sm:pt-20 pb-12 sm:pb-28">
         <div className="absolute inset-0">
           <Image
             src={HERO_IMAGE}
@@ -382,7 +390,7 @@ export default function LandingPage() {
             sizes="100vw"
             unoptimized
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/76 via-black/46 to-black/12" />
         </div>
         <div className="relative z-10 text-left text-white px-4 max-w-2xl mx-auto sm:mx-0 sm:ml-[4%] py-4">
           <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-3 sm:mb-4 drop-shadow-lg">
@@ -402,18 +410,81 @@ export default function LandingPage() {
               </Button>
             </Link>
           ) : (
-            <Button
-              size="lg"
-              onClick={() => openAuthModal("signup")}
-              className="w-full max-w-[min(100%,280px)] sm:max-w-none sm:w-auto border-0 text-white text-sm sm:text-base md:text-lg px-6 sm:px-8 md:px-10 py-2.5 sm:py-3.5 md:py-4 rounded-full shadow-lg hover:opacity-95 transition-opacity"
-              style={{ background: "var(--gradient-primary)" }}
-            >
-              {primaryCta.label}
-            </Button>
+            <div className="flex w-full max-w-[min(100%,420px)] items-stretch gap-2.5">
+              <Button
+                size="lg"
+                onClick={() => openAuthModal("signup")}
+                className="h-11 min-w-0 flex-1 border-0 text-white text-[15px] sm:text-base font-semibold px-4 sm:px-5 rounded-full shadow-lg hover:opacity-95 transition-opacity whitespace-nowrap inline-flex items-center justify-center leading-none"
+                style={{ background: "var(--gradient-primary)" }}
+              >
+                {primaryCta.label}
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => openAuthModal("login")}
+                className="h-11 min-w-0 flex-1 border-white/95 bg-black/35 text-white text-[15px] sm:text-base font-semibold px-4 sm:px-5 rounded-full shadow-lg backdrop-blur-sm hover:bg-black/50 hover:text-white whitespace-nowrap inline-flex items-center justify-center leading-none"
+              >
+                Login
+              </Button>
+            </div>
           )}
         </div>
         <div className="pointer-events-none absolute bottom-5 sm:bottom-6 left-0 right-0 text-center text-white/85 text-[11px] sm:text-sm px-4 leading-snug">
           Built for Lingayat families • Verified profiles • Community-first matchmaking
+        </div>
+      </section>
+
+      <section
+        className="py-10 sm:py-12 md:py-14 px-4"
+        style={{
+          background:
+            "linear-gradient(to bottom, #dfe8e9 0%, #dfe8e9 72%, rgba(223, 232, 233, 0.52) 90%, rgba(223, 232, 233, 0) 100%)",
+        }}
+      >
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-center text-2xl sm:text-3xl font-semibold text-[var(--color-text-primary)] mb-5 sm:mb-7">
+            Profiles
+          </h2>
+
+          <div className="hidden md:grid md:grid-cols-5 gap-4">
+            {homeProfileCategories.map((category) => (
+              <Link
+                key={category.title}
+                href={category.href}
+                className="group relative aspect-square overflow-hidden rounded-xl border border-black/10 shadow-sm"
+              >
+                <Image
+                  src={category.image}
+                  alt={category.title}
+                  fill
+                  className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                  sizes="(max-width: 1024px) 20vw, 220px"
+                />
+              </Link>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-6 gap-3 md:hidden">
+            {homeProfileCategories.map((category, index) => {
+              const mobileSpanClass = index < 2 ? "col-span-3 aspect-square" : "col-span-2 aspect-square";
+              return (
+                <Link
+                  key={category.title}
+                  href={category.href}
+                  className={`group relative overflow-hidden rounded-xl border border-black/10 shadow-sm ${mobileSpanClass}`}
+                >
+                  <Image
+                    src={category.image}
+                    alt={category.title}
+                    fill
+                    className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                    sizes={index < 2 ? "50vw" : "33vw"}
+                  />
+                </Link>
+              );
+            })}
+          </div>
         </div>
       </section>
 
@@ -596,12 +667,12 @@ export default function LandingPage() {
                 </Button>
               )}
             </div>
-            <div className="lg:w-2/3 overflow-x-auto pb-4 -mx-4 px-4 sm:overflow-visible sm:mx-0 sm:px-0">
-              <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div className="lg:w-2/3 overflow-x-auto pb-4 -mx-4 px-4 sm:overflow-visible sm:mx-0 sm:px-0 touch-pan-x">
+              <div className="flex snap-x snap-mandatory sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 {successStories.map((story, i) => (
                   <div
                     key={i}
-                    className="w-[280px] sm:w-auto flex-shrink-0 bg-[var(--color-bg)] rounded-2xl overflow-hidden shadow-[var(--shadow-soft)] border border-[var(--color-border)]/50"
+                    className="w-[280px] sm:w-auto flex-shrink-0 snap-start bg-[var(--color-bg)] rounded-2xl overflow-hidden shadow-[var(--shadow-soft)] border border-[var(--color-border)]/50"
                   >
                     <div className="relative aspect-[4/3]">
                       <Image
@@ -644,7 +715,6 @@ export default function LandingPage() {
                 <button
                   type="button"
                   data-faq-index={i}
-                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
                   className="w-full px-6 py-5 flex items-start justify-between gap-4 text-left hover:bg-[var(--color-bg)]/50 transition cursor-pointer"
                 >
                   <span className="text-[var(--color-text-muted)] font-medium mr-2">
@@ -661,13 +731,20 @@ export default function LandingPage() {
                     )}
                   </span>
                 </button>
-                {openFaq === i && (
-                  <div className="px-6 pb-5 pl-14">
-                    <p className="text-[var(--color-text-muted)] text-sm leading-relaxed">
-                      {faq.a}
-                    </p>
+                <div
+                  className={`grid transition-all duration-300 ease-out ${
+                    openFaq === i ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                  }`}
+                  aria-hidden={openFaq !== i}
+                >
+                  <div className="overflow-hidden">
+                    <div className="px-6 pb-5 pl-14 pt-0.5">
+                      <p className="text-[var(--color-text-muted)] text-sm leading-relaxed">
+                        {faq.a}
+                      </p>
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
             ))}
           </div>
