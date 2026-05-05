@@ -1311,7 +1311,7 @@ export default function OtherProfilePage() {
           </div>
         </div>
       )}
-      <header className="sticky top-0 bg-white/95 backdrop-blur border-b border-[var(--border)] px-3 sm:px-4 py-3 flex items-center justify-between z-10 rounded-b-2xl">
+      <header className="sticky top-0 z-20 -mx-3 sm:-mx-2 lg:-mx-2 xl:-mx-3 bg-white/95 backdrop-blur border-b border-[var(--border)] px-3 sm:px-4 py-3 flex items-center justify-between rounded-none sm:rounded-b-2xl">
         <button
           onClick={() => router.back()}
           className="flex items-center gap-2 px-3 py-2 -ml-2 rounded-xl hover:bg-gray-100 transition-colors font-medium text-[var(--foreground)]"
@@ -1320,29 +1320,14 @@ export default function OtherProfilePage() {
           <span className="hidden sm:inline">Back</span>
         </button>
         
-        {/* Profile navigation indicator */}
-        {currentIdx >= 0 && profiles.length > 1 && (
-          <div className="flex flex-col items-center gap-1 min-w-0 flex-1 px-2">
-            <span className="text-xs sm:text-sm font-semibold text-[var(--primary)] tracking-tight truncate max-w-[11rem] sm:max-w-none">
-              LingayatBandhu
-            </span>
-            <div className="flex gap-1">
-              {profiles.slice(Math.max(0, currentIdx - 2), Math.min(profiles.length, currentIdx + 3)).map((_, i) => {
-                const actualIndex = Math.max(0, currentIdx - 2) + i;
-                return (
-                  <div
-                    key={actualIndex}
-                    className={`h-1.5 rounded-full transition-all ${
-                      actualIndex === currentIdx
-                        ? "w-8 bg-[var(--primary)]"
-                        : "w-1.5 bg-gray-300"
-                    }`}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        )}
+        <Link href="/home" className="min-w-0 flex-1 px-2 text-center leading-none hover:opacity-90 transition-opacity">
+          <span className="text-[clamp(1.02rem,3.65vw,1.2rem)] font-semibold text-[var(--primary)] tracking-tight truncate block max-w-[15.5rem] mx-auto sm:max-w-none">
+            LingayatBandhu
+          </span>
+          <span className="mt-0.5 block text-[9.5px] sm:text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[var(--primary)]/85 truncate max-w-[15.5rem] mx-auto sm:max-w-none">
+            MATRIMONY
+          </span>
+        </Link>
         
         <ShareProfileButton profile={profile} />
       </header>

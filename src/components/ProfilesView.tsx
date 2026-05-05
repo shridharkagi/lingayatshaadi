@@ -238,7 +238,11 @@ export function ProfilesView({
       <ProfilesPageHeader />
 
       {/* Compact hero — z-[22] above forensic watermark (fixed z-[21]) */}
-      <section className="relative h-[min(320px,55vh)] min-h-[280px] sm:h-[320px] md:h-[360px] overflow-hidden pt-[4.75rem] sm:pt-16">
+      <section
+        className={`relative h-[min(380px,56vh)] min-h-[335px] sm:h-[340px] md:h-[380px] overflow-visible sm:overflow-hidden ${
+          isLoggedIn ? "pt-[4.9rem] sm:pt-[4.75rem]" : "pt-[5.5rem] sm:pt-16"
+        }`}
+      >
         <div className="absolute inset-0">
           <Image
             src={heroImage}
@@ -249,16 +253,21 @@ export function ProfilesView({
             sizes="100vw"
             unoptimized
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-[var(--color-bg)]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/74 via-black/48 to-[var(--color-bg)]" />
         </div>
-        <div className="relative z-[22] isolate h-full max-w-6xl mx-auto px-3.5 sm:px-4 pt-1 pb-5 sm:pt-2 sm:pb-4 flex flex-col justify-center text-white items-center text-center sm:items-start sm:text-left">
-          <h1 className="text-[clamp(1.25rem,4.6vw,2.25rem)] sm:text-3xl md:text-4xl font-bold mb-2 sm:mb-2.5 drop-shadow max-w-2xl px-0.5">
+        <div
+          className={`relative z-[22] isolate h-full max-w-6xl mx-auto px-3.5 sm:px-4 flex flex-col justify-center text-white items-center text-center sm:items-start sm:text-left ${
+            isLoggedIn ? "pt-2.5 pb-2.5 sm:pt-1 sm:pb-3.5" : "pt-4 pb-4 sm:pt-2 sm:pb-5"
+          }`}
+        >
+          <div className="w-full max-w-[min(100%,44rem)] rounded-xl bg-black/20 px-2.5 py-2 backdrop-blur-[1px] sm:bg-transparent sm:p-0 sm:backdrop-blur-0">
+          <h1 className="text-[clamp(1.15rem,6.1vw,2.2rem)] sm:text-3xl md:text-4xl font-bold mb-1.5 sm:mb-2.5 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] max-w-2xl px-0.5 leading-[1.12]">
             {title}
           </h1>
-          <p className="text-sm sm:text-base text-white/90 max-w-2xl px-0.5 leading-relaxed">
+          <p className="text-[clamp(0.92rem,4.35vw,1.12rem)] sm:text-base text-white/95 max-w-2xl px-0.5 leading-snug sm:leading-relaxed drop-shadow-[0_1px_8px_rgba(0,0,0,0.45)]">
             {subtitle}
           </p>
-          <div className="mt-4 flex w-full max-w-md sm:max-w-none flex-wrap items-center justify-center gap-2.5 sm:justify-start sm:gap-2">
+          <div className="mt-2.5 sm:mt-4 flex w-full max-w-md sm:max-w-none flex-wrap items-center justify-center gap-2 sm:justify-start sm:gap-2">
             {isLoggedIn && (
               <Link
                 href="/account"
@@ -279,15 +288,16 @@ export function ProfilesView({
               <button
                 type="button"
                 onClick={() => openAuthModal("login")}
-                className="min-h-[40px] inline-flex items-center justify-center px-4 py-2 rounded-full bg-black/20 hover:bg-black/30 text-xs sm:text-sm font-medium transition"
+                className="min-h-[40px] inline-flex items-center justify-center rounded-full bg-white px-5 py-1.5 text-[17px] sm:text-base font-semibold text-[#1f1f1f] shadow-[0_8px_18px_rgba(0,0,0,0.30)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#f7f7f7] hover:shadow-[0_12px_24px_rgba(0,0,0,0.36)] active:translate-y-0 active:shadow-[0_6px_14px_rgba(0,0,0,0.28)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/85 focus-visible:ring-offset-2 focus-visible:ring-offset-black/35"
               >
-                Sign In
+                Log in
               </button>
             )}
           </div>
+          </div>
           {showCreateProfileStrip && (
-            <div className="mt-3 sm:mt-3.5 w-full max-w-xl flex flex-col gap-3 rounded-2xl border border-white/20 bg-black/40 px-3.5 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:py-2.5 sm:pl-4 sm:pr-4">
-              <p className="min-w-0 text-left text-[12px] leading-snug text-white/95 sm:flex-1 sm:text-xs">
+            <div className="mt-2 sm:mt-3.5 w-full max-w-xl flex flex-col gap-2 rounded-2xl border border-white/20 bg-black/40 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:py-2.5 sm:pl-4 sm:pr-4">
+              <p className="min-w-0 text-left text-[11px] leading-snug text-white/95 sm:flex-1 sm:text-xs">
                 List your profile — quick setup, family-friendly privacy.
               </p>
               {isLoggedIn ? (
@@ -314,7 +324,7 @@ export function ProfilesView({
       {/* Sticky search + filter bar — less overlap when CTA strip is shown */}
       <div
         className={`sticky top-14 sm:top-16 z-30 px-3 sm:px-4 ${
-          showCreateProfileStrip ? "-mt-2.5 sm:-mt-5" : "-mt-6 sm:-mt-8"
+          showCreateProfileStrip ? "mt-3 sm:-mt-5" : "-mt-2 sm:-mt-8"
         }`}
       >
         <div className="max-w-6xl mx-auto">
@@ -490,8 +500,9 @@ export function ProfilesView({
 
       {isLoggedIn && <ViewerForensicWatermark />}
 
-      {/* Bottom nav (logged in) or footer */}
-      {isLoggedIn ? <BottomNav /> : <SiteFooter />}
+      {/* Keep footer for guests, but always show mobile bottom nav on listing routes. */}
+      <BottomNav />
+      {!isLoggedIn && <SiteFooter />}
     </div>
   );
 }
