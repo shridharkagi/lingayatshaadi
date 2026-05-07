@@ -45,29 +45,46 @@ export async function POST(req: NextRequest) {
   const subscriptionLookupProfileIds = await listOwnedProfileIdsIncludingDeleted(admin, auth.userId);
   const orFilter = userSubscriptionsOrFilter(auth.userId, subscriptionLookupProfileIds);
 
-  const [{ count: totalUsed }, { count: todayUsed }, { data: subRows }] = await Promise.all([
-    admin
-      .from("contact_views")
-      .select("viewer_id", { count: "exact", head: true })
-      .eq("viewer_id", body.viewerProfileId),
-    admin
-      .from("contact_views")
-      .select("viewer_id", { count: "exact", head: true })
-      .eq("viewer_id", body.viewerProfileId)
-      .gte("viewed_at", startUtc)
-      .lte("viewed_at", endUtc),
-    admin
+  const { data: subRows } = await admin
       .from("user_subscriptions")
-      .select("id, total_contact_views_snapshot, daily_contact_view_limit_snapshot")
+      .select("id, starts_at, expires_at, total_contact_views_snapshot, daily_contact_view_limit_snapshot")
       .or(orFilter)
       .eq("status", "active")
       .lte("starts_at", nowIso)
       .gte("expires_at", nowIso)
       .order("expires_at", { ascending: false })
-      .limit(1),
-  ]);
+      .limit(1);
 
   const activeSubscription = subRows?.[0];
+  const ownerViewerIds = subscriptionLookupProfileIds.length > 0
+    ? subscriptionLookupProfileIds
+    : [body.viewerProfileId];
+  const viewerOrFilter = ownerViewerIds.map((id) => `viewer_id.eq.${id}`).join(",");
+  const periodStart = activeSubscription?.starts_at || null;
+  const periodEnd = activeSubscription?.expires_at || null;
+  const effectiveTodayStart = periodStart && periodStart > startUtc ? periodStart : startUtc;
+  const effectiveTodayEnd = periodEnd && periodEnd < endUtc ? periodEnd : endUtc;
+
+  const [{ count: totalUsed }, { count: todayUsed }] = await Promise.all([
+    periodStart && periodEnd
+      ? admin
+          .from("contact_views")
+          .select("viewer_id", { count: "exact", head: true })
+          .or(viewerOrFilter)
+          .gte("viewed_at", periodStart)
+          .lte("viewed_at", periodEnd)
+      : admin
+          .from("contact_views")
+          .select("viewer_id", { count: "exact", head: true })
+          .eq("viewer_id", body.viewerProfileId),
+    admin
+      .from("contact_views")
+      .select("viewer_id", { count: "exact", head: true })
+      .or(viewerOrFilter)
+      .gte("viewed_at", effectiveTodayStart)
+      .lte("viewed_at", effectiveTodayEnd),
+  ]);
+
   const totalLimit = activeSubscription
     ? Number(activeSubscription.total_contact_views_snapshot || 0)
     : null;
@@ -81,6 +98,8 @@ export async function POST(req: NextRequest) {
       totalLimit: totalLimit && totalLimit > 0 ? totalLimit : null,
       todayUsed: Number(todayUsed || 0),
       dailyLimit: dailyLimit && dailyLimit > 0 ? dailyLimit : null,
+      activeStartsAt: periodStart,
+      activeExpiresAt: periodEnd,
     },
   });
 }

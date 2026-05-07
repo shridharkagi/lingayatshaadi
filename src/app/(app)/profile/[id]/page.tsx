@@ -86,6 +86,7 @@ import { getAccountAccessState } from "@/lib/api/accessState";
 import { maskBirthDateKeepYear, maskLastName, maskLastNameKeepPrefix, MASKED_VALUE, type AccountAccessState } from "@/lib/accessPolicy";
 import { normalizeDataVisibilityConfig, resolveViewerTier } from "@/lib/dataVisibility";
 import { WhatsAppGroupCta } from "@/components/whatsapp/WhatsAppGroupCta";
+import { PremiumUnlockModal } from "@/components/modals/PremiumUnlockModal";
 
 /** Session-only: user dismissed the confidential-use strip for this browser session. */
 const CONFIDENTIAL_STRIP_SESSION_KEY = "profile_confidential_notice_dismiss";
@@ -298,6 +299,7 @@ export default function OtherProfilePage() {
   const [reportMessage, setReportMessage] = useState("");
   const [reporting, setReporting] = useState(false);
   const [showCreateProfileModal, setShowCreateProfileModal] = useState(false);
+  const [showPremiumUnlockModal, setShowPremiumUnlockModal] = useState(false);
   const [copiedMemberId, setCopiedMemberId] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
   const [stripNoticeDismissed, setStripNoticeDismissed] = useState(false);
@@ -310,6 +312,9 @@ export default function OtherProfilePage() {
   const showToast = useCallback((msg: string, type: "success" | "error" = "success") => {
     setToast({ msg, type });
     window.setTimeout(() => setToast(null), 2500);
+  }, []);
+  const openPremiumUnlock = useCallback(() => {
+    setShowPremiumUnlockModal(true);
   }, []);
 
   useEffect(() => {
@@ -1494,8 +1499,16 @@ export default function OtherProfilePage() {
                 openAuthModal("login");
                 return;
               }
-              if (!canSendInterestNow || needsOwnProfile) {
+              if (!hasValidSubscription) {
+                openPremiumUnlock();
+                return;
+              }
+              if (needsOwnProfile) {
                 setShowCreateProfileModal(true);
+                return;
+              }
+              if (!canSendInterestNow) {
+                openPremiumUnlock();
                 return;
               }
               if (!actorId || !profile || hasShownInterest || sendingInterest) return;
@@ -1555,7 +1568,7 @@ export default function OtherProfilePage() {
             <button
               onClick={() => {
                 if (!canUseContact) {
-                  showToast("Upgrade your plan to view full profile details and contact information.", "error");
+                  openPremiumUnlock();
                   return;
                 }
                 toggleContactDetails();
@@ -1638,7 +1651,7 @@ export default function OtherProfilePage() {
             <span className="text-[11px] sm:text-xs font-semibold truncate">Share</span>
           </button>
         </div>
-        
+
         {whatsappUrl && (
           <div className="mt-2">
             <a
@@ -1741,8 +1754,9 @@ export default function OtherProfilePage() {
                     Complete profile registration now
                   </Link>
                 )}
-                <Link
-                  href="/membership"
+                <button
+                  type="button"
+                  onClick={openPremiumUnlock}
                   className={`inline-flex w-full min-h-[44px] flex-1 items-center justify-center rounded-lg px-3 py-2.5 text-center text-sm font-semibold shadow-sm transition sm:min-w-[min(100%,160px)] sm:flex-none ${
                     viewerHasNoMatrimonialProfile || viewerHasIncompleteMatrimonialProfile
                       ? "border-2 border-[var(--primary)] bg-white text-[var(--primary)] hover:bg-[var(--primary)]/5"
@@ -1750,7 +1764,7 @@ export default function OtherProfilePage() {
                   }`}
                 >
                   Upgrade Plan
-                </Link>
+                </button>
                 <button
                   type="button"
                   onClick={openSupportPopup}
@@ -2231,12 +2245,13 @@ export default function OtherProfilePage() {
                     : "Upgrade to view phone and WhatsApp details for this profile."}
                 </p>
                 <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <Link
-                    href="/membership"
+                  <button
+                    type="button"
+                    onClick={openPremiumUnlock}
                     className="inline-flex items-center justify-center rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white"
                   >
                     Upgrade to View Contact
-                  </Link>
+                  </button>
                   <button
                     type="button"
                     onClick={openSupportPopup}
@@ -2345,12 +2360,13 @@ export default function OtherProfilePage() {
                       Login to View Photos
                     </button>
                   ) : (
-                    <Link
-                      href="/membership"
+                    <button
+                      type="button"
+                      onClick={openPremiumUnlock}
                       className="px-6 py-3 rounded-xl border border-white/35 bg-white/20 text-white font-semibold backdrop-blur-md hover:bg-white/26 transition shadow-[0_10px_30px_rgba(0,0,0,0.28)]"
                     >
                       Upgrade to View Photos
-                    </Link>
+                    </button>
                   )}
                 </div>
               </div>
@@ -2377,6 +2393,24 @@ export default function OtherProfilePage() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {isLoggedIn && !hasValidSubscription && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
+            <p className="text-sm font-semibold text-[var(--foreground)]">Contact Details</p>
+            <p className="mt-1 text-xs text-gray-600">Tap below to reveal phone contact details.</p>
+            <button
+              type="button"
+              onClick={openPremiumUnlock}
+              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[var(--primary)]/90 transition"
+            >
+              <Phone size={16} />
+              View Contact Details
+            </button>
+            <p className="mt-2 text-[11px] text-gray-500">
+              For genuine matchmaking only. Misuse may lead to account blocking.
+            </p>
           </div>
         )}
 
@@ -2605,6 +2639,15 @@ export default function OtherProfilePage() {
           </div>
         </div>
       )}
+
+      <PremiumUnlockModal
+        isOpen={showPremiumUnlockModal}
+        onClose={() => setShowPremiumUnlockModal(false)}
+        memberId={getMemberIdDisplay(profile)}
+        name={profile.fullName}
+        whatsappNumber={config.whatsappContactNumber || config.callContactNumber || "6360130905"}
+        callNumber={config.callContactNumber || config.whatsappContactNumber || "6360130905"}
+      />
 
       {showCreateProfileModal && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50">

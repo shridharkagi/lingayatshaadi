@@ -34,6 +34,8 @@ export interface ContactViewsSummary {
   totalLimit: number | null;
   todayUsed: number;
   dailyLimit: number | null;
+  activeStartsAt?: string | null;
+  activeExpiresAt?: string | null;
 }
 
 /** Get contacts I've viewed (viewer_id = my profile) */

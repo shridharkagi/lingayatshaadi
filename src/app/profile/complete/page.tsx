@@ -538,6 +538,7 @@ function ProfileCompleteInner() {
   // (no autosave; explicit Save flips to pending_review via the usual
   // updateProfileById auto-flip).
   const [isDraftFlow, setIsDraftFlow] = useState(!hasUrlProfileId);
+  const [photoUploading, setPhotoUploading] = useState(false);
   // UI indicator near the header: "Saving…" / "Saved" / "Offline".
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   // Prevents the debounced autosave from firing during the initial load
@@ -1509,23 +1510,25 @@ function ProfileCompleteInner() {
                   ...(profile.photos || []).filter((p) => p !== profile.profilePhoto),
                 ]}
                 onAdd={(url) => {
-                  const isFirst = !profile.profilePhoto && (profile.photos?.length ?? 0) === 0;
-                  if (isFirst) {
-                    setProfile((prev) => ({ ...prev, profilePhoto: url, photos: [] }));
-                  } else {
-                    setProfile((prev) => ({
+                  setProfile((prev) => {
+                    const isFirst = !prev.profilePhoto && (prev.photos?.length ?? 0) === 0;
+                    if (isFirst) {
+                      return { ...prev, profilePhoto: url, photos: [] };
+                    }
+                    return {
                       ...prev,
                       photos: [...(prev.photos || []).filter((p) => p !== prev.profilePhoto), url],
-                    }));
-                  }
+                    };
+                  });
                 }}
                 onRemove={(url) => {
-                  if (url === profile.profilePhoto) {
-                    const rest = (profile.photos || []).filter((p) => p !== url);
-                    setProfile((prev) => ({ ...prev, profilePhoto: rest[0], photos: rest.slice(1) }));
-                  } else {
-                    setProfile((prev) => ({ ...prev, photos: (prev.photos || []).filter((p) => p !== url) }));
-                  }
+                  setProfile((prev) => {
+                    if (url === prev.profilePhoto) {
+                      const rest = (prev.photos || []).filter((p) => p !== url);
+                      return { ...prev, profilePhoto: rest[0], photos: rest.slice(1) };
+                    }
+                    return { ...prev, photos: (prev.photos || []).filter((p) => p !== url) };
+                  });
                 }}
                 primaryUrl={profile.profilePhoto}
                 onSetPrimary={(url) => {
@@ -1541,6 +1544,7 @@ function ProfileCompleteInner() {
                 }}
                 userId={authUser?.id || profileIdParam || "new-user"}
                 profileId={draftId ?? undefined}
+                onUploadingChange={setPhotoUploading}
               />
               <div className="mt-4 pt-4 border-t border-gray-100">
                 <h4 className="text-sm font-semibold text-gray-900">KYC Documents</h4>
@@ -1583,11 +1587,13 @@ function ProfileCompleteInner() {
             <Button
               onClick={next}
               className="flex-1 sm:flex-none sm:px-8"
-              disabled={saving}
+              disabled={saving || photoUploading}
             >
               {step === steps.length
                 ? saving
                   ? "Saving..."
+                  : photoUploading
+                  ? "Uploading photos..."
                   : hasUrlProfileId && !isDraftFlow
                   ? "Save Changes"
                   : "Submit for Review"
