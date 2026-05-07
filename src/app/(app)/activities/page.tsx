@@ -264,25 +264,30 @@ export default function ActivitiesPage() {
         getContactViews(user.id),
         getContactViewsSummary(user.id),
       ]);
-      const dbList = (data || []).map((v) => ({ profileId: v.viewedId, viewedAt: v.viewedAt }));
-      // Merge DB + localStorage by profileId, keeping the most recent viewedAt.
+      const dbListRaw = (data || []).map((v) => ({ profileId: v.viewedId, viewedAt: v.viewedAt }));
+      const dbList =
+        summary?.activeStartsAt && summary?.activeExpiresAt
+          ? dbListRaw.filter((v) => v.viewedAt >= summary.activeStartsAt! && v.viewedAt <= summary.activeExpiresAt!)
+          : dbListRaw;
+      // Use DB as the source of truth for logged-in users, while keeping the
+      // list unique by profile for cleaner rendering.
       const byId = new Map<string, { profileId: string; viewedAt: string }>();
-      [...dbList, ...fromStorage.map((c) => ({ profileId: c.profileId, viewedAt: c.viewedAt }))].forEach((v) => {
+      dbList.forEach((v) => {
         const existing = byId.get(v.profileId);
         if (!existing || v.viewedAt > existing.viewedAt) byId.set(v.profileId, v);
       });
       merged = Array.from(byId.values()).sort((a, b) => (a.viewedAt < b.viewedAt ? 1 : -1));
+      setContactsTotal(summary?.totalUsed || 0);
       setContactsDailyUsed(summary?.todayUsed || 0);
       setContactsTotalLimit(summary?.totalLimit ?? null);
       setContactsDailyLimit(summary?.dailyLimit ?? null);
     } else {
       merged = fromStorage.map((c) => ({ profileId: c.profileId, viewedAt: c.viewedAt }));
+      setContactsTotal(merged.length);
       setContactsDailyUsed(0);
       setContactsTotalLimit(null);
       setContactsDailyLimit(null);
     }
-
-    setContactsTotal(merged.length);
     const enriched = await Promise.all(
       merged.map(async (v) => {
         const cached = cache.get(v.profileId);

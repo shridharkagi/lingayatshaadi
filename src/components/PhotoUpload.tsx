@@ -32,6 +32,8 @@ interface PhotoUploadProps {
   primaryUrl?: string;
   /** Called when the user taps "Set as primary" on a non-primary photo. */
   onSetPrimary?: (url: string) => void;
+  /** Optional callback so parent can block submit while uploads run. */
+  onUploadingChange?: (uploading: boolean) => void;
   /**
    * Optional: the `profiles.id` the photo belongs to. When provided, every
    * successful upload ALSO inserts a row into `profile_photos` with
@@ -39,8 +41,6 @@ interface PhotoUploadProps {
    * it. When omitted (e.g. very first step of a brand-new profile creation
    * before the draft row exists), the photo still uploads but isn't
    * tracked per-photo — the profile-level moderation still gates it.
-   * Failures in this bookkeeping write are logged but never block the
-   * user's upload.
    */
   profileId?: string;
 }
@@ -78,6 +78,7 @@ export function PhotoUpload({
   userId,
   primaryUrl,
   onSetPrimary,
+  onUploadingChange,
   profileId,
 }: PhotoUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -97,6 +98,7 @@ export function PhotoUpload({
     setError(null);
     setInfo(null);
     setLoading(true);
+    onUploadingChange?.(true);
 
     try {
       const SOURCE_LIMIT_MB = 10;
@@ -137,7 +139,9 @@ export function PhotoUpload({
             sortOrder: currentPhotos.length + idx,
           });
           if (recordErr) {
-            console.warn("[PhotoUpload] photo uploaded but profile_photos insert failed:", recordErr);
+            throw new Error(
+              `Photo uploaded but couldn't be attached to your profile (${recordErr}). Please retry this photo.`
+            );
           }
         }
         onAdd(data.url);
@@ -146,6 +150,7 @@ export function PhotoUpload({
       setError(humanizeUploadError(err));
     } finally {
       setLoading(false);
+      onUploadingChange?.(false);
     }
   };
 
