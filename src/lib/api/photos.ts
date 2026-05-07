@@ -117,21 +117,23 @@ export async function createPhotoRecord(params: {
   isPrimary?: boolean;
 }): Promise<{ data: ProfilePhoto | null; error: string | null }> {
   try {
-    const supabase = createSupabaseClient();
-    const { data, error } = await supabase
-      .from("profile_photos")
-      .insert({
-        profile_id: params.profileId,
+    const headers = await getAuthHeader();
+    const res = await fetch("/api/profile-photos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({
+        profileId: params.profileId,
         url: params.url,
-        storage_path: params.storagePath ?? null,
-        sort_order: params.sortOrder ?? 0,
-        is_primary: Boolean(params.isPrimary),
-        status: "pending",
-      })
-      .select()
-      .single();
-    if (error) return { data: null, error: error.message };
-    return { data: fromRow(data as PhotoRow), error: null };
+        storagePath: params.storagePath,
+        sortOrder: params.sortOrder ?? 0,
+        isPrimary: Boolean(params.isPrimary),
+      }),
+    });
+    const json = (await res.json()) as { photo?: PhotoRow; error?: string };
+    if (!res.ok || !json.photo) {
+      return { data: null, error: json.error || "Failed to create photo" };
+    }
+    return { data: fromRow(json.photo), error: null };
   } catch (err) {
     return { data: null, error: err instanceof Error ? err.message : "Failed to create photo" };
   }
