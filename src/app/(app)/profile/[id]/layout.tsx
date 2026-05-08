@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { fetchProfileForSeo } from "@/lib/server/fetchProfileForSeo";
-import { getPublicSiteUrl, absolutePublicAssetUrl } from "@/lib/siteUrl";
+import { getPublicSiteUrl } from "@/lib/siteUrl";
 import { buildProfileSeoDescription, buildProfileSeoTitle } from "@/lib/profileSeo";
 import { getProfileSlug } from "@/lib/memberId";
 
@@ -43,9 +43,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const description = buildProfileSeoDescription(profile);
   const canonicalPath = `/profile/${getProfileSlug(profile)}`;
   const profileUrl = `${siteUrl}${canonicalPath}`;
-  const imageUrl = profile.profilePhoto
-    ? absolutePublicAssetUrl(siteUrl, profile.profilePhoto)
-    : defaultOg;
+  const imageUrl = `${siteUrl}${canonicalPath}/opengraph-image`;
 
   return {
     metadataBase: new URL(siteUrl),

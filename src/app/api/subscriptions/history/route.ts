@@ -99,24 +99,20 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  const accountViewerIds = ownedProfileIds.length > 0 ? ownedProfileIds : [auth.userId];
   const subscriptionsWithUsage = (subsRes.data || []).map((s) => {
     const sub = s as {
       user_id?: string;
       starts_at?: string;
       expires_at?: string;
     };
-    const ownerId = String(sub.user_id || "");
     const startTs = new Date(String(sub.starts_at || "")).getTime();
     const endTs = new Date(String(sub.expires_at || "")).getTime();
     const contacts_used_count =
-      ownerId && Number.isFinite(startTs) && Number.isFinite(endTs)
+      Number.isFinite(startTs) && Number.isFinite(endTs)
         ? views.filter((v) => {
             const viewerId = String(v.viewer_id || "");
-            const belongsToSubscription =
-              ownerId === auth.userId
-                ? ownedProfileIds.includes(viewerId)
-                : viewerId === ownerId;
-            if (!belongsToSubscription) return false;
+            if (!accountViewerIds.includes(viewerId)) return false;
             const viewedTs = new Date(String(v.viewed_at || "")).getTime();
             return Number.isFinite(viewedTs) && viewedTs >= startTs && viewedTs <= endTs;
           }).length
