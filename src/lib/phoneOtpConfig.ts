@@ -36,11 +36,11 @@ export function fast2smsTemplateIdFor(purpose: OtpPurpose): string | null {
 export function fast2smsMessageFor(purpose: OtpPurpose, otp: string): string {
   switch (purpose) {
     case "login":
-      return `Your LingayatShaadi OTP for login verification is ${otp}. Valid for 10 minutes. Do not share it.`;
+      return `Welcome to LingayatBandhu. Your login OTP is ${otp}. Valid for 10 minutes. Please do not share it.`;
     case "signup":
-      return `Your LingayatShaadi OTP for account verification is ${otp}. Valid for 10 minutes. Do not share it.`;
+      return `Welcome to LingayatBandhu. Your account verification OTP is ${otp}. Valid for 10 minutes.`;
     case "password_reset":
-      return `Your LingayatShaadi OTP for password reset is ${otp}. Valid for 10 minutes. Do not share it.`;
+      return `Your LingayatBandhu password reset OTP is ${otp}. Valid for 10 minutes. Do not share it. For support, call 6360130905.`;
   }
 }
 
