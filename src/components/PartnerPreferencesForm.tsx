@@ -43,6 +43,7 @@ import {
   INDIAN_STATES,
 } from "@/data/constants";
 import { DualRangeSlider } from "@/components/ui/RangeSlider";
+import { useRevealOnOpen } from "@/hooks/useRevealOnOpen";
 
 interface PartnerPreferencesFormProps {
   value: PartnerPreference | undefined;
@@ -177,13 +178,22 @@ function Section({
   filledCount: number;
   children: React.ReactNode;
 }) {
+  // `inert` keeps collapsed content out of the tab order (set directly; React 18 has no typed prop).
+  const bodyRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    if (open) el.removeAttribute("inert");
+    else el.setAttribute("inert", "");
+  }, [open]);
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-white shadow-sm overflow-hidden">
+    <div className="rounded-2xl border border-[var(--border)] bg-white shadow-sm">
       <button
         type="button"
         onClick={() => onToggle(id)}
         aria-expanded={open}
-        className="w-full flex items-center gap-3 px-4 sm:px-5 py-4 text-left hover:bg-gray-50 transition"
+        aria-controls={`pp-sec-${id}`}
+        className={`w-full flex items-center gap-3 px-4 sm:px-5 py-4 text-left hover:bg-gray-50 transition-colors ${open ? "rounded-t-2xl" : "rounded-2xl"}`}
       >
         <div className="w-10 h-10 rounded-xl bg-[var(--primary)]/10 text-[var(--primary)] flex items-center justify-center shrink-0">
           <Icon size={18} />
@@ -203,16 +213,19 @@ function Section({
         </div>
         <ChevronDown
           size={20}
-          className={`text-gray-400 shrink-0 transition-transform ${
+          className={`text-gray-400 shrink-0 transition-transform duration-300 ${
             open ? "rotate-180" : ""
           }`}
         />
       </button>
-      {open && (
-        <div className="px-4 sm:px-5 pb-5 pt-1 border-t border-[var(--border)]">
-          <div className="space-y-5">{children}</div>
+      {/* Always mounted so it can animate; hidden content is inert (not focusable). */}
+      <div ref={bodyRef} id={`pp-sec-${id}`} className={`ui-collapse ${open ? "open" : ""}`} aria-hidden={!open}>
+        <div className="ui-collapse-in">
+          <div className="px-4 sm:px-5 pb-5 pt-4 border-t border-[var(--border)]">
+            <div className="space-y-5">{children}</div>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -297,6 +310,11 @@ function SearchSelect({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const ref = useRef<HTMLDivElement>(null);
+  const popRef = useRevealOnOpen<HTMLDivElement>(open);
+  const searchRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (open) searchRef.current?.focus({ preventScroll: true });
+  }, [open]);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -336,7 +354,7 @@ function SearchSelect({
       </button>
 
       {open && !disabled && (
-        <div className="absolute z-30 mt-2 left-0 right-0 bg-white border border-[var(--border)] rounded-xl shadow-xl overflow-hidden">
+        <div ref={popRef} className="ui-pop absolute z-30 mt-2 left-0 right-0 bg-white border border-[var(--border)] rounded-xl shadow-xl overflow-hidden">
           <div className="p-2 border-b border-[var(--border)] bg-white sticky top-0">
             <div className="relative">
               <Search
@@ -344,7 +362,7 @@ function SearchSelect({
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
               />
               <input
-                autoFocus
+                ref={searchRef}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search..."
@@ -423,6 +441,7 @@ function MultiChipPicker({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const ref = useRef<HTMLDivElement>(null);
+  const popRef = useRevealOnOpen<HTMLDivElement>(open);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -510,7 +529,7 @@ function MultiChipPicker({
       </div>
 
       {open && !disabled && (
-        <div className="absolute z-30 mt-2 left-0 right-0 bg-white border border-[var(--border)] rounded-xl shadow-xl overflow-hidden">
+        <div ref={popRef} className="ui-pop absolute z-30 mt-2 left-0 right-0 bg-white border border-[var(--border)] rounded-xl shadow-xl overflow-hidden">
           <div className="max-h-56 overflow-y-auto py-1">
             {(filtered as string[]).map((opt) => (
               <button
@@ -559,7 +578,9 @@ export function PartnerPreferencesForm({
   onResetToSuggested,
 }: PartnerPreferencesFormProps) {
   const pref = value || {};
-  const [openSection, setOpenSection] = useState<SectionKey | null>("basic");
+  // Sections open independently: opening one never collapses another, so the
+  // page doesn't jump under the cursor.
+  const [openSections, setOpenSections] = useState<Set<SectionKey>>(() => new Set<SectionKey>(["basic"]));
 
   const set = (patch: Partial<PartnerPreference>) =>
     onChange({ ...pref, ...patch });
@@ -619,7 +640,12 @@ export function PartnerPreferencesForm({
   const completion = Math.round((filledTotal / totalFields) * 100);
 
   const toggle = (id: SectionKey) =>
-    setOpenSection((cur) => (cur === id ? null : id));
+    setOpenSections((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const reset = () => {
     seededRef.current = false;
@@ -751,7 +777,7 @@ export function PartnerPreferencesForm({
         icon={Sparkles}
         title="Basic Preferences"
         subtitle="Age, height & marital status"
-        open={openSection === "basic"}
+        open={openSections.has("basic")}
         onToggle={toggle}
         filledCount={filled.basic}
       >
@@ -801,7 +827,7 @@ export function PartnerPreferencesForm({
         icon={Users}
         title="Community Preferences"
         subtitle="Caste & sub-caste"
-        open={openSection === "community"}
+        open={openSections.has("community")}
         onToggle={toggle}
         filledCount={filled.community}
       >
@@ -837,7 +863,7 @@ export function PartnerPreferencesForm({
         icon={GraduationCap}
         title="Education & Career"
         subtitle="Studies, profession & income"
-        open={openSection === "career"}
+        open={openSections.has("career")}
         onToggle={toggle}
         filledCount={filled.career}
       >
@@ -884,7 +910,7 @@ export function PartnerPreferencesForm({
         icon={MapPin}
         title="Lifestyle & Location"
         subtitle="City, state & food habits"
-        open={openSection === "lifestyle"}
+        open={openSections.has("lifestyle")}
         onToggle={toggle}
         filledCount={filled.lifestyle}
       >

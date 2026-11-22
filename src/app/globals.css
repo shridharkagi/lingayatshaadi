@@ -238,3 +238,22 @@ button,
 .slider-thumb::-moz-range-thumb:active {
   transform: scale(0.95);
 }
+
+/* ---------- Shared motion: collapsible sections + dropdown popovers ---------- */
+/* Height animation without measuring: grid rows 0fr → 1fr. */
+.ui-collapse { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .28s cubic-bezier(.2,.8,.2,1), opacity .2s ease; }
+.ui-collapse.open { grid-template-rows: 1fr; opacity: 1; }
+.ui-collapse > .ui-collapse-in { min-height: 0; overflow: hidden; }
+/* Once fully open, stop clipping so dropdowns inside can overflow the card. */
+.ui-collapse.open > .ui-collapse-in { animation: ui-unclip 0s .3s forwards; }
+@keyframes ui-unclip { to { overflow: visible; } }
+
+.ui-pop { transform-origin: top center; animation: ui-pop-in .16s cubic-bezier(.2,.8,.2,1); }
+@keyframes ui-pop-in { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-collapse, .ui-pop { transition: none; animation: none; }
+  .ui-collapse.open > .ui-collapse-in { animation: none; overflow: visible; }
+}
+/* Leave room for sticky bars when a dropdown scrolls itself into view. */
+.ui-pop { scroll-margin-bottom: 84px; scroll-margin-top: 16px; }

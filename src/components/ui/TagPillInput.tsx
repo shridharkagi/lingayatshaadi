@@ -1,5 +1,6 @@
 "use client";
 
+import { useRevealOnOpen } from "@/hooks/useRevealOnOpen";
 import { useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 
@@ -25,6 +26,7 @@ export function TagPillInput({
   const [input, setInput] = useState("");
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const popRef = useRevealOnOpen<HTMLDivElement>(open);
 
   const normalized = values.map((v) => v.trim().toLowerCase());
   const canAddMore = maxTags == null || values.length < maxTags;
@@ -96,7 +98,7 @@ export function TagPillInput({
         className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-white focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/30 focus:border-[var(--primary)] transition-all disabled:bg-gray-50 disabled:text-gray-500"
       />
       {open && canAddMore && (filtered.length > 0 || input.trim()) && (
-        <div className="absolute z-40 mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-lg py-1">
+        <div ref={popRef} className="ui-pop absolute z-40 mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-lg py-1">
           {filtered.map((s) => (
             <button
               key={s}

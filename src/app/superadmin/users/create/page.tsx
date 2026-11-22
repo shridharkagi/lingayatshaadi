@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, CircleAlert, Search, ShieldCheck, UserRound, UsersRound, X } from "lucide-react";
@@ -148,6 +148,8 @@ export default function SuperAdminCreateProfilePage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [active, setActive] = useState(SECTIONS[0].id);
+  /** While a jump-scroll is running, ignore the observer so the highlight doesn't flicker. */
+  const jumpLock = useRef<number>(0);
 
   const required = [
     { label: "Full name", ok: !!profile.fullName?.trim() },
@@ -165,7 +167,7 @@ export default function SuperAdminCreateProfilePage() {
     const io = new IntersectionObserver(
       (entries) => {
         const vis = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-        if (vis) setActive(vis.target.id.replace(/^pf-/, ""));
+        if (vis && Date.now() > jumpLock.current) setActive(vis.target.id.replace(/^pf-/, ""));
       },
       { rootMargin: "-80px 0px -60% 0px" }
     );
@@ -173,7 +175,14 @@ export default function SuperAdminCreateProfilePage() {
     return () => io.disconnect();
   }, []);
 
-  const jump = (id: string) => document.getElementById(`pf-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const jump = (id: string) => {
+    const el = document.getElementById(`pf-${id}`);
+    if (!el) return;
+    setActive(id);
+    jumpLock.current = Date.now() + 900;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+  };
 
   const handleCreate = useCallback(async () => {
     if (!profile.fullName?.trim()) {

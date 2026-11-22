@@ -1,5 +1,6 @@
 "use client";
 
+import { useRevealOnOpen } from "@/hooks/useRevealOnOpen";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
@@ -22,6 +23,7 @@ export function SearchableSelect({
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const popRef = useRevealOnOpen<HTMLDivElement>(open);
 
   useEffect(() => {
     const onDocClick = (event: MouseEvent) => {
@@ -70,7 +72,7 @@ export function SearchableSelect({
       </div>
 
       {showMenu && (
-        <div className="absolute z-40 mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
+        <div ref={popRef} className="ui-pop absolute z-40 mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-sm text-gray-500">{emptyMessage}</div>
           ) : (
