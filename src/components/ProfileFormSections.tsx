@@ -45,8 +45,11 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-white p-4 sm:p-5 shadow-sm space-y-4">
-      <div className="flex items-start gap-3">
+    <div
+      id={`pf-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+      className="pf-section rounded-2xl border border-[var(--border)] bg-white p-4 sm:p-5 shadow-sm space-y-4"
+    >
+      <div className="pf-section-head flex items-start gap-3">
         {Icon && (
           <div className="w-9 h-9 rounded-xl bg-[var(--primary)]/10 text-[var(--primary)] flex items-center justify-center shrink-0">
             <Icon size={18} />
@@ -57,7 +60,7 @@ function Section({
           {subtitle ? <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p> : null}
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{children}</div>
+      <div className="pf-grid grid grid-cols-1 md:grid-cols-2 gap-4">{children}</div>
     </div>
   );
 }
@@ -66,6 +69,8 @@ interface ProfileFormSectionsProps {
   profile: Partial<Profile>;
   onChange: (updates: Partial<Profile>) => void;
   adminMode?: boolean;
+  /** Hide the Admin Controls card (e.g. on the create page, which has its own panel). */
+  hideAdminControls?: boolean;
   userId?: string;
 }
 
@@ -287,6 +292,7 @@ export function ProfileFormSections({
   profile,
   onChange,
   adminMode = false,
+  hideAdminControls = false,
   userId,
 }: ProfileFormSectionsProps) {
   const update = (key: keyof Profile, value: string | boolean | string[] | number | undefined) => {
@@ -307,8 +313,8 @@ export function ProfileFormSections({
   const annualIncomeSliderRange = parseAnnualIncomeRange(profile.annualIncome);
 
   return (
-    <div className="space-y-6">
-      {adminMode && (
+    <div className="pf-sections space-y-6">
+      {adminMode && !hideAdminControls && (
         <Section title="Admin Controls" subtitle="Review controls and identity details" icon={BadgeCheck}>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Member ID (Public ID)</label>

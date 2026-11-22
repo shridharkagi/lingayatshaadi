@@ -4,6 +4,7 @@ import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
 import { generatePublicIdFromExistingIds } from "@/lib/memberId";
 import { toProfileRow } from "@/lib/profileMapper";
+import { logAdminAudit } from "@/lib/server/adminAudit";
 
 function fallbackProfileEmail(superAdminUserId: string): string {
   const safe = String(superAdminUserId || "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 20) || "admin";
@@ -14,9 +15,9 @@ export async function POST(req: NextRequest) {
   const auth = await requireSuperAdmin(req);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-  let body: { profile?: Partial<Profile> } = {};
+  let body: { profile?: Partial<Profile>; ownerAccountId?: string } = {};
   try {
-    body = (await req.json()) as { profile?: Partial<Profile> };
+    body = (await req.json()) as { profile?: Partial<Profile>; ownerAccountId?: string };
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
@@ -30,10 +31,28 @@ export async function POST(req: NextRequest) {
   if (!gender) return NextResponse.json({ error: "Gender is required" }, { status: 400 });
 
   const admin = createSupabaseAdmin();
+
+  // Owner: the admin's own account (default) or an existing member account.
+  const ownerId = String(body.ownerAccountId || "").trim() || auth.userId;
+  const forMember = ownerId !== auth.userId;
+  if (forMember) {
+    const { count } = await admin
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", ownerId)
+      .is("deleted_at", null);
+    if ((count || 0) >= 3) {
+      return NextResponse.json({ error: "That account already has 3 profiles (the maximum)." }, { status: 400 });
+    }
+  }
+
   let accountEmail = "";
   let accountName = "";
   try {
-    const authRes = await admin.auth.admin.getUserById(auth.userId);
+    const authRes = await admin.auth.admin.getUserById(ownerId);
+    if (forMember && !authRes.data.user) {
+      return NextResponse.json({ error: "Owner account not found" }, { status: 404 });
+    }
     accountEmail = String(authRes.data.user?.email || "").trim();
     accountName =
       String((authRes.data.user?.user_metadata?.full_name as string) || "").trim() ||
@@ -49,13 +68,13 @@ export async function POST(req: NextRequest) {
     dateOfBirth,
     gender: gender as "male" | "female",
     email: accountEmail || fallbackProfileEmail(auth.userId),
-    // Superadmin-created profiles should clearly remain admin-managed.
-    accountHolderName: "Admin",
+    // Admin-owned profiles are marked as such; member-owned ones keep the member's name.
+    accountHolderName: forMember ? accountName || input.accountHolderName || "" : "Admin",
     managedBy: input.managedBy || "parent",
   };
 
   const row = toProfileRow(profilePayload);
-  row.user_id = auth.userId;
+  row.user_id = ownerId;
   row.email = String(row.email || accountEmail || fallbackProfileEmail(auth.userId));
 
   // Superadmin-created profiles should go to moderation queue by default.
@@ -72,9 +91,19 @@ export async function POST(req: NextRequest) {
 
   const { data: inserted, error } = await admin.from("profiles").insert(row).select("id").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const newId = String((inserted as { id?: string } | null)?.id || "");
+
+  await logAdminAudit({
+    actorUserId: auth.userId,
+    action: "profile.create",
+    entityType: "profile",
+    entityId: newId,
+    afterJson: { full_name: fullName, gender, owner_account_id: ownerId },
+    meta: { owner: forMember ? "member" : "admin" },
+  });
 
   return NextResponse.json({
-    profileId: String((inserted as { id?: string } | null)?.id || ""),
+    profileId: newId,
   });
 }
 

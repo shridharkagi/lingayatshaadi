@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { Check, CircleAlert, Search, ShieldCheck, UserRound, UsersRound, X } from "lucide-react";
 import { ProfileFormSections } from "@/components/ProfileFormSections";
 import { Profile } from "@/types";
 import { validateMatrimonyDob } from "@/lib/dateOfBirth";
 import { adminFetch } from "@/lib/api/adminClient";
+import { PageHeader, phoneFmt, useDebounced } from "@/components/superadmin/ui";
 
 const initialProfile: Partial<Profile> = {
   aboutMe: "",
@@ -51,27 +51,147 @@ const initialProfile: Partial<Profile> = {
   trustScore: 0,
 };
 
+type P = Partial<Profile>;
+/** Sections in form order; ids match ProfileFormSections' `pf-<slug>` anchors. */
+/** `track: false` = optional section that can't be judged complete (form defaults / uploads). */
+const SECTIONS: { id: string; label: string; done: (p: P) => boolean; required?: boolean; track?: boolean }[] = [
+  { id: "basic-details", label: "Basic details", done: (p) => !!(p.fullName?.trim() && p.gender && p.dateOfBirth), required: true },
+  { id: "horoscope-details", label: "Horoscope", done: (p) => !!(p.rashi || p.timeOfBirth || p.placeOfBirth) },
+  { id: "education-career", label: "Education & career", done: (p) => !!(p.qualification || p.profession) },
+  { id: "partner-preferences", label: "Partner preferences", done: () => false, track: false },
+  { id: "family-details", label: "Family", done: (p) => !!(p.fatherName || p.motherName) },
+  { id: "about-me", label: "About me", done: (p) => !!p.aboutMe?.trim() },
+  { id: "location-contact", label: "Location & contact", done: (p) => !!(p.city || p.district) && !!(p.contacts?.length || p.contact) },
+  { id: "profile-photos", label: "Photos", done: (p) => !!p.profilePhoto },
+  { id: "kyc-documents", label: "KYC documents", done: () => false, track: false },
+];
+
+type OwnerHit = { id: string; name: string; phone: string | null; accountCode: string | null; profileCount: number };
+
+function OwnerPicker({ owner, onChange }: { owner: OwnerHit | null; onChange: (o: OwnerHit | null) => void }) {
+  const [mode, setMode] = useState<"admin" | "member">(owner ? "member" : "admin");
+  const [q, setQ] = useState("");
+  const dq = useDebounced(q);
+  const [hits, setHits] = useState<OwnerHit[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (mode !== "member" || dq.trim().length < 3) {
+      setHits([]);
+      return;
+    }
+    let alive = true;
+    setBusy(true);
+    adminFetch(`/api/superadmin/search?q=${encodeURIComponent(dq.trim())}`)
+      .then((r) => (r.ok ? r.json() : { accounts: [] }))
+      .then((j) => alive && setHits((j.accounts || []) as OwnerHit[]))
+      .catch(() => alive && setHits([]))
+      .finally(() => alive && setBusy(false));
+    return () => {
+      alive = false;
+    };
+  }, [dq, mode]);
+
+  return (
+    <div className="pc-block">
+      <div className="pc-label">Who owns this profile?</div>
+      <div className="pc-seg" role="radiogroup" aria-label="Profile owner">
+        <button type="button" role="radio" aria-checked={mode === "admin"} className={mode === "admin" ? "on" : ""}
+          onClick={() => { setMode("admin"); onChange(null); }}>
+          <ShieldCheck size={14} /> Admin
+        </button>
+        <button type="button" role="radio" aria-checked={mode === "member"} className={mode === "member" ? "on" : ""} onClick={() => setMode("member")}>
+          <UsersRound size={14} /> Member
+        </button>
+      </div>
+      {mode === "admin" && <p className="pc-hint">Managed by the admin team. You can move it to a member&apos;s account later.</p>}
+      {mode === "member" && (
+        owner ? (
+          <div className="pc-owner">
+            <span className="ad-av" style={{ background: "#3f46b8", width: 30, height: 30 }}><UserRound size={14} /></span>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>{owner.name || "Unnamed account"}</div>
+              <div className="ad-muted" style={{ fontSize: 11 }}>{owner.accountCode} · {phoneFmt(owner.phone)} · {owner.profileCount}/3 profiles</div>
+            </div>
+            <button type="button" className="pc-x" aria-label="Change owner" onClick={() => onChange(null)}><X size={14} /></button>
+          </div>
+        ) : (
+          <>
+            <label className="ad-search-box" style={{ height: 36, marginTop: 8 }}>
+              <Search size={14} aria-hidden="true" />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Phone, U-code or name" aria-label="Find account" autoFocus />
+            </label>
+            {busy && <p className="pc-hint">Searching…</p>}
+            {!busy && dq.trim().length >= 3 && hits.length === 0 && <p className="pc-hint">No account found. The member must sign up first.</p>}
+            <div className="pc-hits">
+              {hits.map((h) => {
+                const full = h.profileCount >= 3;
+                return (
+                  <button key={h.id} type="button" disabled={full} onClick={() => onChange(h)} title={full ? "Already has 3 profiles" : undefined}>
+                    <span style={{ fontWeight: 600 }}>{h.name || "Unnamed"}</span>
+                    <span className="ad-muted" style={{ fontSize: 11 }}>{h.accountCode} · {phoneFmt(h.phone)} · {full ? "3/3 full" : `${h.profileCount}/3`}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )
+      )}
+    </div>
+  );
+}
+
 export default function SuperAdminCreateProfilePage() {
   const router = useRouter();
-  const [profile, setProfile] = useState<Partial<Profile>>(initialProfile);
+  const [profile, setProfile] = useState<P>(initialProfile);
+  const [owner, setOwner] = useState<OwnerHit | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [active, setActive] = useState(SECTIONS[0].id);
 
-  const handleCreate = async () => {
+  const required = [
+    { label: "Full name", ok: !!profile.fullName?.trim() },
+    { label: "Gender", ok: !!profile.gender },
+    { label: "Date of birth", ok: validateMatrimonyDob(String(profile.dateOfBirth || "")).ok },
+  ];
+  const TRACKED = SECTIONS.filter((s) => s.track !== false);
+  const doneCount = TRACKED.filter((s) => s.done(profile)).length;
+  const ready = required.every((r) => r.ok);
+
+  // Highlight the section in view.
+  useEffect(() => {
+    const els = SECTIONS.map((s) => document.getElementById(`pf-${s.id}`)).filter(Boolean) as HTMLElement[];
+    if (!els.length || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const vis = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+        if (vis) setActive(vis.target.id.replace(/^pf-/, ""));
+      },
+      { rootMargin: "-80px 0px -60% 0px" }
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+
+  const jump = (id: string) => document.getElementById(`pf-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  const handleCreate = useCallback(async () => {
     if (!profile.fullName?.trim()) {
       setError("Full name is required");
+      jump("basic-details");
       return;
     }
     if (!profile.gender) {
       setError("Gender is required");
+      jump("basic-details");
       return;
     }
     const matDob = validateMatrimonyDob(String(profile.dateOfBirth || ""));
     if (!matDob.ok) {
       setError(matDob.error);
+      jump("basic-details");
       return;
     }
-    const normalizedDob = matDob.iso;
     setError("");
     setSaving(true);
     try {
@@ -79,11 +199,12 @@ export default function SuperAdminCreateProfilePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          ownerAccountId: owner?.id || undefined,
           profile: {
             ...profile,
             fullName: profile.fullName!,
             gender: profile.gender as "male" | "female",
-            dateOfBirth: normalizedDob,
+            dateOfBirth: matDob.iso,
             maritalStatus: profile.maritalStatus || "",
             caste: profile.caste || "Lingayat",
             subCaste: profile.subCaste || "",
@@ -106,56 +227,96 @@ export default function SuperAdminCreateProfilePage() {
     } finally {
       setSaving(false);
     }
-  };
+  }, [profile, owner, router]);
+
+  // ⌘/Ctrl + Enter saves.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !saving) void handleCreate();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handleCreate, saving]);
 
   return (
-    <div className="max-w-6xl mx-auto pb-8">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-3">
-        <Link href="/superadmin/users" className="p-2 -ml-2 rounded-lg hover:bg-gray-100">
-          <ChevronLeft size={24} />
-        </Link>
-        <div>
-          <h1 className="text-lg font-semibold text-gray-900">Create Profile</h1>
-          <p className="text-sm text-gray-500">Add a new profile on behalf of a user</p>
-        </div>
-      </header>
+    <div className="pc-root">
+      <PageHeader
+        title="Create profile"
+        subtitle="Only name, gender and date of birth are required. Fill the rest now or later from the edit page."
+      >
+        <Link href="/superadmin/review-center" className="ad-btn ghost">Cancel</Link>
+        <button type="button" className="ad-btn pri" onClick={() => void handleCreate()} disabled={saving}>
+          {saving ? "Creating…" : "Create profile"}
+        </button>
+      </PageHeader>
 
-      <div className="mt-6 grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_300px] gap-6 items-start">
-      <div className="p-4 sm:p-6 bg-white rounded-xl shadow-sm">
-        <div className="mb-5 rounded-xl border border-[var(--primary)]/25 bg-[var(--primary)]/5 px-4 py-3">
-          <p className="text-sm font-semibold text-[var(--primary)]">Single-page profile creation</p>
-          <p className="text-xs text-gray-600 mt-1">
-            Same flow style as member profile creation, but all sections are visible on one page for faster admin entry.
-          </p>
-        </div>
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>
-        )}
-        <ProfileFormSections
-          profile={profile}
-          onChange={(u) => setProfile((p) => ({ ...p, ...u }))}
-          adminMode
-          userId={profile.publicId || profile.memberId || profile.id || "admin-create"}
-        />
-        <div className="mt-6 flex gap-3">
-          <Button variant="outline" onClick={() => router.push("/superadmin/users")} className="flex-1">
-            Cancel
-          </Button>
-          <Button onClick={() => void handleCreate()} className="flex-1" disabled={saving}>
-            {saving ? "Creating..." : "Create Profile"}
-          </Button>
+      <div className="pc-layout">
+        <aside className="pc-side">
+          <div className="ad-card pc-card">
+            <OwnerPicker owner={owner} onChange={setOwner} />
+
+            <div className="pc-block">
+              <div className="pc-label">Required</div>
+              {required.map((r) => (
+                <div key={r.label} className={`pc-req ${r.ok ? "ok" : ""}`}>
+                  {r.ok ? <Check size={13} /> : <span className="dot" />} {r.label}
+                </div>
+              ))}
+            </div>
+
+            <div className="pc-block">
+              <div className="pc-label" style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>Sections</span><span className="ad-muted">{doneCount}/{TRACKED.length}</span>
+              </div>
+              <div className="pc-progress"><span style={{ width: `${(doneCount / TRACKED.length) * 100}%` }} /></div>
+              <nav className="pc-nav" aria-label="Form sections">
+                {SECTIONS.map((s) => (
+                  <button key={s.id} type="button" className={`${active === s.id ? "on" : ""} ${s.done(profile) ? "done" : ""}`} onClick={() => jump(s.id)}>
+                    <span className="mk">{s.done(profile) ? <Check size={11} /> : null}</span>
+                    {s.label}
+                    {s.required && <span className="req">required</span>}
+                    {s.track === false && <span className="opt">optional</span>}
+                  </button>
+                ))}
+              </nav>
+            </div>
+
+            <label className="pc-toggle">
+              <input type="checkbox" checked={!!profile.verified} onChange={(e) => setProfile((p) => ({ ...p, verified: e.target.checked }))} />
+              <span>Mark as verified</span>
+            </label>
+            <p className="pc-hint" style={{ marginTop: 6 }}>New profiles go to the Review queue. Member ID is assigned automatically.</p>
+          </div>
+        </aside>
+
+        <div className="pc-form pf-compact">
+          <ProfileFormSections
+            profile={profile}
+            onChange={(u) => setProfile((p) => ({ ...p, ...u }))}
+            adminMode
+            hideAdminControls
+            userId={profile.publicId || profile.memberId || profile.id || "admin-create"}
+          />
         </div>
       </div>
-      <aside className="hidden 2xl:block 2xl:sticky 2xl:top-4 rounded-xl border border-gray-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-gray-900">Quick checklist</h2>
-        <ul className="mt-3 space-y-2 text-xs text-gray-600">
-          <li>Full name, Gender, DOB are mandatory.</li>
-          <li>New profile is auto-linked to your superadmin account.</li>
-          <li>Date of birth: use DD, MM, YYYY fields (must be 18+).</li>
-          <li>Height now uses slider for faster mobile entry.</li>
-          <li>Gender uses quick radio-style chips.</li>
-        </ul>
-      </aside>
+
+      <div className="pc-bar">
+        <div className="pc-bar-in">
+          {error ? (
+            <span className="pc-err"><CircleAlert size={15} /> {error}</span>
+          ) : (
+            <span className="ad-muted" style={{ fontSize: 13 }}>
+              {ready ? "Ready to create" : `Still needed: ${required.filter((r) => !r.ok).map((r) => r.label.toLowerCase()).join(", ")}`}
+              {" · "}{owner ? `for ${owner.name || owner.accountCode}` : "owned by admin"}
+              <span className="pc-kbd">⌘ Enter</span>
+            </span>
+          )}
+          <span style={{ flex: 1 }} />
+          <Link href="/superadmin/review-center" className="ad-btn ghost">Cancel</Link>
+          <button type="button" className="ad-btn pri" onClick={() => void handleCreate()} disabled={saving}>
+            {saving ? "Creating…" : "Create profile"}
+          </button>
+        </div>
       </div>
     </div>
   );

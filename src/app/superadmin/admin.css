@@ -383,3 +383,73 @@
 .ad-root .ct-open { border: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-align: left; padding: 4px 6px; margin: -4px -6px; border-radius: 8px; transition: background .15s; }
 .ad-root .ct-open:hover { background: #fff3e8; }
 .ad-root .ct-open .lnk { font-size: 11px; color: #c25a00; font-weight: 600; }
+
+/* ======================= Create profile (compact) ======================= */
+.ad-root .pc-root { display: flex; flex-direction: column; gap: 14px; padding-bottom: 70px; }
+.ad-root .pc-layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 16px; align-items: start; }
+.ad-root .pc-side { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; }
+.ad-root .pc-card { padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+.ad-root .pc-label { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ad-muted); margin-bottom: 6px; }
+.ad-root .pc-hint { font-size: 11.5px; color: var(--ad-muted); margin: 6px 0 0; line-height: 1.4; }
+.ad-root .pc-seg { display: grid; grid-template-columns: 1fr 1fr; background: #f3f4f8; border-radius: 10px; padding: 3px; gap: 3px; }
+.ad-root .pc-seg button { border: 0; background: transparent; font: inherit; font-size: 12px; padding: 7px 6px; border-radius: 8px; cursor: pointer; color: #4a4d60; display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+.ad-root .pc-seg button.on { background: #fff; color: var(--ad-text); font-weight: 600; box-shadow: 0 1px 3px rgba(20,16,40,.12); }
+.ad-root .pc-owner { display: flex; gap: 8px; align-items: center; margin-top: 8px; padding: 8px; border: 1px solid #d6dcfb; background: #f4f6ff; border-radius: 10px; }
+.ad-root .pc-x { border: 0; background: none; cursor: pointer; color: var(--ad-muted); padding: 4px; border-radius: 6px; }
+.ad-root .pc-x:hover { background: #e7eafd; }
+.ad-root .pc-hits { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.ad-root .pc-hits button { border: 1px solid var(--ad-line-2); background: #fff; border-radius: 9px; padding: 6px 9px; text-align: left; font: inherit; font-size: 12.5px; display: flex; flex-direction: column; cursor: pointer; }
+.ad-root .pc-hits button:hover:not(:disabled) { border-color: #f2a26a; background: #fff8f1; }
+.ad-root .pc-hits button:disabled { opacity: .5; cursor: not-allowed; }
+.ad-root .pc-req { display: flex; align-items: center; gap: 7px; font-size: 13px; padding: 2px 0; color: #8a3a12; }
+.ad-root .pc-req .dot { width: 7px; height: 7px; border-radius: 50%; background: #f28c28; margin: 0 3px; }
+.ad-root .pc-req.ok { color: #0f766e; }
+.ad-root .pc-progress { height: 5px; background: #eef0f6; border-radius: 99px; overflow: hidden; margin-bottom: 8px; }
+.ad-root .pc-progress span { display: block; height: 100%; background: linear-gradient(90deg, #f28c28, #e0457b); transition: width .3s; }
+.ad-root .pc-nav { display: flex; flex-direction: column; gap: 1px; }
+.ad-root .pc-nav button { border: 0; background: transparent; font: inherit; font-size: 13px; text-align: left; padding: 6px 8px; border-radius: 8px; cursor: pointer; color: #3b3e52; display: flex; align-items: center; gap: 8px; transition: background .15s; }
+.ad-root .pc-nav button:hover { background: #f5f6fa; }
+.ad-root .pc-nav button.on { background: linear-gradient(90deg, #fff1e4, #fdeef5); color: var(--ad-text); font-weight: 600; }
+.ad-root .pc-nav .mk { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid #cfd2de; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.ad-root .pc-nav button.done .mk { background: #22b07d; border-color: #22b07d; color: #fff; }
+.ad-root .pc-nav .req { margin-left: auto; font-size: 10px; color: #c25a00; font-weight: 600; }
+.ad-root .pc-toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; padding-top: 10px; border-top: 1px solid var(--ad-line-2); }
+.ad-root .pc-bar { position: fixed; left: 256px; right: 0; bottom: 0; z-index: 30; background: rgba(255,255,255,.92); backdrop-filter: blur(8px); border-top: 1px solid var(--ad-line-2); box-shadow: 0 -6px 20px rgba(20,16,40,.06); }
+.ad-root .pc-bar-in { display: flex; align-items: center; gap: 8px; padding: 10px 24px; }
+.ad-root .pc-err { color: #b42358; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+.ad-root .pc-kbd { margin-left: 10px; font-size: 11px; border: 1px solid var(--ad-line-2); border-radius: 5px; padding: 1px 5px; background: #fff; }
+@media (max-width: 1100px) {
+  .ad-root .pc-layout { grid-template-columns: 1fr; }
+  .ad-root .pc-side { position: static; max-height: none; }
+  .ad-root .pc-nav { flex-direction: row; flex-wrap: wrap; }
+}
+@media (max-width: 900px) { .ad-root .pc-bar { left: 0; } .ad-root .pc-kbd { display: none; } }
+
+/* Compact density for the shared ProfileFormSections (scoped; overrides Tailwind utilities) */
+.pf-compact .pf-sections { display: flex; flex-direction: column; gap: 12px; }
+.pf-compact .pf-sections > * { margin-block: 0 !important; }
+.pf-compact .pf-section { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px !important; border-radius: 14px !important; scroll-margin-top: 16px; box-shadow: 0 1px 2px rgba(20,16,40,.04) !important; }
+.pf-compact .pf-section > * { margin-block: 0 !important; }
+.pf-compact .pf-section-head { align-items: center !important; padding-bottom: 8px; border-bottom: 1px solid #f1f2f6; }
+.pf-compact .pf-section-head > div:first-child { width: 28px !important; height: 28px !important; border-radius: 8px !important; }
+.pf-compact .pf-section-head h3 { font-size: 14.5px !important; }
+.pf-compact .pf-section-head p { display: none; }
+.pf-compact .pf-grid { gap: 10px 14px !important; }
+@media (min-width: 1280px) {
+  .pf-compact .pf-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+  .pf-compact .pf-grid > .md\:col-span-2 { grid-column: 1 / -1; }
+}
+.pf-compact label { font-size: 12.5px !important; margin-bottom: 3px !important; color: #4a4d60; }
+.pf-compact input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),
+.pf-compact select { padding: 7px 11px !important; border-radius: 9px !important; font-size: 14px !important; min-height: 36px; }
+.pf-compact textarea { padding: 8px 11px !important; border-radius: 9px !important; font-size: 14px !important; min-height: 64px !important; }
+.pf-compact .rounded-xl.p-4, .pf-compact .px-4.py-3.rounded-xl:not(input):not(select):not(textarea) { padding: 8px 12px !important; }
+
+/* Sticky elements need body to not be a scroll container (globals.css sets overflow-x: hidden). */
+body:has(.ad-root) { overflow-x: clip; }
+html:has(.ad-root) { overflow-x: clip; }
+/* DOB split fields: fit in one row inside a 3-column grid */
+.pf-compact input[placeholder="DD"], .pf-compact input[placeholder="MM"] { width: 2.9rem !important; padding-left: 4px !important; padding-right: 4px !important; text-align: center; }
+.pf-compact input[placeholder="YYYY"] { width: 4.4rem !important; padding-left: 4px !important; padding-right: 4px !important; text-align: center; }
+.pf-compact .flex-wrap:has(> input[placeholder="DD"]) { flex-wrap: nowrap; gap: 4px; }
+.ad-root .pc-nav .opt { margin-left: auto; font-size: 10px; color: var(--ad-muted); }
