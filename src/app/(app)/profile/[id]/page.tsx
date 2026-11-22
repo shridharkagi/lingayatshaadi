@@ -1456,7 +1456,7 @@ export default function OtherProfilePage() {
         </button>
         
         <Link href="/home" className="min-w-0 flex-1 px-2 text-center leading-none hover:opacity-90 transition-opacity">
-          <span className="text-[clamp(1.02rem,3.65vw,1.2rem)] font-semibold lb-grad-text tracking-tight truncate block max-w-[15.5rem] mx-auto sm:max-w-none">
+          <span className="text-[clamp(1.02rem,3.65vw,1.2rem)] font-semibold lb-wordmark tracking-tight truncate block max-w-[15.5rem] mx-auto sm:max-w-none">
             LingayatBandhu
           </span>
           <span className="mt-0.5 block text-[9.5px] sm:text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[var(--lb-subtle)] truncate max-w-[15.5rem] mx-auto sm:max-w-none">

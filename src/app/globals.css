@@ -556,3 +556,13 @@ body:has(> .lb-midnight) {
     border-radius: 0 0 14px 14px;
   }
 }
+
+/* Wordmark: solid Champagne (no background-clip:text). Gradient-clipped text renders
+   transparent in Safari/iOS (and some Chrome builds) inside backdrop-filter headers
+   and with text-overflow: ellipsis, which made "LingayatBandhu" disappear. */
+.lb-midnight .lb-wordmark {
+  color: #EED19A;
+  -webkit-text-fill-color: #EED19A;
+  background: none;
+  text-shadow: 0 0 18px rgba(235, 201, 131, 0.18);
+}

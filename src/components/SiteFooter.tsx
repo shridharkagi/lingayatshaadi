@@ -12,7 +12,7 @@ export function SiteFooter() {
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 sm:gap-6 mb-6 sm:mb-8">
           <Link href="/" className="flex items-center gap-2">
             <Heart className="w-6 h-6 text-[var(--lb-accent)] fill-[var(--lb-accent)]" />
-            <span className="font-bold text-lg lb-grad-text">LingayatBandhu</span>
+            <span className="font-bold text-lg lb-wordmark">LingayatBandhu</span>
           </Link>
           <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-sm">
             <Link href="/contact" className="hover:text-[var(--lb-accent-text)] transition">

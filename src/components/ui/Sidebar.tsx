@@ -62,7 +62,7 @@ export function Sidebar() {
       <Link href="/profiles" className="p-6 flex items-center gap-2 border-b border-[var(--border)]">
         <Heart className="w-8 h-8 text-[var(--lb-accent)] fill-[var(--lb-accent)]" />
         <span className="leading-tight text-[var(--primary)]">
-          <span className="block text-xl font-bold lb-grad-text">LingayatBandhu</span>
+          <span className="block text-xl font-bold lb-wordmark">LingayatBandhu</span>
           <span className="block text-[11px] font-semibold tracking-[0.14em] uppercase text-[var(--lb-subtle)]">
             Matrimony
           </span>
