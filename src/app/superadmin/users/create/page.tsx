@@ -58,10 +58,10 @@ const SECTIONS: { id: string; label: string; done: (p: P) => boolean; required?:
   { id: "basic-details", label: "Basic details", done: (p) => !!(p.fullName?.trim() && p.gender && p.dateOfBirth), required: true },
   { id: "horoscope-details", label: "Horoscope", done: (p) => !!(p.rashi || p.timeOfBirth || p.placeOfBirth) },
   { id: "education-career", label: "Education & career", done: (p) => !!(p.qualification || p.profession) },
-  { id: "partner-preferences", label: "Partner preferences", done: () => false, track: false },
   { id: "family-details", label: "Family", done: (p) => !!(p.fatherName || p.motherName) },
   { id: "about-me", label: "About me", done: (p) => !!p.aboutMe?.trim() },
   { id: "location-contact", label: "Location & contact", done: (p) => !!(p.city || p.district) && !!(p.contacts?.length || p.contact) },
+  { id: "partner-preferences", label: "Partner preferences", done: () => false, track: false },
   { id: "profile-photos", label: "Photos", done: (p) => !!p.profilePhoto },
   { id: "kyc-documents", label: "KYC documents", done: () => false, track: false },
 ];

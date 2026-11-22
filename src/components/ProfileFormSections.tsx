@@ -539,44 +539,6 @@ export function ProfileFormSections({
         </div>
       </Section>
 
-      {adminMode && (
-        <Section title="Partner Preferences" subtitle="What this profile is looking for in a match" icon={HeartHandshake}>
-          <div className="md:col-span-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-[var(--border)] bg-gray-50/80 px-4 py-3">
-            <div>
-              <p className="text-sm font-medium text-gray-900">Show preferences on public profile</p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                When on, visitors who can see this profile may see the partner-preferences summary.
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={profile.showPartnerPreferences ?? true}
-              onClick={() => update("showPartnerPreferences", !(profile.showPartnerPreferences ?? true))}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 focus:ring-offset-2 ${
-                profile.showPartnerPreferences ?? true ? "bg-[var(--primary)]" : "bg-gray-300"
-              }`}
-              aria-label="Show partner preferences on public profile"
-            >
-              <span
-                aria-hidden
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
-                  profile.showPartnerPreferences ?? true ? "translate-x-5" : "translate-x-0"
-                }`}
-              />
-            </button>
-          </div>
-          <div className="md:col-span-2">
-            <PartnerPreferencesForm
-              value={profile.partnerPreference ?? {}}
-              onChange={(next) => onChange({ partnerPreference: next })}
-              hideHeader
-              description="Admin can set or update match preferences on behalf of the member."
-            />
-          </div>
-        </Section>
-      )}
-
       <Section title="Family Details" subtitle="Parents, siblings and family context" icon={Users}>
         <Input label="Father's Name" value={profile.fatherName || ""} onChange={(e) => update("fatherName", e.target.value)} />
         <Input label="Father's Occupation" value={profile.fatherOccupation || ""} onChange={(e) => update("fatherOccupation", e.target.value)} />
@@ -661,6 +623,44 @@ export function ProfileFormSections({
           />
         </div>
       </Section>
+
+      {adminMode && (
+        <Section title="Partner Preferences" subtitle="What this profile is looking for in a match" icon={HeartHandshake}>
+          <div className="md:col-span-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-[var(--border)] bg-gray-50/80 px-4 py-3">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Show preferences on public profile</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                When on, visitors who can see this profile may see the partner-preferences summary.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={profile.showPartnerPreferences ?? true}
+              onClick={() => update("showPartnerPreferences", !(profile.showPartnerPreferences ?? true))}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 focus:ring-offset-2 ${
+                profile.showPartnerPreferences ?? true ? "bg-[var(--primary)]" : "bg-gray-300"
+              }`}
+              aria-label="Show partner preferences on public profile"
+            >
+              <span
+                aria-hidden
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+                  profile.showPartnerPreferences ?? true ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+          <div className="md:col-span-2">
+            <PartnerPreferencesForm
+              value={profile.partnerPreference ?? {}}
+              onChange={(next) => onChange({ partnerPreference: next })}
+              hideHeader
+              description="Admin can set or update match preferences on behalf of the member."
+            />
+          </div>
+        </Section>
+      )}
 
       <Section title="Profile Photos" subtitle="Primary and additional profile photos" icon={Camera}>
         {userId ? (
