@@ -96,12 +96,12 @@ function RowMenu({ row, onAction, onTransfer }: { row: ProfileRow; onAction: (a:
   const acts: Action[] =
     row.status === "deleted" ? ["restore"] : row.status === "suspended" ? ["unsuspend", "trash"] : ["suspend", "to_draft", "trash"];
   return (
-    <div className="ad-menu" ref={ref}>
-      <button type="button" className="ad-btn ghost" style={{ minHeight: 32, width: 36, padding: 0 }} aria-label="More actions" onClick={() => setOpen((v) => !v)}>
+    <div className="sa-menu" ref={ref}>
+      <button type="button" className="sa-btn ghost" style={{ minHeight: 32, width: 36, padding: 0 }} aria-label="More actions" onClick={() => setOpen((v) => !v)}>
         <MoreHorizontal size={16} />
       </button>
       {open && (
-        <div className="ad-menu-pop" role="menu">
+        <div className="sa-menu-pop" role="menu">
           <Link href={`/superadmin/users/${row.id}/edit`}>Edit profile</Link>
           {row.publicId && row.status !== "deleted" && (
             <a href={`/profile/${row.publicId.toLowerCase()}`} target="_blank" rel="noreferrer">View as member ↗</a>
@@ -291,25 +291,25 @@ export default function ProfilesPage() {
         <CsvButton onClick={exportCsv} busy={exporting} />
       </PageHeader>
 
-      <div className="ad-tabs" role="tablist">
+      <div className="sa-tabs" role="tablist">
         {TABS.map((t) => (
-          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={`ad-tab ${tab === t.id ? "on" : ""}`} onClick={() => setTab(t.id)}>
+          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={`sa-tab ${tab === t.id ? "on" : ""}`} onClick={() => setTab(t.id)}>
             {t.label}<span className="cnt">{tabCount(t)}</span>
           </button>
         ))}
       </div>
 
-      <div className="ad-toolbar">
-        <label className="ad-search-box" style={{ flex: "1 1 280px", maxWidth: 420, height: 40 }}>
+      <div className="sa-toolbar">
+        <label className="sa-search-box" style={{ flex: "1 1 280px", maxWidth: 420, height: 40 }}>
           <Search size={16} aria-hidden="true" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, LB-ID, U-code, city or phone" aria-label="Search profiles" />
         </label>
-        <select className="ad-select" value={gender} onChange={(e) => setGender(e.target.value)} aria-label="Bride or groom">
+        <select className="sa-select" value={gender} onChange={(e) => setGender(e.target.value)} aria-label="Bride or groom">
           <option value="">Brides &amp; grooms</option>
           <option value="female">Brides</option>
           <option value="male">Grooms</option>
         </select>
-        <select className="ad-select" value={stateF} onChange={(e) => setStateF(e.target.value)} aria-label="State">
+        <select className="sa-select" value={stateF} onChange={(e) => setStateF(e.target.value)} aria-label="State">
           <option value="">All states</option>
           <option value="Karnataka">Karnataka</option>
           <option value="Maharashtra">Maharashtra</option>
@@ -318,45 +318,45 @@ export default function ProfilesPage() {
           <option value="Andhra Pradesh">Andhra Pradesh</option>
           <option value="Tamil Nadu">Tamil Nadu</option>
         </select>
-        <select className="ad-select" value={photo} onChange={(e) => setPhoto(e.target.value)} aria-label="Photo">
+        <select className="sa-select" value={photo} onChange={(e) => setPhoto(e.target.value)} aria-label="Photo">
           <option value="">Any photo</option>
           <option value="with">With photo</option>
           <option value="without">Without photo</option>
         </select>
-        <select className={`ad-select ${rel ? "is-set" : ""}`} value={rel} onChange={(e) => setRel(e.target.value)} aria-label="Created for">
+        <select className={`sa-select ${rel ? "is-set" : ""}`} value={rel} onChange={(e) => setRel(e.target.value)} aria-label="Created for">
           {REL_OPTIONS.map((o) => {
             const n = relCount(o.id);
             return <option key={o.id} value={o.id}>{o.label}{n !== undefined ? ` (${n})` : ""}</option>;
           })}
         </select>
         <DateFilter value={dates} onChange={setDates} fields={DATE_FIELDS} field={dateOn} onFieldChange={setDateOn} />
-        <select className={`ad-select ${sort !== "newest" ? "is-set" : ""}`} value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
+        <select className={`sa-select ${sort !== "newest" ? "is-set" : ""}`} value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
           {SORTS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
         </select>
         <ResetButton show={filtersOn} onClick={resetFilters} />
       </div>
 
       {selected.size > 0 && (
-        <div className="ad-bulk">
+        <div className="sa-bulk">
           <strong>{selected.size} selected</strong>
           <span style={{ flex: 1 }} />
           {tab === "deleted" ? (
-            <button type="button" className="ad-btn ghost" disabled={busy} onClick={() => runAction([...selected], "restore")}>Restore</button>
+            <button type="button" className="sa-btn ghost" disabled={busy} onClick={() => runAction([...selected], "restore")}>Restore</button>
           ) : (
             <>
-              <button type="button" className="ad-btn ghost" disabled={busy} onClick={() => runAction([...selected], "suspend")}>Suspend</button>
-              <button type="button" className="ad-btn ghost" disabled={busy} onClick={() => runAction([...selected], "trash")}>Move to trash</button>
+              <button type="button" className="sa-btn ghost" disabled={busy} onClick={() => runAction([...selected], "suspend")}>Suspend</button>
+              <button type="button" className="sa-btn ghost" disabled={busy} onClick={() => runAction([...selected], "trash")}>Move to trash</button>
             </>
           )}
-          <button type="button" className="ad-btn ghost" onClick={() => setSelected(new Set())}>Clear</button>
+          <button type="button" className="sa-btn ghost" onClick={() => setSelected(new Set())}>Clear</button>
         </div>
       )}
       {notice && <div className="m3-ok" role="status">{notice}</div>}
       {error && <div className="m3-error">{error}</div>}
 
-      <div className="ad-card" style={{ padding: 0, overflow: "visible" }}>
-        <div className="ad-table-wrap" style={{ overflow: "visible" }}>
-          <table className="ad-table">
+      <div className="sa-card" style={{ padding: 0, overflow: "visible" }}>
+        <div className="sa-table-wrap" style={{ overflow: "visible" }}>
+          <table className="sa-table">
             <thead>
               <tr>
                 <th style={{ width: 36 }}>
@@ -368,13 +368,13 @@ export default function ProfilesPage() {
             </thead>
             <tbody>
               {loading && rows.length === 0 &&
-                Array.from({ length: 6 }).map((_, i) => <tr key={i}><td colSpan={9}><div className="ad-skel" style={{ height: 30 }} /></td></tr>)}
+                Array.from({ length: 6 }).map((_, i) => <tr key={i}><td colSpan={9}><div className="sa-skel" style={{ height: 30 }} /></td></tr>)}
               {rows.map((p) => (
                 <tr key={p.id}>
                   <td><input type="checkbox" aria-label={`Select ${p.name || "profile"}`} checked={selected.has(p.id)} onChange={() => toggle(p.id)} /></td>
                   <td>
                     <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                      <span className="ad-av" style={{ background: p.gender === "female" ? "#c2367a" : "#5b3aa8", width: 38, height: 38, position: "relative" }}>
+                      <span className="sa-av" style={{ background: p.gender === "female" ? "#c2367a" : "#5b3aa8", width: 38, height: 38, position: "relative" }}>
                         {p.name ? initials(p.name) : <UserRound size={16} />}
                         {p.photo && (
                           <img src={p.photo} alt="" style={{ position: "absolute", inset: 0 }}
@@ -382,8 +382,8 @@ export default function ProfilesPage() {
                         )}
                       </span>
                       <div>
-                        <Link href={`/superadmin/users/${p.id}/edit`} className="ad-link">{p.name || "Unnamed"}</Link>
-                        <div className="ad-muted" style={{ fontSize: 12 }}>{p.publicId || "No ID yet"}</div>
+                        <Link href={`/superadmin/users/${p.id}/edit`} className="sa-link">{p.name || "Unnamed"}</Link>
+                        <div className="sa-muted" style={{ fontSize: 12 }}>{p.publicId || "No ID yet"}</div>
                       </div>
                     </div>
                   </td>
@@ -394,20 +394,20 @@ export default function ProfilesPage() {
                   <td>
                     <ProfileStatusChip status={p.status} />
                     {p.status === "rejected" && p.rejectionReason && (
-                      <div className="ad-muted" style={{ fontSize: 11, maxWidth: 200, marginTop: 2 }} title={p.rejectionReason}>
+                      <div className="sa-muted" style={{ fontSize: 11, maxWidth: 200, marginTop: 2 }} title={p.rejectionReason}>
                         {p.rejectionReason.slice(0, 50)}{p.rejectionReason.length > 50 ? "…" : ""}
                       </div>
                     )}
                   </td>
                   <td style={{ whiteSpace: "nowrap" }}>
                     {p.userId ? (
-                      <Link href={`/superadmin/accounts/${p.userId}`} className="ad-acct" title="Open account 360°">
+                      <Link href={`/superadmin/accounts/${p.userId}`} className="sa-acct" title="Open account 360°">
                         <span className="nm">{p.accountName || "Unnamed account"}</span>
                         <span className="sub">{[p.accountCode, p.accountPhone ? phoneFmt(p.accountPhone) : null].filter(Boolean).join(" · ") || "—"}</span>
                       </Link>
                     ) : "—"}
                   </td>
-                  <td style={{ whiteSpace: "nowrap", fontSize: 12 }}>{p.views} views<div className="ad-muted">{p.contactedBy} contacted</div></td>
+                  <td style={{ whiteSpace: "nowrap", fontSize: 12 }}>{p.views} views<div className="sa-muted">{p.contactedBy} contacted</div></td>
                   <td style={{ whiteSpace: "nowrap" }}>{fmtDate(dateOn === "approved" ? p.approvedAt : p.createdAt)}</td>
                   <td><RowMenu row={p} onAction={(a) => runAction([p.id], a)} onTransfer={() => setTransferId(p.id)} /></td>
                 </tr>
@@ -415,9 +415,9 @@ export default function ProfilesPage() {
             </tbody>
           </table>
           {!loading && rows.length === 0 && (
-            <div className="ad-empty">
+            <div className="sa-empty">
               No profiles match these filters.{" "}
-              {filtersOn && <button type="button" className="ad-link" style={{ border: 0, background: "none", cursor: "pointer" }} onClick={resetFilters}>Reset filters</button>}
+              {filtersOn && <button type="button" className="sa-link" style={{ border: 0, background: "none", cursor: "pointer" }} onClick={resetFilters}>Reset filters</button>}
             </div>
           )}
         </div>

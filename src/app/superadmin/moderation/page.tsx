@@ -540,39 +540,39 @@ export default function ReviewWorkspacePage() {
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: 12 }}>
         <div>
-          <h1 className="ad-h1">Review</h1>
-          <p className="ad-muted" style={{ margin: "4px 0 0" }}>
-            Profiles, edits, photos and KYC in one queue. <span className="ad-kbd">A</span> approve ·{" "}
-            <span className="ad-kbd">R</span> reject · <span className="ad-kbd">J</span>/<span className="ad-kbd">K</span> next/previous
+          <h1 className="sa-h1">Review</h1>
+          <p className="sa-muted" style={{ margin: "4px 0 0" }}>
+            Profiles, edits, photos and KYC in one queue. <span className="sa-kbd">A</span> approve ·{" "}
+            <span className="sa-kbd">R</span> reject · <span className="sa-kbd">J</span>/<span className="sa-kbd">K</span> next/previous
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <div className="ad-pills" role="tablist" aria-label="Queue filter">
+          <div className="sa-pills" role="tablist" aria-label="Queue filter">
             {FILTERS.map((f) => (
-              <button key={f.id} type="button" role="tab" aria-selected={filter === f.id} className={`ad-pill ${filter === f.id ? "on" : ""}`} onClick={() => setFilter(f.id)}>
+              <button key={f.id} type="button" role="tab" aria-selected={filter === f.id} className={`sa-pill ${filter === f.id ? "on" : ""}`} onClick={() => setFilter(f.id)}>
                 {f.label} <span style={{ opacity: 0.7, marginLeft: 4 }}>{counts[f.id]}</span>
               </button>
             ))}
           </div>
-          <button type="button" className="ad-btn ghost" onClick={load} aria-label="Refresh queue">
+          <button type="button" className="sa-btn ghost" onClick={load} aria-label="Refresh queue">
             <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
           </button>
         </div>
       </div>
 
-      {error && <div className="ad-card" style={{ color: "#b42358" }}>{error}</div>}
+      {error && <div className="sa-card" style={{ color: "#b42358" }}>{error}</div>}
 
       <div className="rv-ws">
-        <section className="ad-card rv-queue" aria-label="Review queue" style={{ padding: 0 }}>
+        <section className="sa-card rv-queue" aria-label="Review queue" style={{ padding: 0 }}>
           <div className="rv-qhead" style={{ flexWrap: "wrap", gap: 6 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", flexWrap: "nowrap" }}>
               <strong style={{ whiteSpace: "nowrap" }}>Queue</strong>
-              <span className="ad-muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
+              <span className="sa-muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
                 {dateWin !== "any" ? `${visible.length}/${items.length}` : visible.length}
               </span>
               <span style={{ flex: 1 }} />
               <select
-                className={`ad-select ad-select-sm ${dateWin !== "any" ? "is-set" : ""}`}
+                className={`sa-select sa-select-sm ${dateWin !== "any" ? "is-set" : ""}`}
                 style={{ flex: "0 1 auto", minWidth: 0, maxWidth: 140 }}
                 value={dateWin}
                 onChange={(e) => setDateWin(e.target.value as DateWindow)}
@@ -585,7 +585,7 @@ export default function ReviewWorkspacePage() {
                 ))}
               </select>
               <select
-                className={`ad-select ad-select-sm ${sortDir !== "oldest" ? "is-set" : ""}`}
+                className={`sa-select sa-select-sm ${sortDir !== "oldest" ? "is-set" : ""}`}
                 style={{ flex: "0 1 auto", minWidth: 0, maxWidth: 120 }}
                 value={sortDir}
                 onChange={(e) => setSortDir(e.target.value as SortDir)}
@@ -597,7 +597,7 @@ export default function ReviewWorkspacePage() {
               {(dateWin !== "any" || sortDir !== "oldest") && (
                 <button
                   type="button"
-                  className="ad-btn ghost"
+                  className="sa-btn ghost"
                   style={{ height: 32, width: 32, padding: 0, flex: "none", justifyContent: "center" }}
                   aria-label="Reset queue filters"
                   title="Reset"
@@ -616,17 +616,17 @@ export default function ReviewWorkspacePage() {
               <div style={{ display: "flex", gap: 6, alignItems: "center", width: "100%", fontSize: 12 }}>
                 <input
                   type="date"
-                  className="ad-input"
+                  className="sa-input"
                   style={{ height: 32, fontSize: 12, padding: "0 8px", flex: 1, minWidth: 0 }}
                   value={customFrom}
                   max={customTo || undefined}
                   onChange={(e) => setCustomFrom(e.target.value)}
                   aria-label="From date"
                 />
-                <span className="ad-muted">to</span>
+                <span className="sa-muted">to</span>
                 <input
                   type="date"
-                  className="ad-input"
+                  className="sa-input"
                   style={{ height: 32, fontSize: 12, padding: "0 8px", flex: 1, minWidth: 0 }}
                   value={customTo}
                   min={customFrom || undefined}
@@ -637,9 +637,9 @@ export default function ReviewWorkspacePage() {
             )}
           </div>
           {loading && items.length === 0 &&
-            Array.from({ length: 5 }).map((_, i) => <div key={i} className="ad-skel" style={{ height: 64, margin: 12 }} />)}
+            Array.from({ length: 5 }).map((_, i) => <div key={i} className="sa-skel" style={{ height: 64, margin: 12 }} />)}
           {!loading && visible.length === 0 && (
-            <div style={{ padding: 32, textAlign: "center" }} className="ad-muted">
+            <div style={{ padding: 32, textAlign: "center" }} className="sa-muted">
               <Check size={28} style={{ color: "#11734b", marginBottom: 8 }} />
               <div>
                 {dateWin !== "any" && items.length > 0
@@ -650,20 +650,20 @@ export default function ReviewWorkspacePage() {
           )}
           {visible.map((it) => (
             <button key={it.key} type="button" className={`rv-qi ${sel?.key === it.key ? "on" : ""}`} onClick={() => setSelKey(it.key)}>
-              <span className="ad-av" style={{ background: it.profile.gender === "female" ? "#c2367a" : "#5b3aa8", width: 40, height: 40 }}>
+              <span className="sa-av" style={{ background: it.profile.gender === "female" ? "#c2367a" : "#5b3aa8", width: 40, height: 40 }}>
                 {it.profile.photo ? <img src={it.profile.photo} alt="" /> : initials(it.profile.name)}
               </span>
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
                   <strong className="rv-ellipsis">{it.profile.name}</strong>
-                  <span className="ad-muted" style={{ fontSize: 12 }}>{ago(it.submittedAt)}</span>
+                  <span className="sa-muted" style={{ fontSize: 12 }}>{ago(it.submittedAt)}</span>
                 </span>
-                <span className="ad-muted rv-ellipsis" style={{ display: "block", fontSize: 12 }}>
+                <span className="sa-muted rv-ellipsis" style={{ display: "block", fontSize: 12 }}>
                   {it.profile.gender === "female" ? "Bride" : "Groom"}
                   {it.profile.age ? ` · ${it.profile.age}` : ""}
                   {it.profile.city ? ` · ${it.profile.city}` : ""}
                 </span>
-                <span className={`ad-chip ${KIND[it.type].cls}`} style={{ marginTop: 6 }}>
+                <span className={`sa-chip ${KIND[it.type].cls}`} style={{ marginTop: 6 }}>
                   {KIND[it.type].label}
                   {it.type === "photo" ? ` · ${(it.photos || []).filter((p) => p.status === "pending").length}` : ""}
                   {it.type === "kyc" ? ` · ${(it.docs || []).length}` : ""}
@@ -675,27 +675,27 @@ export default function ReviewWorkspacePage() {
 
         <section className="rv-detail" aria-label="Selected item">
           {!sel ? (
-            <div className="ad-card ad-muted" style={{ textAlign: "center", padding: 48 }}>
+            <div className="sa-card sa-muted" style={{ textAlign: "center", padding: 48 }}>
               {loading ? "Loading…" : "Select an item from the queue."}
             </div>
           ) : (
-            <div key={sel.key} style={{ display: "flex", flexDirection: "column", gap: 14, animation: "ad-rise .3s ease both" }}>
-              <div className="ad-card rv-hero">
+            <div key={sel.key} style={{ display: "flex", flexDirection: "column", gap: 14, animation: "sa-rise .3s ease both" }}>
+              <div className="sa-card rv-hero">
                 <div className="rv-photo">
                   {sel.profile.photo ? <img src={sel.profile.photo} alt="" /> : <UserRound size={34} />}
                 </div>
                 <div style={{ flex: 1, minWidth: 220 }}>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
                     <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{sel.profile.name}</h2>
-                    <span className={`ad-chip ${KIND[sel.type].cls}`}>{KIND[sel.type].label}</span>
+                    <span className={`sa-chip ${KIND[sel.type].cls}`}>{KIND[sel.type].label}</span>
                   </div>
-                  <div className="ad-muted" style={{ marginTop: 4 }}>
+                  <div className="sa-muted" style={{ marginTop: 4 }}>
                     {sel.profile.publicId || "No member ID yet"} · {sel.profile.gender === "female" ? "Bride" : "Groom"}
                     {sel.profile.age ? ` · ${sel.profile.age}` : ""}
                     {sel.profile.city ? ` · ${sel.profile.city}` : ""}
                     {sel.profile.profession ? ` · ${sel.profile.profession}` : ""}
                   </div>
-                  <div className="ad-muted" style={{ fontSize: 12, marginTop: 8 }}>
+                  <div className="sa-muted" style={{ fontSize: 12, marginTop: 8 }}>
                     {[
                       `Account ${sel.account.accountCode || "—"}`,
                       phoneFmt(sel.account.phone),
@@ -709,9 +709,9 @@ export default function ReviewWorkspacePage() {
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <Link href={`/superadmin/accounts/${sel.account.userId}`} className="ad-btn ghost">Account 360°</Link>
+                  <Link href={`/superadmin/accounts/${sel.account.userId}`} className="sa-btn ghost">Account 360°</Link>
                   {(sel.type === "new" || sel.type === "edit") && (
-                    <button type="button" className={`ad-btn ${editing ? "pri" : "ghost"}`} onClick={() => {
+                    <button type="button" className={`sa-btn ${editing ? "pri" : "ghost"}`} onClick={() => {
                       if (editing && dirtyEdit && !window.confirm("Discard your unsaved changes?")) return;
                       setEditing((v) => !v);
                       setDraft({});
@@ -719,24 +719,24 @@ export default function ReviewWorkspacePage() {
                       <Pencil size={14} /> {editing ? "Stop editing" : "Edit here"}
                     </button>
                   )}
-                  <Link href={`/superadmin/users/${sel.profile.id}/edit`} className="ad-btn ghost" title="Open the full profile editor">
+                  <Link href={`/superadmin/users/${sel.profile.id}/edit`} className="sa-btn ghost" title="Open the full profile editor">
                     Full editor <ExternalLink size={14} />
                   </Link>
                 </div>
               </div>
 
               {sel.checks.length > 0 && (
-                <div className="ad-card">
-                  <h3 className="ad-h2" style={{ marginBottom: 12 }}>Automatic checks</h3>
+                <div className="sa-card">
+                  <h3 className="sa-h2" style={{ marginBottom: 12 }}>Automatic checks</h3>
                   <div className="rv-checks">
                     {sel.checks.map((c, i) => (
                       <div key={i} className="rv-check">
-                        <span className={`ad-chip ${c.level === "ok" ? "t-green" : c.level === "warn" ? "t-amber" : "t-indigo"}`}>
+                        <span className={`sa-chip ${c.level === "ok" ? "t-green" : c.level === "warn" ? "t-amber" : "t-indigo"}`}>
                           {c.level === "ok" ? "OK" : c.level === "warn" ? "Check" : "Info"}
                         </span>
                         <div>
                           <strong style={{ fontSize: 13 }}>{c.title}</strong>
-                          <div className="ad-muted" style={{ fontSize: 12 }}>{c.detail}</div>
+                          <div className="sa-muted" style={{ fontSize: 12 }}>{c.detail}</div>
                         </div>
                       </div>
                     ))}
@@ -745,10 +745,10 @@ export default function ReviewWorkspacePage() {
               )}
 
               {sel.type === "edit" && (
-                <div className="ad-card">
-                  <h3 className="ad-h2" style={{ marginBottom: 12 }}>What changed since last approval</h3>
+                <div className="sa-card">
+                  <h3 className="sa-h2" style={{ marginBottom: 12 }}>What changed since last approval</h3>
                   {changes.length === 0 ? (
-                    <p className="ad-muted">No visible field changes — likely a photo or settings update.</p>
+                    <p className="sa-muted">No visible field changes — likely a photo or settings update.</p>
                   ) : (
                     <div style={{ overflowX: "auto" }}>
                       <table className="rv-diff">
@@ -775,15 +775,15 @@ export default function ReviewWorkspacePage() {
                   <div className="rv-editbar">
                     <span><Pencil size={14} /> Editing {sel.profile.name}{dirtyEdit ? <strong className="rv-dirty"> · {Object.keys(draft).length} change{Object.keys(draft).length === 1 ? "" : "s"}</strong> : null}</span>
                     <span style={{ flex: 1 }} />
-                    <button type="button" className="ad-btn ghost" disabled={savingEdit} onClick={() => {
+                    <button type="button" className="sa-btn ghost" disabled={savingEdit} onClick={() => {
                       if (dirtyEdit && !window.confirm("Discard your unsaved changes?")) return;
                       setEditing(false);
                       setDraft({});
                     }}>Cancel</button>
-                    <button type="button" className="ad-btn ghost" disabled={savingEdit || !dirtyEdit} onClick={() => void saveEdits(false)}>
+                    <button type="button" className="sa-btn ghost" disabled={savingEdit || !dirtyEdit} onClick={() => void saveEdits(false)}>
                       <Save size={14} /> {savingEdit ? "Saving…" : "Save"}
                     </button>
-                    <button type="button" className="ad-btn rv-ok" disabled={savingEdit} onClick={() => void saveEdits(true)}>
+                    <button type="button" className="sa-btn rv-ok" disabled={savingEdit} onClick={() => void saveEdits(true)}>
                       <Check size={14} /> {dirtyEdit ? "Save & approve" : "Approve"}
                     </button>
                   </div>
@@ -793,15 +793,15 @@ export default function ReviewWorkspacePage() {
                       const row = sel.live as Record<string, unknown>;
                       const label = Object.fromEntries(FIELDS) as Record<string, string>;
                       return (
-                        <section key={g.title} className={`ad-card rv-group ${g.wide ? "wide" : ""}`}>
+                        <section key={g.title} className={`sa-card rv-group ${g.wide ? "wide" : ""}`}>
                           <h3 className="rv-group-h">
-                            <span className={`ad-ico ${g.tone}`}><Icon size={15} /></span>
+                            <span className={`sa-ico ${g.tone}`}><Icon size={15} /></span>
                             {g.title}
                           </h3>
                           {g.keys[0] === "partner_preference" ? (
-                            <p className="ad-muted" style={{ fontSize: 13, margin: 0 }}>
+                            <p className="sa-muted" style={{ fontSize: 13, margin: 0 }}>
                               Partner preferences are edited in the{" "}
-                              <Link className="ad-link" href={`/superadmin/users/${sel.profile.id}/edit`}>full editor</Link>.
+                              <Link className="sa-link" href={`/superadmin/users/${sel.profile.id}/edit`}>full editor</Link>.
                             </p>
                           ) : (
                             <div className={`rv-form ${g.wide ? "cols" : ""}`}>
@@ -820,12 +820,12 @@ export default function ReviewWorkspacePage() {
                                   return (
                                     <label key={k} className={`rv-f long ${changed ? "chg" : ""}`}>
                                       <span>Contact numbers</span>
-                                      {list.length === 0 && <em className="ad-muted" style={{ fontSize: 12 }}>No contact numbers. Add them in the full editor.</em>}
+                                      {list.length === 0 && <em className="sa-muted" style={{ fontSize: 12 }}>No contact numbers. Add them in the full editor.</em>}
                                       {list.map((c, i) => (
                                         <span key={i} className="rv-contact">
-                                          <input className="ad-input" value={c.number || ""} inputMode="tel"
+                                          <input className="sa-input" value={c.number || ""} inputMode="tel"
                                             onChange={(e) => set(list.map((x, j) => (j === i ? { ...x, number: e.target.value.replace(/[^\d+ ]/g, "") } : x)))} />
-                                          <small className="ad-muted">{c.belongsTo || "—"} · {(c.methods || []).join("/") || "—"}{c.showOnProfile === false ? " · hidden" : ""}</small>
+                                          <small className="sa-muted">{c.belongsTo || "—"} · {(c.methods || []).join("/") || "—"}{c.showOnProfile === false ? " · hidden" : ""}</small>
                                         </span>
                                       ))}
                                     </label>
@@ -837,16 +837,16 @@ export default function ReviewWorkspacePage() {
                                   <label key={k} className={`rv-f ${EDIT_TEXTAREA.has(k) ? "long" : ""} ${changed ? "chg" : ""}`}>
                                     <span>{label[k] || k}{EDIT_ARRAY.has(k) ? " (comma separated)" : ""}</span>
                                     {opts ? (
-                                      <select className="ad-select" value={text} onChange={(e) => set(e.target.value)}>
+                                      <select className="sa-select" value={text} onChange={(e) => set(e.target.value)}>
                                         <option value="">—</option>
                                         {[...new Set([...opts, ...(text && !opts.includes(text) ? [text] : [])])].map((o) => (
                                           <option key={o} value={o}>{k === "relationship" ? (o === "self" ? "Self" : `For ${o}`) : o.charAt(0).toUpperCase() + o.slice(1)}</option>
                                         ))}
                                       </select>
                                     ) : EDIT_TEXTAREA.has(k) ? (
-                                      <textarea className="ad-input" rows={k === "about_me" ? 4 : 2} value={text} onChange={(e) => set(e.target.value)} />
+                                      <textarea className="sa-input" rows={k === "about_me" ? 4 : 2} value={text} onChange={(e) => set(e.target.value)} />
                                     ) : (
-                                      <input className="ad-input" type={k === "date_of_birth" ? "date" : "text"} value={text} onChange={(e) => set(e.target.value)} />
+                                      <input className="sa-input" type={k === "date_of_birth" ? "date" : "text"} value={text} onChange={(e) => set(e.target.value)} />
                                     )}
                                   </label>
                                 );
@@ -865,11 +865,11 @@ export default function ReviewWorkspacePage() {
                   {details.map((g) => {
                     const Icon = g.icon;
                     return (
-                      <section key={g.title} className={`ad-card rv-group ${g.wide ? "wide" : ""}`}>
+                      <section key={g.title} className={`sa-card rv-group ${g.wide ? "wide" : ""}`}>
                         <h3 className="rv-group-h">
-                          <span className={`ad-ico ${g.tone}`}><Icon size={15} /></span>
+                          <span className={`sa-ico ${g.tone}`}><Icon size={15} /></span>
                           {g.title}
-                          <span className="ad-muted" style={{ fontSize: 11, fontWeight: 500, marginLeft: "auto" }}>{g.items.length}</span>
+                          <span className="sa-muted" style={{ fontSize: 11, fontWeight: 500, marginLeft: "auto" }}>{g.items.length}</span>
                         </h3>
                         <dl className={`rv-dl ${g.wide ? "cols" : ""}`}>
                           {g.items.map((d) => (
@@ -886,13 +886,13 @@ export default function ReviewWorkspacePage() {
               )}
 
               {(sel.photos || []).length > 0 && (
-                <div className="ad-card">
-                  <h3 className="ad-h2" style={{ marginBottom: 12 }}>Photos</h3>
+                <div className="sa-card">
+                  <h3 className="sa-h2" style={{ marginBottom: 12 }}>Photos</h3>
                   <div className="rv-thumbs">
                     {(sel.photos || []).map((ph) => (
                       <div key={ph.id} className={`rv-th ${ph.status === "pending" ? "pending" : ""}`}>
                         <a href={ph.url} target="_blank" rel="noreferrer"><img src={ph.url} alt="" /></a>
-                        <span className={`ad-chip ${ph.status === "approved" ? "t-green" : ph.status === "pending" ? "t-amber" : "t-rose"}`} style={{ position: "absolute", left: 6, top: 6 }}>
+                        <span className={`sa-chip ${ph.status === "approved" ? "t-green" : ph.status === "pending" ? "t-amber" : "t-rose"}`} style={{ position: "absolute", left: 6, top: 6 }}>
                           {ph.status}
                         </span>
                         {ph.status === "pending" && (
@@ -905,23 +905,23 @@ export default function ReviewWorkspacePage() {
                     ))}
                   </div>
                   {(sel.type === "new" || sel.type === "edit") && (
-                    <p className="ad-muted" style={{ fontSize: 12, margin: "10px 0 0" }}>Approving the profile also approves its pending photos.</p>
+                    <p className="sa-muted" style={{ fontSize: 12, margin: "10px 0 0" }}>Approving the profile also approves its pending photos.</p>
                   )}
                 </div>
               )}
 
               {sel.type === "kyc" && (
-                <div className="ad-card">
-                  <h3 className="ad-h2" style={{ marginBottom: 12 }}>KYC documents</h3>
+                <div className="sa-card">
+                  <h3 className="sa-h2" style={{ marginBottom: 12 }}>KYC documents</h3>
                   <div style={{ display: "grid", gap: 10 }}>
                     {(sel.docs || []).map((d) => (
                       <a key={d.id} href={d.url || "#"} target="_blank" rel="noreferrer" className="rv-doc">
-                        <span className="ad-ico t-indigo">{/image/.test(d.fileType || "") ? <ShieldCheck size={18} /> : <FileText size={18} />}</span>
+                        <span className="sa-ico t-indigo">{/image/.test(d.fileType || "") ? <ShieldCheck size={18} /> : <FileText size={18} />}</span>
                         <span style={{ flex: 1 }}>
                           <strong style={{ textTransform: "capitalize" }}>{(d.idType || "document").replace(/_/g, " ")}</strong>
-                          <span className="ad-muted" style={{ display: "block", fontSize: 12 }}>{d.fileName} · uploaded {ago(d.createdAt)} ago</span>
+                          <span className="sa-muted" style={{ display: "block", fontSize: 12 }}>{d.fileName} · uploaded {ago(d.createdAt)} ago</span>
                         </span>
-                        <span className="ad-muted" style={{ fontSize: 12 }}>{d.url ? "Open ↗" : "File unavailable"}</span>
+                        <span className="sa-muted" style={{ fontSize: 12 }}>{d.url ? "Open ↗" : "File unavailable"}</span>
                       </a>
                     ))}
                   </div>
@@ -929,14 +929,14 @@ export default function ReviewWorkspacePage() {
               )}
 
               {rejecting && (
-                <div className="ad-card" style={{ borderColor: "#f3c4d4" }}>
-                  <h3 className="ad-h2" style={{ color: "#b42358", marginBottom: 10 }}>Reject — choose a reason (the member sees this)</h3>
+                <div className="sa-card" style={{ borderColor: "#f3c4d4" }}>
+                  <h3 className="sa-h2" style={{ color: "#b42358", marginBottom: 10 }}>Reject — choose a reason (the member sees this)</h3>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                     {REASONS[sel.type].map((r) => (
                       <button key={r} type="button" className={`rv-reason ${reason === r ? "on" : ""}`} onClick={() => setReason(r)}>{r}</button>
                     ))}
                   </div>
-                  <label className="ad-muted" style={{ display: "block", fontSize: 12, marginTop: 12 }}>
+                  <label className="sa-muted" style={{ display: "block", fontSize: 12, marginTop: 12 }}>
                     Optional note to the member
                     <input className="rv-input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Please remove the phone number from About me" />
                   </label>
@@ -944,16 +944,16 @@ export default function ReviewWorkspacePage() {
               )}
 
               <div className="rv-bar">
-                <button type="button" className="ad-btn rv-ok" disabled={savingEdit} onClick={() => (editing ? void saveEdits(true) : approve(sel))}>
-                  <Check size={16} /> {editing && dirtyEdit ? "Save & approve" : "Approve"} <span className="ad-kbd" style={{ background: "transparent", color: "#fff", borderColor: "rgba(255,255,255,.4)" }}>A</span>
+                <button type="button" className="sa-btn rv-ok" disabled={savingEdit} onClick={() => (editing ? void saveEdits(true) : approve(sel))}>
+                  <Check size={16} /> {editing && dirtyEdit ? "Save & approve" : "Approve"} <span className="sa-kbd" style={{ background: "transparent", color: "#fff", borderColor: "rgba(255,255,255,.4)" }}>A</span>
                 </button>
-                <button type="button" className="ad-btn rv-no" onClick={() => reject(sel)}>
-                  <X size={16} /> {rejecting ? "Confirm reject" : "Reject"} <span className="ad-kbd">R</span>
+                <button type="button" className="sa-btn rv-no" onClick={() => reject(sel)}>
+                  <X size={16} /> {rejecting ? "Confirm reject" : "Reject"} <span className="sa-kbd">R</span>
                 </button>
-                {rejecting && <button type="button" className="ad-btn ghost" onClick={() => setRejecting(false)}>Cancel</button>}
+                {rejecting && <button type="button" className="sa-btn ghost" onClick={() => setRejecting(false)}>Cancel</button>}
                 <span style={{ flex: 1 }} />
-                <button type="button" className="ad-btn ghost" onClick={() => move(-1)} aria-label="Previous"><ChevronLeft size={16} /></button>
-                <button type="button" className="ad-btn ghost" onClick={() => move(1)}>
+                <button type="button" className="sa-btn ghost" onClick={() => move(-1)} aria-label="Previous"><ChevronLeft size={16} /></button>
+                <button type="button" className="sa-btn ghost" onClick={() => move(1)}>
                   Skip <SkipForward size={14} /> <ChevronRight size={16} style={{ display: "none" }} />
                 </button>
               </div>

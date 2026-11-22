@@ -118,16 +118,16 @@ export default function SuperAdminEditProfilePage() {
   if (!id || loading || loadError) {
     return (
       <div className="pc-root">
-        <div className="ad-card" style={{ padding: 24 }}>
+        <div className="sa-card" style={{ padding: 24 }}>
           {loading && !loadError ? (
             <>
-              <div className="ad-skel" style={{ height: 28, width: 240, marginBottom: 12 }} />
-              <div className="ad-skel" style={{ height: 200 }} />
+              <div className="sa-skel" style={{ height: 28, width: 240, marginBottom: 12 }} />
+              <div className="sa-skel" style={{ height: 200 }} />
             </>
           ) : (
             <>
-              <p className="ad-muted">{!id ? "Invalid profile ID" : loadError}</p>
-              <Link href="/superadmin/review-center" className="ad-link">← Back to Profiles</Link>
+              <p className="sa-muted">{!id ? "Invalid profile ID" : loadError}</p>
+              <Link href="/superadmin/review-center" className="sa-link">← Back to Profiles</Link>
             </>
           )}
         </div>
@@ -148,7 +148,7 @@ export default function SuperAdminEditProfilePage() {
       sideTop={
         <div className="pc-block">
           <div className="pc-summary">
-            <span className="ad-av" style={{ background: profile.gender === "female" ? "#c2367a" : "#5b3aa8", width: 44, height: 44, position: "relative" }}>
+            <span className="sa-av" style={{ background: profile.gender === "female" ? "#c2367a" : "#5b3aa8", width: 44, height: 44, position: "relative" }}>
               {profile.fullName ? initials(profile.fullName) : <UserRound size={18} />}
               {profile.profilePhoto && (
                 <img src={profile.profilePhoto} alt="" style={{ position: "absolute", inset: 0 }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
@@ -156,7 +156,7 @@ export default function SuperAdminEditProfilePage() {
             </span>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{profile.fullName || "Unnamed"}</div>
-              <div className="ad-muted" style={{ fontSize: 12 }}>{memberId}</div>
+              <div className="sa-muted" style={{ fontSize: 12 }}>{memberId}</div>
               <div style={{ marginTop: 4 }}><ProfileStatusChip status={status} /></div>
             </div>
           </div>

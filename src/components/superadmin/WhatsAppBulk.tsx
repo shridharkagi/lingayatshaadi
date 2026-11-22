@@ -92,28 +92,28 @@ export default function WhatsAppBulk({
 
   return (
     <div className="wa-scrim" onClick={onClose}>
-      <div className="wa-panel ad-card" role="dialog" aria-modal="true" aria-label="Send WhatsApp messages" onClick={(e) => e.stopPropagation()}>
+      <div className="wa-panel sa-card" role="dialog" aria-modal="true" aria-label="Send WhatsApp messages" onClick={(e) => e.stopPropagation()}>
         <div className="wa-head">
           <div>
-            <h2 className="ad-h2" style={{ margin: 0 }}><MessageCircle size={18} /> WhatsApp {recipients.length} account{recipients.length === 1 ? "" : "s"}</h2>
-            <p className="ad-muted" style={{ margin: "4px 0 0", fontSize: 12 }}>
+            <h2 className="sa-h2" style={{ margin: 0 }}><MessageCircle size={18} /> WhatsApp {recipients.length} account{recipients.length === 1 ? "" : "s"}</h2>
+            <p className="sa-muted" style={{ margin: "4px 0 0", fontSize: 12 }}>
               Click <strong>Send</strong> for each person. WhatsApp opens with the message ready; press send there.
             </p>
           </div>
-          <button type="button" className="ad-btn ghost" style={{ width: 36, padding: 0 }} onClick={onClose} aria-label="Close"><X size={16} /></button>
+          <button type="button" className="sa-btn ghost" style={{ width: 36, padding: 0 }} onClick={onClose} aria-label="Close"><X size={16} /></button>
         </div>
 
         <div className="wa-body">
           <div className="wa-compose">
-            <label className="ad-muted" style={{ fontSize: 12 }}>Template</label>
-            <select className="ad-select" value={tpl} onChange={(e) => setTpl(e.target.value)}>
+            <label className="sa-muted" style={{ fontSize: 12 }}>Template</label>
+            <select className="sa-select" value={tpl} onChange={(e) => setTpl(e.target.value)}>
               {TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
             </select>
-            <label className="ad-muted" style={{ fontSize: 12, marginTop: 8 }}>
+            <label className="sa-muted" style={{ fontSize: 12, marginTop: 8 }}>
               Message — <code>{"{name}"}</code> becomes the first name{tpl === "expiring" && <>, <code>{"{planEnds}"}</code> the plan end date</>}
             </label>
-            <textarea className="ad-input" rows={6} value={text} onChange={(e) => setText(e.target.value)} style={{ height: "auto", padding: 10, resize: "vertical" }} />
-            <div className="wa-preview"><span className="ad-muted" style={{ fontSize: 11 }}>Preview</span>{preview}</div>
+            <textarea className="sa-input" rows={6} value={text} onChange={(e) => setText(e.target.value)} style={{ height: "auto", padding: 10, resize: "vertical" }} />
+            <div className="wa-preview"><span className="sa-muted" style={{ fontSize: 11 }}>Preview</span>{preview}</div>
             <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, marginTop: 6 }}>
               <input type="checkbox" checked={logNote} onChange={(e) => setLogNote(e.target.checked)} /> Log a note on each account
             </label>
@@ -123,12 +123,12 @@ export default function WhatsAppBulk({
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
               <strong style={{ fontSize: 13 }}>{sent.size} of {withPhone.length} sent</strong>
               <div className="wa-progress"><span style={{ width: `${withPhone.length ? (sent.size / withPhone.length) * 100 : 0}%` }} /></div>
-              <button type="button" className="ad-btn ghost" style={{ minHeight: 30, fontSize: 12 }} onClick={copyNumbers}>
+              <button type="button" className="sa-btn ghost" style={{ minHeight: 30, fontSize: 12 }} onClick={copyNumbers}>
                 {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? "Copied" : "Copy numbers"}
               </button>
             </div>
             {next && (
-              <button type="button" className="ad-btn pri" style={{ width: "100%", marginBottom: 8 }} onClick={() => send(next)}>
+              <button type="button" className="sa-btn pri" style={{ width: "100%", marginBottom: 8 }} onClick={() => send(next)}>
                 <MessageCircle size={16} /> Send to next: {next.name || phoneFmt(next.phone)}
               </button>
             )}
@@ -141,10 +141,10 @@ export default function WhatsAppBulk({
                   <div key={r.id} className={`wa-row ${done ? "done" : ""}`}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name || "Unnamed"}</div>
-                      <div className="ad-muted" style={{ fontSize: 11 }}>{ok ? phoneFmt(r.phone) : "No phone"}</div>
+                      <div className="sa-muted" style={{ fontSize: 11 }}>{ok ? phoneFmt(r.phone) : "No phone"}</div>
                     </div>
                     {ok && (
-                      <button type="button" className={`ad-btn ${done ? "ghost" : "ghost"}`} style={{ minHeight: 30, fontSize: 12 }} onClick={() => send(r)}>
+                      <button type="button" className={`sa-btn ${done ? "ghost" : "ghost"}`} style={{ minHeight: 30, fontSize: 12 }} onClick={() => send(r)}>
                         {done ? <><Check size={14} /> Sent · again</> : "Send"}
                       </button>
                     )}

@@ -111,59 +111,59 @@ export default function LeadsPage() {
         <CsvButton onClick={exportCsv} busy={exporting} />
       </PageHeader>
 
-      <div className="ad-grid-kpi">
-        <div className="ad-card rp-stat"><span className="ad-muted" style={{ fontSize: 13 }}>Total leads</span><span className="v">{allTotal}</span>
-          {filtersOn && <span className="ad-muted" style={{ fontSize: 12 }}>{total} match your filters</span>}</div>
+      <div className="sa-grid-kpi">
+        <div className="sa-card rp-stat"><span className="sa-muted" style={{ fontSize: 13 }}>Total leads</span><span className="v">{allTotal}</span>
+          {filtersOn && <span className="sa-muted" style={{ fontSize: 12 }}>{total} match your filters</span>}</div>
         {Object.entries(sources).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, n]) => (
-          <button key={k} type="button" className="ad-card hover rp-stat" style={{ textAlign: "left", cursor: "pointer", border: source === k ? "1.5px solid #e67300" : undefined, font: "inherit" }}
+          <button key={k} type="button" className="sa-card hover rp-stat" style={{ textAlign: "left", cursor: "pointer", border: source === k ? "1.5px solid #e67300" : undefined, font: "inherit" }}
             onClick={() => setSource(source === k ? "" : k)}>
-            <span className="ad-muted" style={{ fontSize: 13 }}>From {k === "unknown" ? "unknown page" : k}</span>
+            <span className="sa-muted" style={{ fontSize: 13 }}>From {k === "unknown" ? "unknown page" : k}</span>
             <span className="v">{n}</span>
           </button>
         ))}
       </div>
 
-      <div className="ad-toolbar">
-        <label className="ad-search-box" style={{ flex: "1 1 280px", maxWidth: 420, height: 40 }}>
+      <div className="sa-toolbar">
+        <label className="sa-search-box" style={{ flex: "1 1 280px", maxWidth: 420, height: 40 }}>
           <Search size={16} aria-hidden="true" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, phone or city" aria-label="Search leads" />
         </label>
-        <select className={`ad-select ${source ? "is-set" : ""}`} value={source} onChange={(e) => setSource(e.target.value)} aria-label="Source page">
+        <select className={`sa-select ${source ? "is-set" : ""}`} value={source} onChange={(e) => setSource(e.target.value)} aria-label="Source page">
           <option value="">All sources</option>
           {Object.entries(sources).sort((a, b) => b[1] - a[1]).map(([k, n]) => (
             <option key={k} value={k}>From {k === "unknown" ? "unknown page" : k} ({n})</option>
           ))}
         </select>
-        <select className={`ad-select ${signed ? "is-set" : ""}`} value={signed} onChange={(e) => setSigned(e.target.value)} aria-label="Signed up">
+        <select className={`sa-select ${signed ? "is-set" : ""}`} value={signed} onChange={(e) => setSigned(e.target.value)} aria-label="Signed up">
           <option value="">Signed up or not</option>
           <option value="yes">Has an account</option>
           <option value="no">Not signed up yet</option>
         </select>
         <DateFilter value={dates} onChange={setDates} />
-        <select className={`ad-select ${sort !== "newest" ? "is-set" : ""}`} value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
+        <select className={`sa-select ${sort !== "newest" ? "is-set" : ""}`} value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
           {SORTS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
         </select>
         <ResetButton show={filtersOn} onClick={resetFilters} />
       </div>
       {error && <div className="m3-error">{error}</div>}
 
-      <div className="ad-card" style={{ padding: 0, overflow: "hidden" }}>
-        <div className="ad-table-wrap">
-          <table className="ad-table">
+      <div className="sa-card" style={{ padding: 0, overflow: "hidden" }}>
+        <div className="sa-table-wrap">
+          <table className="sa-table">
             <thead><tr><th>Name</th><th>Phone</th><th>City</th><th>Source</th><th>Submitted</th><th>Account</th><th /></tr></thead>
             <tbody>
-              {loading && rows.length === 0 && Array.from({ length: 6 }).map((_, i) => <tr key={i}><td colSpan={7}><div className="ad-skel" style={{ height: 26 }} /></td></tr>)}
+              {loading && rows.length === 0 && Array.from({ length: 6 }).map((_, i) => <tr key={i}><td colSpan={7}><div className="sa-skel" style={{ height: 26 }} /></td></tr>)}
               {rows.map((l) => (
                 <tr key={l.id}>
                   <td><strong>{l.name || "—"}</strong></td>
                   <td style={{ whiteSpace: "nowrap" }}>{phoneFmt(l.contact_no)}</td>
                   <td>{l.city || "—"}</td>
-                  <td><span className="ad-chip t-indigo">{l.source_page || "unknown"}</span></td>
+                  <td><span className="sa-chip t-indigo">{l.source_page || "unknown"}</span></td>
                   <td style={{ whiteSpace: "nowrap" }}>{fmtDateTime(l.created_at)}</td>
-                  <td>{l.account_id ? <Link className="ad-link" href={`/superadmin/accounts/${l.account_id}`}>Open 360°</Link> : <span className="ad-muted">Not signed up</span>}</td>
+                  <td>{l.account_id ? <Link className="sa-link" href={`/superadmin/accounts/${l.account_id}`}>Open 360°</Link> : <span className="sa-muted">Not signed up</span>}</td>
                   <td>
                     {l.contact_no && (
-                      <a className="ad-btn ghost" style={{ minHeight: 30, fontSize: 12 }} target="_blank" rel="noreferrer"
+                      <a className="sa-btn ghost" style={{ minHeight: 30, fontSize: 12 }} target="_blank" rel="noreferrer"
                         href={`https://wa.me/${phoneDigits(l.contact_no)}?text=${encodeURIComponent(`Namaskara${l.name ? " " + l.name.split(" ")[0] : ""}, thank you for joining the LingayatBandhu WhatsApp group. Create your free profile at https://www.lingayatbandhu.com`)}`}>
                         <MessageCircle size={14} /> WhatsApp
                       </a>
@@ -174,9 +174,9 @@ export default function LeadsPage() {
             </tbody>
           </table>
           {!loading && rows.length === 0 && (
-            <div className="ad-empty">
+            <div className="sa-empty">
               No leads match.{" "}
-              {filtersOn && <button type="button" className="ad-link" style={{ border: 0, background: "none", cursor: "pointer" }} onClick={resetFilters}>Reset filters</button>}
+              {filtersOn && <button type="button" className="sa-link" style={{ border: 0, background: "none", cursor: "pointer" }} onClick={resetFilters}>Reset filters</button>}
             </div>
           )}
         </div>

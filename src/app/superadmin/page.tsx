@@ -59,12 +59,12 @@ function timeAgo(iso?: string | null) {
 }
 
 function Delta({ cur, prev, suffix = "vs previous period" }: { cur: number; prev: number; suffix?: string }) {
-  if (!prev && !cur) return <span className="ad-flat">No activity yet</span>;
-  if (!prev) return <span className="ad-up">▲ new · {suffix}</span>;
+  if (!prev && !cur) return <span className="sa-flat">No activity yet</span>;
+  if (!prev) return <span className="sa-up">▲ new · {suffix}</span>;
   const pct = Math.round(((cur - prev) / prev) * 100);
-  if (pct === 0) return <span className="ad-flat">● same as previous period</span>;
+  if (pct === 0) return <span className="sa-flat">● same as previous period</span>;
   return (
-    <span className={pct > 0 ? "ad-up" : "ad-down"}>
+    <span className={pct > 0 ? "sa-up" : "sa-down"}>
       {pct > 0 ? "▲" : "▼"} {Math.abs(pct)}% {suffix}
     </span>
   );
@@ -111,16 +111,16 @@ function InboxCard({
   delay: number;
 }) {
   return (
-    <Link href={href} className={`ad-card hover ad-task ${n === 0 ? "zero" : ""}`} style={{ animationDelay: `${delay}s` }}>
+    <Link href={href} className={`sa-card hover sa-task ${n === 0 ? "zero" : ""}`} style={{ animationDelay: `${delay}s` }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span className={`ad-ico ${tone}`}>
+        <span className={`sa-ico ${tone}`}>
           <Icon size={20} />
         </span>
-        {chip && n > 0 && <span className={`ad-chip ${chip.cls}`}>{chip.text}</span>}
+        {chip && n > 0 && <span className={`sa-chip ${chip.cls}`}>{chip.text}</span>}
       </div>
       <div className="n">{num(n)}</div>
       <div style={{ fontWeight: 600 }}>{title}</div>
-      <div className="ad-muted" style={{ fontSize: 12 }}>
+      <div className="sa-muted" style={{ fontSize: 12 }}>
         {n === 0 ? "All clear" : meta}
       </div>
     </Link>
@@ -130,19 +130,19 @@ function InboxCard({
 function Skeleton() {
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      <div className="ad-grid-inbox">
+      <div className="sa-grid-inbox">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="ad-skel" style={{ height: 150 }} />
+          <div key={i} className="sa-skel" style={{ height: 150 }} />
         ))}
       </div>
-      <div className="ad-grid-kpi">
+      <div className="sa-grid-kpi">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="ad-skel" style={{ height: 110 }} />
+          <div key={i} className="sa-skel" style={{ height: 110 }} />
         ))}
       </div>
-      <div className="ad-grid-2">
-        <div className="ad-skel" style={{ height: 280 }} />
-        <div className="ad-skel" style={{ height: 280 }} />
+      <div className="sa-grid-2">
+        <div className="sa-skel" style={{ height: 280 }} />
+        <div className="sa-skel" style={{ height: 280 }} />
       </div>
     </div>
   );
@@ -226,8 +226,8 @@ export default function AdminOverviewPage() {
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: 12 }}>
         <div>
-          <h1 className="ad-h1">{greeting}</h1>
-          <p className="ad-muted" style={{ margin: "4px 0 0" }}>
+          <h1 className="sa-h1">{greeting}</h1>
+          <p className="sa-muted" style={{ margin: "4px 0 0" }}>
             {loading && !data
               ? "Loading your dashboard…"
               : totalTasks > 0
@@ -237,12 +237,12 @@ export default function AdminOverviewPage() {
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <div className="ad-pills" role="group" aria-label="Date range">
+          <div className="sa-pills" role="group" aria-label="Date range">
             {RANGES.map((r) => (
               <button
                 key={r.id}
                 type="button"
-                className={`ad-pill ${range === r.id ? "on" : ""}`}
+                className={`sa-pill ${range === r.id ? "on" : ""}`}
                 onClick={() => setRange(r.id)}
                 aria-pressed={range === r.id}
               >
@@ -252,26 +252,26 @@ export default function AdminOverviewPage() {
           </div>
           {range === "custom" && (
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <label className="ad-muted" style={{ fontSize: 12 }}>
+              <label className="sa-muted" style={{ fontSize: 12 }}>
                 From{" "}
-                <input type="date" className="ad-date" value={customFrom} max={customTo} onChange={(e) => setCustomFrom(e.target.value)} />
+                <input type="date" className="sa-date" value={customFrom} max={customTo} onChange={(e) => setCustomFrom(e.target.value)} />
               </label>
-              <label className="ad-muted" style={{ fontSize: 12 }}>
+              <label className="sa-muted" style={{ fontSize: 12 }}>
                 To{" "}
-                <input type="date" className="ad-date" value={customTo} min={customFrom} max={isoDay(new Date())} onChange={(e) => setCustomTo(e.target.value)} />
+                <input type="date" className="sa-date" value={customTo} min={customFrom} max={isoDay(new Date())} onChange={(e) => setCustomTo(e.target.value)} />
               </label>
             </div>
           )}
-          <button type="button" className="ad-btn ghost" onClick={() => (range === "custom" ? load(range, customFrom, customTo) : load(range))} aria-label="Refresh" title={updatedAt ? `Updated ${updatedAt.toLocaleTimeString("en-IN")}` : "Refresh"}>
+          <button type="button" className="sa-btn ghost" onClick={() => (range === "custom" ? load(range, customFrom, customTo) : load(range))} aria-label="Refresh" title={updatedAt ? `Updated ${updatedAt.toLocaleTimeString("en-IN")}` : "Refresh"}>
             <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
           </button>
         </div>
       </div>
 
       {error && (
-        <div className="ad-card" style={{ borderColor: "#f3c4d4", color: "#b42358" }}>
+        <div className="sa-card" style={{ borderColor: "#f3c4d4", color: "#b42358" }}>
           Couldn&apos;t load the dashboard: {error}{" "}
-          <button type="button" className="ad-btn ghost" style={{ marginLeft: 8 }} onClick={() => (range === "custom" ? load(range, customFrom, customTo) : load(range))}>
+          <button type="button" className="sa-btn ghost" style={{ marginLeft: 8 }} onClick={() => (range === "custom" ? load(range, customFrom, customTo) : load(range))}>
             Try again
           </button>
         </div>
@@ -281,7 +281,7 @@ export default function AdminOverviewPage() {
         <Skeleton />
       ) : data ? (
         <>
-          <section aria-label="Action inbox" className="ad-grid-inbox">
+          <section aria-label="Action inbox" className="sa-grid-inbox">
             <InboxCard
               href="/superadmin/moderation"
               icon={UserRoundCheck}
@@ -340,50 +340,50 @@ export default function AdminOverviewPage() {
             />
           </section>
 
-          <section aria-label="Key numbers" className="ad-grid-kpi">
-            <div className="ad-card ad-kpi">
-              <div className="ad-muted" style={{ fontSize: 13 }}>Accounts (logins)</div>
+          <section aria-label="Key numbers" className="sa-grid-kpi">
+            <div className="sa-card sa-kpi">
+              <div className="sa-muted" style={{ fontSize: 13 }}>Accounts (logins)</div>
               <div className="v">{num(k.accountsTotal)}</div>
-              <span className="ad-muted" style={{ fontSize: 12 }}>
+              <span className="sa-muted" style={{ fontSize: 12 }}>
                 +{num(k.accountsNew)} new · <Delta cur={k.accountsNew} prev={k.accountsNewPrev} suffix="" />
               </span>
             </div>
-            <div className="ad-card ad-kpi">
-              <div className="ad-muted" style={{ fontSize: 13 }}>Live profiles</div>
+            <div className="sa-card sa-kpi">
+              <div className="sa-muted" style={{ fontSize: 13 }}>Live profiles</div>
               <div className="v">{num(k.liveProfiles)}</div>
-              <span className="ad-muted" style={{ fontSize: 12 }}>
+              <span className="sa-muted" style={{ fontSize: 12 }}>
                 of {num(k.profilesTotal)} profiles · {num(k.approvedInRange)} approved
               </span>
             </div>
-            <div className="ad-card ad-kpi">
-              <div className="ad-muted" style={{ fontSize: 13 }}>Paid members (active)</div>
+            <div className="sa-card sa-kpi">
+              <div className="sa-muted" style={{ fontSize: 13 }}>Paid members (active)</div>
               <div className="v">{num(k.paidMembers)}</div>
-              <span className="ad-muted" style={{ fontSize: 12 }}>
+              <span className="sa-muted" style={{ fontSize: 12 }}>
                 {k.accountsTotal ? Math.round((k.paidMembers / k.accountsTotal) * 100) : 0}% of accounts
               </span>
             </div>
-            <div className="ad-card ad-kpi">
-              <div className="ad-muted" style={{ fontSize: 13 }}>Revenue collected</div>
+            <div className="sa-card sa-kpi">
+              <div className="sa-muted" style={{ fontSize: 13 }}>Revenue collected</div>
               <div className="v">{inr(k.revenue)}</div>
               <Delta cur={k.revenue} prev={k.revenuePrev} />
             </div>
-            <div className="ad-card ad-kpi">
-              <div className="ad-muted" style={{ fontSize: 13 }}>Contact views</div>
+            <div className="sa-card sa-kpi">
+              <div className="sa-muted" style={{ fontSize: 13 }}>Contact views</div>
               <div className="v">{num(k.contactViews)}</div>
               <Delta cur={k.contactViews} prev={k.contactViewsPrev} />
             </div>
-            <div className="ad-card ad-kpi">
-              <div className="ad-muted" style={{ fontSize: 13 }}>Profile views</div>
+            <div className="sa-card sa-kpi">
+              <div className="sa-muted" style={{ fontSize: 13 }}>Profile views</div>
               <div className="v">{num(k.profileViews)}</div>
               <Delta cur={k.profileViews} prev={k.profileViewsPrev} />
             </div>
           </section>
 
-          <section className="ad-grid-2">
-            <div className="ad-card">
+          <section className="sa-grid-2">
+            <div className="sa-card">
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
-                <h2 className="ad-h2">Growth funnel</h2>
-                <span className="ad-muted" style={{ fontSize: 12 }}>All time · by account</span>
+                <h2 className="sa-h2">Growth funnel</h2>
+                <span className="sa-muted" style={{ fontSize: 12 }}>All time · by account</span>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {funnel.map((s, i) => {
@@ -391,10 +391,10 @@ export default function AdminOverviewPage() {
                   const conv = i > 0 && prev ? ` · ${Math.round((s.n / prev) * 100)}%` : "";
                   return (
                     <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div className="ad-muted" style={{ width: 130, fontSize: 12, flex: "none" }}>{s.label}</div>
+                      <div className="sa-muted" style={{ width: 130, fontSize: 12, flex: "none" }}>{s.label}</div>
                       <div style={{ flex: 1 }}>
                         <div
-                          className="ad-funnel-bar"
+                          className="sa-funnel-bar"
                           style={{ width: `${Math.max((s.n / funnelMax) * 100, 6)}%`, background: s.grad, animationDelay: `${i * 0.08}s` }}
                         >
                           {num(s.n)}
@@ -405,17 +405,17 @@ export default function AdminOverviewPage() {
                   );
                 })}
               </div>
-              <p className="ad-muted" style={{ fontSize: 12, margin: "14px 0 0" }}>
+              <p className="sa-muted" style={{ fontSize: 12, margin: "14px 0 0" }}>
                 Percentages show how many moved on from the step before.
               </p>
             </div>
 
-            <div className="ad-card">
+            <div className="sa-card">
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
-                <h2 className="ad-h2">Signups &amp; approvals</h2>
-                <div className="ad-muted" style={{ fontSize: 12, display: "flex", gap: 14 }}>
-                  <span><span className="ad-dot" style={{ background: "#e67300" }} />Signups</span>
-                  <span><span className="ad-dot" style={{ background: "#3f46b8" }} />Approvals</span>
+                <h2 className="sa-h2">Signups &amp; approvals</h2>
+                <div className="sa-muted" style={{ fontSize: 12, display: "flex", gap: 14 }}>
+                  <span><span className="sa-dot" style={{ background: "#e67300" }} />Signups</span>
+                  <span><span className="sa-dot" style={{ background: "#3f46b8" }} />Approvals</span>
                 </div>
               </div>
               <div style={{ height: 230 }}>
@@ -443,10 +443,10 @@ export default function AdminOverviewPage() {
             </div>
           </section>
 
-          <section className="ad-grid-2">
-            <div className="ad-card">
+          <section className="sa-grid-2">
+            <div className="sa-card">
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
-                <h2 className="ad-h2">Live profile mix</h2>
+                <h2 className="sa-h2">Live profile mix</h2>
                 <Link href="/superadmin/analytics" style={{ fontSize: 12 }}>Open reports</Link>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -455,7 +455,7 @@ export default function AdminOverviewPage() {
                     <span>Brides {Math.round(((gender.female || 0) / genderTotal) * 100)}% · {gender.female || 0}</span>
                     <span>Grooms {Math.round(((gender.male || 0) / genderTotal) * 100)}% · {gender.male || 0}</span>
                   </div>
-                  <div className="ad-mix" style={{ marginTop: 6 }}>
+                  <div className="sa-mix" style={{ marginTop: 6 }}>
                     <div style={{ width: `${((gender.female || 0) / genderTotal) * 100}%`, background: "#e0457b" }} />
                     <div style={{ width: `${((gender.male || 0) / genderTotal) * 100}%`, background: "#3f46b8" }} />
                   </div>
@@ -464,12 +464,12 @@ export default function AdminOverviewPage() {
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 12, fontSize: 12 }}>
                     {states.slice(0, 5).map(([s, v], i) => (
                       <span key={s}>
-                        <span className="ad-dot" style={{ background: stateColors[i] }} />
+                        <span className="sa-dot" style={{ background: stateColors[i] }} />
                         {s} {Math.round((v / stateTotal) * 100)}%
                       </span>
                     ))}
                   </div>
-                  <div className="ad-mix" style={{ marginTop: 6 }}>
+                  <div className="sa-mix" style={{ marginTop: 6 }}>
                     {states.slice(0, 5).map(([s, v], i) => (
                       <div key={s} style={{ width: `${(v / stateTotal) * 100}%`, background: stateColors[i] }} />
                     ))}
@@ -495,22 +495,22 @@ export default function AdminOverviewPage() {
               </div>
             </div>
 
-            <div className="ad-card">
+            <div className="sa-card">
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                <h2 className="ad-h2">Recent admin activity</h2>
+                <h2 className="sa-h2">Recent admin activity</h2>
                 <Link href="/superadmin/admin-logs" style={{ fontSize: 12 }}>Full audit log</Link>
               </div>
-              {(data.recent || []).length === 0 && <p className="ad-muted">No admin actions recorded yet.</p>}
+              {(data.recent || []).length === 0 && <p className="sa-muted">No admin actions recorded yet.</p>}
               {(data.recent || []).map((r, i) => {
                 const d = describe(r.action, r.entityType || "");
                 return (
-                  <div key={i} className="ad-row">
-                    <span className={`ad-chip ${d.cls}`} style={{ minWidth: 92, justifyContent: "center" }}>{d.label}</span>
+                  <div key={i} className="sa-row">
+                    <span className={`sa-chip ${d.cls}`} style={{ minWidth: 92, justifyContent: "center" }}>{d.label}</span>
                     <div style={{ flex: 1, minWidth: 0, fontSize: 13 }}>
                       {r.entityType?.replace(/_/g, " ") || "item"}
-                      <span className="ad-muted" style={{ fontSize: 12 }}> · {String(r.entityId || "").slice(0, 8)}</span>
+                      <span className="sa-muted" style={{ fontSize: 12 }}> · {String(r.entityId || "").slice(0, 8)}</span>
                     </div>
-                    <span className="ad-muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>{timeAgo(r.at)}</span>
+                    <span className="sa-muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>{timeAgo(r.at)}</span>
                   </div>
                 );
               })}

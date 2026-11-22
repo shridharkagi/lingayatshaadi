@@ -95,16 +95,16 @@ function OwnerPicker({ owner, onChange }: { owner: OwnerHit | null; onChange: (o
       {mode === "member" && (
         owner ? (
           <div className="pc-owner">
-            <span className="ad-av" style={{ background: "#3f46b8", width: 30, height: 30 }}><UserRound size={14} /></span>
+            <span className="sa-av" style={{ background: "#3f46b8", width: 30, height: 30 }}><UserRound size={14} /></span>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ fontWeight: 600, fontSize: 13 }}>{owner.name || "Unnamed account"}</div>
-              <div className="ad-muted" style={{ fontSize: 11 }}>{owner.accountCode} · {phoneFmt(owner.phone)} · {owner.profileCount}/3 profiles</div>
+              <div className="sa-muted" style={{ fontSize: 11 }}>{owner.accountCode} · {phoneFmt(owner.phone)} · {owner.profileCount}/3 profiles</div>
             </div>
             <button type="button" className="pc-x" aria-label="Change owner" onClick={() => onChange(null)}><X size={14} /></button>
           </div>
         ) : (
           <>
-            <label className="ad-search-box" style={{ height: 36, marginTop: 8 }}>
+            <label className="sa-search-box" style={{ height: 36, marginTop: 8 }}>
               <Search size={14} aria-hidden="true" />
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Phone, U-code or name" aria-label="Find account" autoFocus />
             </label>
@@ -116,7 +116,7 @@ function OwnerPicker({ owner, onChange }: { owner: OwnerHit | null; onChange: (o
                 return (
                   <button key={h.id} type="button" disabled={full} onClick={() => onChange(h)} title={full ? "Already has 3 profiles" : undefined}>
                     <span style={{ fontWeight: 600 }}>{h.name || "Unnamed"}</span>
-                    <span className="ad-muted" style={{ fontSize: 11 }}>{h.accountCode} · {phoneFmt(h.phone)} · {full ? "3/3 full" : `${h.profileCount}/3`}</span>
+                    <span className="sa-muted" style={{ fontSize: 11 }}>{h.accountCode} · {phoneFmt(h.phone)} · {full ? "3/3 full" : `${h.profileCount}/3`}</span>
                   </button>
                 );
               })}

@@ -108,13 +108,13 @@ export default function ProfileEditorLayout({
     <div className="pc-root">
       <PageHeader title={title} subtitle={subtitle}>
         {headerExtra}
-        <Link href={cancelHref} className="ad-btn ghost">Cancel</Link>
-        <button type="button" className="ad-btn pri" onClick={onSave} disabled={saving}>{saving ? savingLabel : saveLabel}</button>
+        <Link href={cancelHref} className="sa-btn ghost">Cancel</Link>
+        <button type="button" className="sa-btn pri" onClick={onSave} disabled={saving}>{saving ? savingLabel : saveLabel}</button>
       </PageHeader>
 
       <div className="pc-layout">
         <aside className="pc-side">
-          <div className="ad-card pc-card">
+          <div className="sa-card pc-card">
             {sideTop}
             <div className="pc-block">
               <div className="pc-label">Required</div>
@@ -126,7 +126,7 @@ export default function ProfileEditorLayout({
             </div>
             <div className="pc-block">
               <div className="pc-label" style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>Sections</span><span className="ad-muted">{doneCount}/{tracked.length}</span>
+                <span>Sections</span><span className="sa-muted">{doneCount}/{tracked.length}</span>
               </div>
               <div className="pc-progress"><span style={{ width: `${(doneCount / tracked.length) * 100}%` }} /></div>
               <nav className="pc-nav" aria-label="Form sections">
@@ -154,14 +154,14 @@ export default function ProfileEditorLayout({
           {error ? (
             <span className="pc-err"><CircleAlert size={15} /> {error}</span>
           ) : (
-            <span className="ad-muted" style={{ fontSize: 13 }}>
+            <span className="sa-muted" style={{ fontSize: 13 }}>
               {barStatus}
               <span className="pc-kbd">⌘ Enter</span>
             </span>
           )}
           <span style={{ flex: 1 }} />
-          <Link href={cancelHref} className="ad-btn ghost">Cancel</Link>
-          <button type="button" className="ad-btn pri" onClick={onSave} disabled={saving}>{saving ? savingLabel : saveLabel}</button>
+          <Link href={cancelHref} className="sa-btn ghost">Cancel</Link>
+          <button type="button" className="sa-btn pri" onClick={onSave} disabled={saving}>{saving ? savingLabel : saveLabel}</button>
         </div>
       </div>
     </div>

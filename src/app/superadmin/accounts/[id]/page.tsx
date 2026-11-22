@@ -157,14 +157,14 @@ function AssignPlan({ data, onClose, onSaved }: { data: Data; onClose: () => voi
   };
 
   return (
-    <section className="ad-card m3-drawer" aria-label="Assign plan">
+    <section className="sa-card m3-drawer" aria-label="Assign plan">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2 className="ad-h2" style={{ fontSize: 17 }}>Assign plan</h2>
-        <button type="button" className="ad-btn ghost" style={{ width: 40, padding: 0 }} onClick={onClose} aria-label="Close">
+        <h2 className="sa-h2" style={{ fontSize: 17 }}>Assign plan</h2>
+        <button type="button" className="sa-btn ghost" style={{ width: 40, padding: 0 }} onClick={onClose} aria-label="Close">
           <X size={16} />
         </button>
       </div>
-      <p className="ad-muted" style={{ fontSize: 12, margin: "4px 0 14px" }}>One form, one save. Nothing changes until you press Save.</p>
+      <p className="sa-muted" style={{ fontSize: 12, margin: "4px 0 14px" }}>One form, one save. Nothing changes until you press Save.</p>
       <div className="m3-plans">
         {plans.map((p) => (
           <button
@@ -177,10 +177,10 @@ function AssignPlan({ data, onClose, onSaved }: { data: Data; onClose: () => voi
             }}
           >
             <strong>{p.name}</strong>
-            <span className="ad-muted" style={{ display: "block", fontSize: 12 }}>
+            <span className="sa-muted" style={{ display: "block", fontSize: 12 }}>
               {inr(p.price)} · {p.duration_days} days
             </span>
-            <span className="ad-muted" style={{ display: "block", fontSize: 12 }}>
+            <span className="sa-muted" style={{ display: "block", fontSize: 12 }}>
               {p.total_contact_views || "∞"} contacts · {p.daily_contact_view_limit || "∞"}/day
             </span>
           </button>
@@ -215,7 +215,7 @@ function AssignPlan({ data, onClose, onSaved }: { data: Data; onClose: () => voi
         <span>• Payment of {inr(amount)} recorded · member notified · logged in audit</span>
       </div>
       {error && <div className="m3-error">{error}</div>}
-      <button type="button" className="ad-btn pri" style={{ width: "100%", marginTop: 14, minHeight: 46 }} onClick={save} disabled={saving || !plan}>
+      <button type="button" className="sa-btn pri" style={{ width: "100%", marginTop: 14, minHeight: 46 }} onClick={save} disabled={saving || !plan}>
         {saving ? "Saving…" : "Save plan"}
       </button>
     </section>
@@ -307,12 +307,12 @@ export default function AccountPage() {
   if (loading && !data) {
     return (
       <div style={{ display: "grid", gap: 14 }}>
-        <div className="ad-skel" style={{ height: 120 }} />
-        <div className="ad-skel" style={{ height: 260 }} />
+        <div className="sa-skel" style={{ height: 120 }} />
+        <div className="sa-skel" style={{ height: 260 }} />
       </div>
     );
   }
-  if (!data) return <div className="ad-card" style={{ color: "#b42358" }}>{error || "Account not found"}</div>;
+  if (!data) return <div className="sa-card" style={{ color: "#b42358" }}>{error || "Account not found"}</div>;
 
   const a = data.account;
   const q = data.quota;
@@ -324,20 +324,20 @@ export default function AccountPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div className="ad-muted" style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+      <div className="sa-muted" style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
         <Link href="/superadmin/users" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
           <ArrowLeft size={14} /> Accounts
         </Link>
         / {a.accountCode || a.id.slice(0, 8)}
       </div>
 
-      <section className="ad-card m3-head">
+      <section className="sa-card m3-head">
         <div className="m3-bigav">{(a.name || "?").split(/\s+/).map((x) => x[0]).slice(0, 2).join("").toUpperCase()}</div>
         <div style={{ flex: 1, minWidth: 240, position: "relative", zIndex: 1 }}>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
             <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>{a.name || "Unnamed account"}</h1>
-            {q ? <span className="ad-chip m3-gold">{q.planName}</span> : <span className="ad-chip t-grey">No active plan</span>}
-            {a.suspended ? <span className="ad-chip t-rose">Suspended</span> : <span className="ad-chip t-green">Active</span>}
+            {q ? <span className="sa-chip m3-gold">{q.planName}</span> : <span className="sa-chip t-grey">No active plan</span>}
+            {a.suspended ? <span className="sa-chip t-rose">Suspended</span> : <span className="sa-chip t-green">Active</span>}
           </div>
           <div style={{ opacity: 0.85, marginTop: 6, fontSize: 14 }}>
             {[a.accountCode, phoneFmt(a.phone), a.city, `joined ${fmtDate(a.createdAt)}`, a.lastSignInAt ? `last login ${fmtDateTime(a.lastSignInAt)}` : null]
@@ -346,14 +346,14 @@ export default function AccountPage() {
           </div>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, position: "relative", zIndex: 1 }}>
-          <button type="button" className="ad-btn pri" onClick={() => { setAssignOpen(true); setSaved(null); }}>Assign / change plan</button>
+          <button type="button" className="sa-btn pri" onClick={() => { setAssignOpen(true); setSaved(null); }}>Assign / change plan</button>
           {waDigits && (
-            <a className="ad-btn m3-light" href={`https://wa.me/${waDigits}`} target="_blank" rel="noreferrer"><MessageCircle size={16} /> WhatsApp</a>
+            <a className="sa-btn m3-light" href={`https://wa.me/${waDigits}`} target="_blank" rel="noreferrer"><MessageCircle size={16} /> WhatsApp</a>
           )}
-          <button type="button" className="ad-btn m3-light" disabled={busy} onClick={() => accountAction(a.suspended ? "unsuspend" : "suspend")}>
+          <button type="button" className="sa-btn m3-light" disabled={busy} onClick={() => accountAction(a.suspended ? "unsuspend" : "suspend")}>
             {a.suspended ? <CheckCircle2 size={16} /> : <Ban size={16} />} {a.suspended ? "Unsuspend" : "Suspend"}
           </button>
-          <button type="button" className="ad-btn m3-light" disabled={busy} onClick={load} aria-label="Refresh"><RefreshCw size={16} /></button>
+          <button type="button" className="sa-btn m3-light" disabled={busy} onClick={load} aria-label="Refresh"><RefreshCw size={16} /></button>
         </div>
       </section>
 
@@ -362,20 +362,20 @@ export default function AccountPage() {
 
       <div className="m3-cols">
         <div className="m3-left">
-          <section className="ad-card">
+          <section className="sa-card">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-              <h2 className="ad-h2">
+              <h2 className="sa-h2">
                 Profiles on this account · {liveProfiles.length} active
-                {liveProfiles.length <= 3 ? <span className="ad-muted" style={{ fontWeight: 500 }}> (limit 3)</span> : null}
+                {liveProfiles.length <= 3 ? <span className="sa-muted" style={{ fontWeight: 500 }}> (limit 3)</span> : null}
               </h2>
               {deletedCount > 0 && (
-                <button type="button" className="ad-btn ghost m3-sm" onClick={() => setShowDeleted((v) => !v)}>
+                <button type="button" className="sa-btn ghost m3-sm" onClick={() => setShowDeleted((v) => !v)}>
                   {showDeleted ? "Hide" : "Show"} {deletedCount} deleted
                 </button>
               )}
             </div>
             {shownProfiles.length === 0 && (
-              <p className="ad-muted">{data.profiles.length === 0 ? "This account hasn't created a profile yet." : "No active profiles."}</p>
+              <p className="sa-muted">{data.profiles.length === 0 ? "This account hasn't created a profile yet." : "No active profiles."}</p>
             )}
             <div className="m3-profiles">
               {shownProfiles.map((p) => {
@@ -384,19 +384,19 @@ export default function AccountPage() {
                 return (
                   <div key={String(p.id)} className="m3-pc">
                     <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                      <span className="ad-av" style={{ background: p.gender === "female" ? "#c2367a" : "#5b3aa8", width: 42, height: 42 }}>
+                      <span className="sa-av" style={{ background: p.gender === "female" ? "#c2367a" : "#5b3aa8", width: 42, height: 42 }}>
                         {p.profile_photo ? <img src={String(p.profile_photo)} alt="" /> : <UserRound size={18} />}
                       </span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <strong>{String(p.full_name || "Unnamed")}</strong>
-                        <div className="ad-muted" style={{ fontSize: 12 }}>
+                        <div className="sa-muted" style={{ fontSize: 12 }}>
                           {[p.public_id, p.relationship ? `for ${p.relationship}` : null, age(p.date_of_birth), p.city].filter(Boolean).join(" · ")}
                         </div>
                       </div>
-                      <span className={`ad-chip ${cls}`}>{label}</span>
+                      <span className={`sa-chip ${cls}`}>{label}</span>
                     </div>
                     {e && (
-                      <div className="ad-muted" style={{ fontSize: 12 }}>
+                      <div className="sa-muted" style={{ fontSize: 12 }}>
                         {e.views} views · {e.interests} interests received · contacted by {e.contactedBy}
                       </div>
                     )}
@@ -404,15 +404,15 @@ export default function AccountPage() {
                       <div style={{ fontSize: 12, color: "#b42358" }}>Rejected: {String(p.rejection_reason)}</div>
                     ) : null}
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      <Link className="ad-btn ghost m3-sm" href={`/superadmin/users/${p.id}/edit`}>Edit</Link>
+                      <Link className="sa-btn ghost m3-sm" href={`/superadmin/users/${p.id}/edit`}>Edit</Link>
                       {p.public_id && !p.deleted_at ? (
-                        <a className="ad-btn ghost m3-sm" href={`/profile/${String(p.public_id).toLowerCase()}`} target="_blank" rel="noreferrer">View</a>
+                        <a className="sa-btn ghost m3-sm" href={`/profile/${String(p.public_id).toLowerCase()}`} target="_blank" rel="noreferrer">View</a>
                       ) : null}
                       {p.moderation_status === "pending_review" && !p.deleted_at ? (
-                        <Link className="ad-btn ghost m3-sm" href="/superadmin/moderation">Review</Link>
+                        <Link className="sa-btn ghost m3-sm" href="/superadmin/moderation">Review</Link>
                       ) : null}
                       {!p.deleted_at && (
-                        <button type="button" className="ad-btn ghost m3-sm" onClick={() => setTransferId(String(p.id))}>Move to another account</button>
+                        <button type="button" className="sa-btn ghost m3-sm" onClick={() => setTransferId(String(p.id))}>Move to another account</button>
                       )}
                     </div>
                   </div>
@@ -421,32 +421,32 @@ export default function AccountPage() {
             </div>
           </section>
 
-          <section className="ad-card">
-            <h2 className="ad-h2" style={{ marginBottom: 6 }}>Activity timeline</h2>
+          <section className="sa-card">
+            <h2 className="sa-h2" style={{ marginBottom: 6 }}>Activity timeline</h2>
             {data.timeline.map((ev, i) => (
               <div key={i} className="m3-tl">
                 <span className="m3-tdot" style={{ background: TONE[ev.tone] || TONE.grey }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14 }}>{ev.text}</div>
-                  <div className="ad-muted" style={{ fontSize: 12 }}>{fmtDateTime(ev.at)}</div>
+                  <div className="sa-muted" style={{ fontSize: 12 }}>{fmtDateTime(ev.at)}</div>
                 </div>
               </div>
             ))}
           </section>
 
-          <section className="ad-card">
-            <h2 className="ad-h2" style={{ marginBottom: 12 }}>Plans &amp; payments</h2>
+          <section className="sa-card">
+            <h2 className="sa-h2" style={{ marginBottom: 12 }}>Plans &amp; payments</h2>
             <div style={{ overflowX: "auto" }}>
               <table className="m3-table">
                 <thead><tr><th>Plan</th><th>Period</th><th>Contacts</th><th>Status</th></tr></thead>
                 <tbody>
-                  {data.subscriptions.length === 0 && <tr><td colSpan={4} className="ad-muted">No plans yet</td></tr>}
+                  {data.subscriptions.length === 0 && <tr><td colSpan={4} className="sa-muted">No plans yet</td></tr>}
                   {data.subscriptions.map((s) => (
                     <tr key={String(s.id)}>
-                      <td><strong>{String(s.plan_name_snapshot || "Plan")}</strong> <span className="ad-muted">{inr(s.price_snapshot)}</span></td>
+                      <td><strong>{String(s.plan_name_snapshot || "Plan")}</strong> <span className="sa-muted">{inr(s.price_snapshot)}</span></td>
                       <td>{fmtDate(s.starts_at)} → {fmtDate(s.expires_at)}</td>
                       <td>{String(s.total_contact_views_snapshot ?? "—")} · {String(s.daily_contact_view_limit_snapshot ?? "—")}/day</td>
-                      <td><span className={`ad-chip ${s.status === "active" ? "t-green" : s.status === "refunded" ? "t-rose" : "t-grey"}`}>{String(s.status)}</span></td>
+                      <td><span className={`sa-chip ${s.status === "active" ? "t-green" : s.status === "refunded" ? "t-rose" : "t-grey"}`}>{String(s.status)}</span></td>
                     </tr>
                   ))}
                 </tbody>
@@ -454,14 +454,14 @@ export default function AccountPage() {
               <table className="m3-table" style={{ marginTop: 16 }}>
                 <thead><tr><th>Paid on</th><th>Amount</th><th>Mode</th><th>Reference</th><th>Status</th></tr></thead>
                 <tbody>
-                  {data.payments.length === 0 && <tr><td colSpan={5} className="ad-muted">No payments recorded</td></tr>}
+                  {data.payments.length === 0 && <tr><td colSpan={5} className="sa-muted">No payments recorded</td></tr>}
                   {data.payments.map((p) => (
                     <tr key={String(p.id)}>
                       <td>{fmtDate(p.paid_at || p.created_at)}</td>
                       <td><strong>{inr(p.amount)}</strong></td>
                       <td>{String(p.payment_mode || p.provider || "—").replace(/_/g, " ")}</td>
-                      <td className="ad-muted">{String(p.external_txn_id || "—")}</td>
-                      <td><span className={`ad-chip ${p.status === "paid" ? "t-green" : "t-rose"}`}>{String(p.status)}</span></td>
+                      <td className="sa-muted">{String(p.external_txn_id || "—")}</td>
+                      <td><span className={`sa-chip ${p.status === "paid" ? "t-green" : "t-rose"}`}>{String(p.status)}</span></td>
                     </tr>
                   ))}
                 </tbody>
@@ -482,30 +482,30 @@ export default function AccountPage() {
               }}
             />
           )}
-          <section className="ad-card">
-            <h2 className="ad-h2" style={{ marginBottom: 12 }}>Contact quota</h2>
+          <section className="sa-card">
+            <h2 className="sa-h2" style={{ marginBottom: 12 }}>Contact quota</h2>
             {q ? (
               <>
                 <div className="m3-meter-row"><span>Total</span><strong>{q.totalUsed} / {q.totalLimit || "∞"}</strong></div>
                 <div className="m3-meter"><span style={{ width: `${pct(q.totalUsed, q.totalLimit)}%` }} /></div>
                 <div className="m3-meter-row" style={{ marginTop: 12 }}><span>Today</span><strong>{q.todayUsed} / {q.dailyLimit || "∞"}</strong></div>
                 <div className="m3-meter"><span style={{ width: `${pct(q.todayUsed, q.dailyLimit)}%` }} /></div>
-                <div className="ad-muted" style={{ fontSize: 12, marginTop: 10 }}>{q.planName} ends {fmtDate(q.expiresAt)} · daily reset 00:00 IST</div>
+                <div className="sa-muted" style={{ fontSize: 12, marginTop: 10 }}>{q.planName} ends {fmtDate(q.expiresAt)} · daily reset 00:00 IST</div>
               </>
             ) : (
-              <p className="ad-muted" style={{ margin: 0 }}>No active plan — contact details are locked for this member.</p>
+              <p className="sa-muted" style={{ margin: 0 }}>No active plan — contact details are locked for this member.</p>
             )}
           </section>
 
           {data.upgradeRequests.length > 0 && (
-            <section className="ad-card">
-              <h2 className="ad-h2" style={{ marginBottom: 10 }}>Upgrade requests</h2>
+            <section className="sa-card">
+              <h2 className="sa-h2" style={{ marginBottom: 10 }}>Upgrade requests</h2>
               {data.upgradeRequests.map((r) => (
                 <div key={String(r.id)} className="m3-tl">
                   <span className="m3-tdot" style={{ background: r.status === "new" ? TONE.rose : r.status === "contacted" ? TONE.amber : TONE.grey }} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14 }}><strong>{String(r.plan_name || r.plan_code || "Plan")}</strong> · {String(r.status)}</div>
-                    <div className="ad-muted" style={{ fontSize: 12 }}>
+                    <div className="sa-muted" style={{ fontSize: 12 }}>
                       {fmtDateTime(r.created_at)} · call {phoneFmt(String(r.callback_number || ""))}{r.note ? ` · “${String(r.note)}”` : ""}
                     </div>
                   </div>
@@ -515,8 +515,8 @@ export default function AccountPage() {
             </section>
           )}
 
-          <section className="ad-card">
-            <h2 className="ad-h2" style={{ marginBottom: 10 }}>Internal notes</h2>
+          <section className="sa-card">
+            <h2 className="sa-h2" style={{ marginBottom: 10 }}>Internal notes</h2>
             <div style={{ display: "flex", gap: 8 }}>
               <input
                 className="rv-input"
@@ -527,23 +527,23 @@ export default function AccountPage() {
                 placeholder="Only admins see this"
                 aria-label="New note"
               />
-              <button type="button" className="ad-btn pri" onClick={addNote} disabled={noteBusy || !noteText.trim()} aria-label="Add note"><Plus size={16} /></button>
+              <button type="button" className="sa-btn pri" onClick={addNote} disabled={noteBusy || !noteText.trim()} aria-label="Add note"><Plus size={16} /></button>
             </div>
             <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-              {data.notes.length === 0 && <p className="ad-muted" style={{ fontSize: 13, margin: 0 }}>No notes yet.</p>}
+              {data.notes.length === 0 && <p className="sa-muted" style={{ fontSize: 13, margin: 0 }}>No notes yet.</p>}
               {data.notes.map((n) => (
                 <div key={String(n.id)} className="m3-note">
                   <div style={{ fontSize: 13, whiteSpace: "pre-wrap" }}>{String(n.body)}</div>
-                  <div className="ad-muted" style={{ fontSize: 11, marginTop: 4 }}>{fmtDateTime(n.created_at)}</div>
+                  <div className="sa-muted" style={{ fontSize: 11, marginTop: 4 }}>{fmtDateTime(n.created_at)}</div>
                 </div>
               ))}
             </div>
           </section>
 
-          <section className="ad-card" style={{ borderColor: "#f3c4d4" }}>
-            <h2 className="ad-h2" style={{ marginBottom: 6, color: "#b42358" }}>Danger zone</h2>
-            <p className="ad-muted" style={{ fontSize: 12, margin: "0 0 10px" }}>Deleting removes the login and moves all profiles to trash.</p>
-            <button type="button" className="ad-btn ghost" style={{ color: "#b42358", borderColor: "#f3c4d4" }} disabled={busy} onClick={() => accountAction("delete")}>
+          <section className="sa-card" style={{ borderColor: "#f3c4d4" }}>
+            <h2 className="sa-h2" style={{ marginBottom: 6, color: "#b42358" }}>Danger zone</h2>
+            <p className="sa-muted" style={{ fontSize: 12, margin: "0 0 10px" }}>Deleting removes the login and moves all profiles to trash.</p>
+            <button type="button" className="sa-btn ghost" style={{ color: "#b42358", borderColor: "#f3c4d4" }} disabled={busy} onClick={() => accountAction("delete")}>
               <Trash2 size={16} /> Delete account
             </button>
           </section>

@@ -124,25 +124,25 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
   if (gate !== "ok") {
     return (
-      <div className="ad-root">
-        <div className="ad-gate">
-          <div className="ad-card" style={{ maxWidth: 420, textAlign: "center", padding: 28 }}>
-            <div className="ad-mark" style={{ margin: "0 auto 14px" }}>LB</div>
-            {gate === "checking" && <p className="ad-muted">Checking admin access…</p>}
+      <div className="sa-root">
+        <div className="sa-gate">
+          <div className="sa-card" style={{ maxWidth: 420, textAlign: "center", padding: 28 }}>
+            <div className="sa-mark" style={{ margin: "0 auto 14px" }}>LB</div>
+            {gate === "checking" && <p className="sa-muted">Checking admin access…</p>}
             {gate === "signin" && (
               <>
-                <h1 className="ad-h2" style={{ fontSize: 18 }}>Sign in to the admin console</h1>
-                <p className="ad-muted" style={{ margin: "8px 0 16px" }}>Log in with the super admin mobile number.</p>
-                <button type="button" className="ad-btn pri" onClick={() => router.push("/login")}>
+                <h1 className="sa-h2" style={{ fontSize: 18 }}>Sign in to the admin console</h1>
+                <p className="sa-muted" style={{ margin: "8px 0 16px" }}>Log in with the super admin mobile number.</p>
+                <button type="button" className="sa-btn pri" onClick={() => router.push("/login")}>
                   <LogIn size={16} /> Go to login
                 </button>
               </>
             )}
             {gate === "denied" && (
               <>
-                <h1 className="ad-h2" style={{ fontSize: 18 }}>No admin access</h1>
-                <p className="ad-muted" style={{ margin: "8px 0 16px" }}>This account isn&apos;t a super admin.</p>
-                <Link className="ad-btn ghost" href="/home">Back to the app</Link>
+                <h1 className="sa-h2" style={{ fontSize: 18 }}>No admin access</h1>
+                <p className="sa-muted" style={{ margin: "8px 0 16px" }}>This account isn&apos;t a super admin.</p>
+                <Link className="sa-btn ghost" href="/home">Back to the app</Link>
               </>
             )}
           </div>
@@ -155,11 +155,11 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + "/");
 
   return (
-    <div className="ad-root">
-      <div className={`ad-scrim ${menuOpen ? "open" : ""}`} onClick={() => setMenuOpen(false)} aria-hidden="true" />
-      <aside className={`ad-side ${menuOpen ? "open" : ""}`} aria-label="Admin navigation">
-        <Link href="/superadmin" className="ad-brand">
-          <span className="ad-mark">LB</span>
+    <div className="sa-root">
+      <div className={`sa-scrim ${menuOpen ? "open" : ""}`} onClick={() => setMenuOpen(false)} aria-hidden="true" />
+      <aside className={`sa-side ${menuOpen ? "open" : ""}`} aria-label="Admin navigation">
+        <Link href="/superadmin" className="sa-brand">
+          <span className="sa-mark">LB</span>
           <span>
             <span style={{ display: "block", fontWeight: 800, fontSize: 16 }}>LingayatBandhu</span>
             <span style={{ display: "block", fontSize: 12, color: "#a39dc0" }}>Admin console</span>
@@ -167,33 +167,33 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         </Link>
         {NAV.map((group, gi) => (
           <div key={gi}>
-            {group.title && <div className="ad-grp">{group.title}</div>}
+            {group.title && <div className="sa-grp">{group.title}</div>}
             {group.items.map((item) => {
               const Icon = item.icon;
               const count = item.badge ? item.badge(inbox) : 0;
               return (
-                <Link key={item.href} href={item.href} className={`ad-nav ${isActive(item) ? "on" : ""}`}>
+                <Link key={item.href} href={item.href} className={`sa-nav ${isActive(item) ? "on" : ""}`}>
                   <Icon size={18} aria-hidden="true" />
                   <span>{item.label}</span>
-                  {count > 0 && <span className="ad-badge">{count > 99 ? "99+" : count}</span>}
+                  {count > 0 && <span className="sa-badge">{count > 99 ? "99+" : count}</span>}
                 </Link>
               );
             })}
           </div>
         ))}
         <div style={{ marginTop: "auto", paddingTop: 16 }}>
-          <Link href="/home" className="ad-nav">
+          <Link href="/home" className="sa-nav">
             <ArrowLeft size={18} aria-hidden="true" />
             <span>Back to the app</span>
           </Link>
         </div>
       </aside>
 
-      <main className="ad-main">
-        <div className="ad-top">
+      <main className="sa-main">
+        <div className="sa-top">
           <button
             type="button"
-            className="ad-btn ghost ad-burger"
+            className="sa-btn ghost sa-burger"
             aria-label="Open menu"
             onClick={() => setMenuOpen(true)}
             style={{ width: 44, padding: 0 }}
@@ -201,7 +201,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             <Menu size={18} />
           </button>
           <GlobalSearch />
-          <Link href="/superadmin/users/create" className="ad-btn pri" style={{ marginLeft: "auto" }}>
+          <Link href="/superadmin/users/create" className="sa-btn pri" style={{ marginLeft: "auto" }}>
             <Plus size={16} /> Create profile
           </Link>
         </div>

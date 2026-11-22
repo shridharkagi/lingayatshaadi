@@ -84,24 +84,24 @@ export default function AuditLogPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <PageHeader title="Audit log" subtitle="Every admin action, newest first. Click a row to see what changed." />
-      <div className="ad-toolbar">
-        <div className="ad-pills">
-          <button type="button" className={`ad-pill ${area === "" ? "on" : ""}`} onClick={() => setArea("")}>All</button>
+      <div className="sa-toolbar">
+        <div className="sa-pills">
+          <button type="button" className={`sa-pill ${area === "" ? "on" : ""}`} onClick={() => setArea("")}>All</button>
           {Object.entries(areas).sort((a, b) => b[1] - a[1]).map(([k, n]) => (
-            <button key={k} type="button" className={`ad-pill ${area === k ? "on" : ""}`} onClick={() => setArea(k)}>
+            <button key={k} type="button" className={`sa-pill ${area === k ? "on" : ""}`} onClick={() => setArea(k)}>
               {AREA_LABEL[k] || k} <span style={{ opacity: 0.6 }}>{n}</span>
             </button>
           ))}
         </div>
-        <input className="ad-input" style={{ flex: "1 1 260px", maxWidth: 380 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter by profile / account id" aria-label="Entity id" />
+        <input className="sa-input" style={{ flex: "1 1 260px", maxWidth: 380 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter by profile / account id" aria-label="Entity id" />
       </div>
       {error && <div className="m3-error">{error}</div>}
-      <div className="ad-card" style={{ padding: 0, overflow: "hidden" }}>
-        <div className="ad-table-wrap">
-          <table className="ad-table">
+      <div className="sa-card" style={{ padding: 0, overflow: "hidden" }}>
+        <div className="sa-table-wrap">
+          <table className="sa-table">
             <thead><tr><th>When</th><th>Action</th><th>Item</th><th>Details</th></tr></thead>
             <tbody>
-              {loading && rows.length === 0 && Array.from({ length: 8 }).map((_, i) => <tr key={i}><td colSpan={4}><div className="ad-skel" style={{ height: 24 }} /></td></tr>)}
+              {loading && rows.length === 0 && Array.from({ length: 8 }).map((_, i) => <tr key={i}><td colSpan={4}><div className="sa-skel" style={{ height: 24 }} /></td></tr>)}
               {rows.map((l) => {
                 const [ar, verb] = [l.action_type.split(".")[0], l.action_type.split(".").slice(1).join(".")];
                 const diff = changed(l.before_json, l.after_json);
@@ -112,28 +112,28 @@ export default function AuditLogPage() {
                     <tr className="clickable" onClick={() => setOpen(open === l.id ? null : l.id)}>
                       <td style={{ whiteSpace: "nowrap" }}>{fmtDateTime(l.created_at)}</td>
                       <td style={{ whiteSpace: "nowrap" }}>
-                        <span className="ad-muted" style={{ fontSize: 12 }}>{AREA_LABEL[ar] || ar} · </span>
-                        <span className={`ad-chip ${TONE[verb] || "t-grey"}`}>{verb.replace(/_/g, " ") || ar}</span>
+                        <span className="sa-muted" style={{ fontSize: 12 }}>{AREA_LABEL[ar] || ar} · </span>
+                        <span className={`sa-chip ${TONE[verb] || "t-grey"}`}>{verb.replace(/_/g, " ") || ar}</span>
                       </td>
                       <td style={{ whiteSpace: "nowrap" }}>
-                        {link ? <Link className="ad-link" href={link} onClick={(e) => e.stopPropagation()}>{(l.entity_type || "").replace(/_/g, " ")} ↗</Link> : <span className="ad-muted">{(l.entity_type || "—").replace(/_/g, " ")}</span>}
-                        <div className="ad-muted" style={{ fontSize: 11 }}>{(l.entity_id || "").slice(0, 8)}</div>
+                        {link ? <Link className="sa-link" href={link} onClick={(e) => e.stopPropagation()}>{(l.entity_type || "").replace(/_/g, " ")} ↗</Link> : <span className="sa-muted">{(l.entity_type || "—").replace(/_/g, " ")}</span>}
+                        <div className="sa-muted" style={{ fontSize: 11 }}>{(l.entity_id || "").slice(0, 8)}</div>
                       </td>
                       <td style={{ fontSize: 12 }}>
-                        {reason ? <span>Reason: {short(reason)}</span> : diff.length ? <span className="ad-muted">{diff.map((d) => d.k.replace(/_/g, " ")).join(", ")}</span> : <span className="ad-muted">—</span>}
+                        {reason ? <span>Reason: {short(reason)}</span> : diff.length ? <span className="sa-muted">{diff.map((d) => d.k.replace(/_/g, " ")).join(", ")}</span> : <span className="sa-muted">—</span>}
                       </td>
                     </tr>
                     {open === l.id && (
                       <tr>
                         <td colSpan={4} style={{ background: "#fafbfd" }}>
-                          {diff.length === 0 && <span className="ad-muted" style={{ fontSize: 12 }}>No field changes recorded.</span>}
+                          {diff.length === 0 && <span className="sa-muted" style={{ fontSize: 12 }}>No field changes recorded.</span>}
                           {diff.map((d) => (
                             <div key={d.k} style={{ fontSize: 12, padding: "3px 0" }}>
                               <strong>{d.k.replace(/_/g, " ")}</strong>: <span className="rv-old">{short(d.b)}</span> → <span className="rv-new">{short(d.a)}</span>
                             </div>
                           ))}
                           {l.meta && Object.keys(l.meta).length > 0 && (
-                            <div className="ad-muted" style={{ fontSize: 11, marginTop: 6, wordBreak: "break-all" }}>Extra: {short(l.meta)}</div>
+                            <div className="sa-muted" style={{ fontSize: 11, marginTop: 6, wordBreak: "break-all" }}>Extra: {short(l.meta)}</div>
                           )}
                         </td>
                       </tr>
@@ -143,7 +143,7 @@ export default function AuditLogPage() {
               })}
             </tbody>
           </table>
-          {!loading && rows.length === 0 && <div className="ad-empty">No admin actions recorded.</div>}
+          {!loading && rows.length === 0 && <div className="sa-empty">No admin actions recorded.</div>}
         </div>
       </div>
       <Pager total={total} limit={LIMIT} offset={offset} onChange={setOffset} />

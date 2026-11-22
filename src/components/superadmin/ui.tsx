@@ -17,8 +17,8 @@ export function PageHeader({ title, subtitle, children }: { title: string; subti
   return (
     <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: 12 }}>
       <div>
-        <h1 className="ad-h1">{title}</h1>
-        {subtitle && <p className="ad-muted" style={{ margin: "4px 0 0" }}>{subtitle}</p>}
+        <h1 className="sa-h1">{title}</h1>
+        {subtitle && <p className="sa-muted" style={{ margin: "4px 0 0" }}>{subtitle}</p>}
       </div>
       {children && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>{children}</div>}
     </div>
@@ -36,13 +36,13 @@ export function Pager({
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between", flexWrap: "wrap" }}>
       <span style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <span className="ad-muted" style={{ fontSize: 12 }}>
+        <span className="sa-muted" style={{ fontSize: 12 }}>
           {total <= limit ? `${n(total)} result${total === 1 ? "" : "s"}` : `${n(from)}–${n(to)} of ${n(total)}`}
         </span>
         {onLimitChange && (
-          <label className="ad-muted" style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <label className="sa-muted" style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6 }}>
             Show
-            <select className="ad-select ad-select-sm" value={limit} onChange={(e) => onLimitChange(Number(e.target.value))} aria-label="Rows per page">
+            <select className="sa-select sa-select-sm" value={limit} onChange={(e) => onLimitChange(Number(e.target.value))} aria-label="Rows per page">
               {PAGE_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
             per page
@@ -51,10 +51,10 @@ export function Pager({
       </span>
       {total > limit && (
         <span style={{ display: "flex", gap: 6 }}>
-          <button type="button" className="ad-btn ghost" style={{ minHeight: 34 }} disabled={offset === 0} onClick={() => onChange(Math.max(0, offset - limit))} aria-label="Previous page">
+          <button type="button" className="sa-btn ghost" style={{ minHeight: 34 }} disabled={offset === 0} onClick={() => onChange(Math.max(0, offset - limit))} aria-label="Previous page">
             <ChevronLeft size={16} />
           </button>
-          <button type="button" className="ad-btn ghost" style={{ minHeight: 34 }} disabled={to >= total} onClick={() => onChange(offset + limit)} aria-label="Next page">
+          <button type="button" className="sa-btn ghost" style={{ minHeight: 34 }} disabled={to >= total} onClick={() => onChange(offset + limit)} aria-label="Next page">
             <ChevronRight size={16} />
           </button>
         </span>
@@ -116,14 +116,14 @@ export function DateFilter({
 }) {
   const today = istDay(new Date());
   return (
-    <div className="ad-datefilter">
+    <div className="sa-datefilter">
       {fields && onFieldChange && (
-        <select className="ad-select" value={field} onChange={(e) => onFieldChange(e.target.value)} aria-label="Date applies to">
+        <select className="sa-select" value={field} onChange={(e) => onFieldChange(e.target.value)} aria-label="Date applies to">
           {fields.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
         </select>
       )}
       <select
-        className={`ad-select ${value.preset !== "any" ? "is-set" : ""}`}
+        className={`sa-select ${value.preset !== "any" ? "is-set" : ""}`}
         value={value.preset}
         aria-label="Date range"
         onChange={(e) => {
@@ -135,11 +135,11 @@ export function DateFilter({
         {DATE_PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
       </select>
       {value.preset === "custom" && (
-        <span className="ad-daterange">
-          <input type="date" className="ad-date" value={value.from} max={value.to || today} aria-label="From date"
+        <span className="sa-daterange">
+          <input type="date" className="sa-date" value={value.from} max={value.to || today} aria-label="From date"
             onChange={(e) => onChange({ ...value, from: e.target.value })} />
-          <span className="ad-muted">to</span>
-          <input type="date" className="ad-date" value={value.to} min={value.from} max={today} aria-label="To date"
+          <span className="sa-muted">to</span>
+          <input type="date" className="sa-date" value={value.to} min={value.from} max={today} aria-label="To date"
             onChange={(e) => onChange({ ...value, to: e.target.value })} />
         </span>
       )}
@@ -150,7 +150,7 @@ export function DateFilter({
 export function ResetButton({ show, onClick }: { show: boolean; onClick: () => void }) {
   if (!show) return null;
   return (
-    <button type="button" className="ad-btn ghost ad-reset" onClick={onClick}>
+    <button type="button" className="sa-btn ghost sa-reset" onClick={onClick}>
       <RotateCcw size={14} /> Reset filters
     </button>
   );
@@ -182,7 +182,7 @@ export function RelChip({ rel }: { rel: string | null | undefined }) {
   const r = REL[rel || "self"] || { label: rel || "Self", cls: "rel-other", icon: Handshake };
   const Icon = r.icon;
   return (
-    <span className={`ad-rel ${r.cls}`} title={r.label === "Self" ? "Created by the person themselves" : `Created by family — for their ${r.label.toLowerCase()}`}>
+    <span className={`sa-rel ${r.cls}`} title={r.label === "Self" ? "Created by the person themselves" : `Created by family — for their ${r.label.toLowerCase()}`}>
       <Icon size={13} aria-hidden="true" /> {r.label === "Self" ? "Self" : `For ${r.label.toLowerCase()}`}
     </span>
   );
@@ -206,7 +206,7 @@ export function downloadCsv(filename: string, headers: string[], rows: (string |
 
 export function CsvButton({ onClick, busy }: { onClick: () => void; busy?: boolean }) {
   return (
-    <button type="button" className="ad-btn ghost" onClick={onClick} disabled={busy}>
+    <button type="button" className="sa-btn ghost" onClick={onClick} disabled={busy}>
       <Download size={16} /> {busy ? "Exporting…" : "Export CSV"}
     </button>
   );
@@ -223,7 +223,7 @@ const PROFILE_STATUS: Record<string, [string, string]> = {
 };
 export function ProfileStatusChip({ status }: { status: string }) {
   const [label, cls] = PROFILE_STATUS[status] || [status, "t-grey"];
-  return <span className={`ad-chip ${cls}`}>{label}</span>;
+  return <span className={`sa-chip ${cls}`}>{label}</span>;
 }
 
 export const fmtDate = (s?: unknown) =>
@@ -256,7 +256,7 @@ export function CopyButton({ onCopy, label = "Copy for Sheets" }: { onCopy: () =
   return (
     <button
       type="button"
-      className="ad-btn ghost"
+      className="sa-btn ghost"
       disabled={state === "busy"}
       title="Copies every matching row (all pages). Paste into Google Sheets with Ctrl/⌘+V."
       onClick={async () => {

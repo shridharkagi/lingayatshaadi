@@ -134,8 +134,8 @@ export default function GlobalSearch() {
   let idx = -1;
 
   return (
-    <div className="ad-search" ref={boxRef}>
-      <label className="ad-search-box">
+    <div className="sa-search" ref={boxRef}>
+      <label className="sa-search-box">
         <Search size={18} aria-hidden="true" />
         <input
           ref={inputRef}
@@ -149,53 +149,53 @@ export default function GlobalSearch() {
           placeholder="Search phone, LB-ID, U-code or name…"
           aria-label="Search accounts and profiles"
         />
-        <span className="ad-kbd">⌘K</span>
+        <span className="sa-kbd">⌘K</span>
       </label>
       {showPanel && (
-        <div className="ad-results" role="listbox">
-          {loading && accounts.length + profiles.length === 0 && <div className="ad-res ad-muted">Searching…</div>}
+        <div className="sa-results" role="listbox">
+          {loading && accounts.length + profiles.length === 0 && <div className="sa-res sa-muted">Searching…</div>}
           {!loading && accounts.length + profiles.length === 0 && (
-            <div className="ad-res ad-muted">No accounts or profiles match “{q.trim()}”.</div>
+            <div className="sa-res sa-muted">No accounts or profiles match “{q.trim()}”.</div>
           )}
-          {accounts.length > 0 && <div className="ad-res-h">Accounts</div>}
+          {accounts.length > 0 && <div className="sa-res-h">Accounts</div>}
           {accounts.map((a) => {
             idx += 1;
             const i = idx;
             return (
-              <Link key={a.id} href={links[i]} className={`ad-res ${active === i ? "on" : ""}`} onClick={() => go(links[i])}>
-                <span className="ad-av" style={{ background: "#3f46b8" }}>
+              <Link key={a.id} href={links[i]} className={`sa-res ${active === i ? "on" : ""}`} onClick={() => go(links[i])}>
+                <span className="sa-av" style={{ background: "#3f46b8" }}>
                   <UsersRound size={16} />
                 </span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <strong>{a.name || "Unnamed account"}</strong>
-                  <span className="ad-muted" style={{ display: "block", fontSize: 12 }}>
+                  <span className="sa-muted" style={{ display: "block", fontSize: 12 }}>
                     {formatPhone(a.phone)} · {a.accountCode || "no code"} · {a.profileCount} profile{a.profileCount === 1 ? "" : "s"}
                   </span>
                 </span>
-                {a.suspended && <span className="ad-chip t-rose">Suspended</span>}
+                {a.suspended && <span className="sa-chip t-rose">Suspended</span>}
               </Link>
             );
           })}
-          {profiles.length > 0 && <div className="ad-res-h">Profiles</div>}
+          {profiles.length > 0 && <div className="sa-res-h">Profiles</div>}
           {profiles.map((p) => {
             idx += 1;
             const i = idx;
             return (
-              <Link key={p.id} href={links[i]} className={`ad-res ${active === i ? "on" : ""}`} onClick={() => go(links[i])}>
-                <span className="ad-av" style={{ background: p.gender === "female" ? "#c2367a" : "#5b3aa8" }}>
+              <Link key={p.id} href={links[i]} className={`sa-res ${active === i ? "on" : ""}`} onClick={() => go(links[i])}>
+                <span className="sa-av" style={{ background: p.gender === "female" ? "#c2367a" : "#5b3aa8" }}>
                   {p.photo ? <img src={p.photo} alt="" /> : p.name ? initials(p.name) : <UserRound size={16} />}
                 </span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <strong>{p.name || "Unnamed profile"}</strong>
-                  <span className="ad-muted" style={{ display: "block", fontSize: 12 }}>
+                  <span className="sa-muted" style={{ display: "block", fontSize: 12 }}>
                     {p.publicId || "no ID yet"} · {p.gender === "female" ? "Bride" : p.gender === "male" ? "Groom" : "—"}
                     {p.city ? ` · ${p.city}` : ""}
                   </span>
                 </span>
                 {p.deleted ? (
-                  <span className="ad-chip t-rose">Deleted</span>
+                  <span className="sa-chip t-rose">Deleted</span>
                 ) : (
-                  <span className={`ad-chip ${STATUS_CHIP[p.status || ""] || "t-grey"}`}>
+                  <span className={`sa-chip ${STATUS_CHIP[p.status || ""] || "t-grey"}`}>
                     {(p.status || "unknown").replace("_", " ")}
                   </span>
                 )}

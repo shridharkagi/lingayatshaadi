@@ -267,9 +267,9 @@ export default function AccountsPage() {
         )}
       </PageHeader>
 
-      <div className="ad-tabs" role="tablist">
+      <div className="sa-tabs" role="tablist">
         {TABS.map((t) => (
-          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={`ad-tab ${tab === t.id ? "on" : ""}`} onClick={() => setTab(t.id)}>
+          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={`sa-tab ${tab === t.id ? "on" : ""}`} onClick={() => setTab(t.id)}>
             {t.label}
             {t.id === "deleted" ? (tab === t.id && !loading && <span className="cnt">{total}</span>) : counts[t.id] !== undefined && <span className="cnt">{counts[t.id]}</span>}
           </button>
@@ -277,13 +277,13 @@ export default function AccountsPage() {
       </div>
 
       {tab !== "deleted" && (
-        <div className="ad-toolbar">
-          <label className="ad-search-box" style={{ flex: "1 1 280px", maxWidth: 420, height: 40 }}>
+        <div className="sa-toolbar">
+          <label className="sa-search-box" style={{ flex: "1 1 280px", maxWidth: 420, height: 40 }}>
             <Search size={16} aria-hidden="true" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, phone or U-code" aria-label="Search accounts" />
           </label>
           <DateFilter value={dates} onChange={setDates} fields={DATE_FIELDS} field={dateOn} onFieldChange={setDateOn} />
-          <select className={`ad-select ${plan ? "is-set" : ""}`} value={plan} onChange={(e) => setPlan(e.target.value)} aria-label="Plan">
+          <select className={`sa-select ${plan ? "is-set" : ""}`} value={plan} onChange={(e) => setPlan(e.target.value)} aria-label="Plan">
             <option value="">Any plan</option>
             <option value="paid">Any paid plan ({Object.entries(planCounts).filter(([k]) => k !== "none").reduce((n, [, v]) => n + v, 0)})</option>
             {[...new Set([...PLAN_OPTIONS, ...Object.keys(planCounts).filter((k) => k !== "none")])].map((p) => (
@@ -291,7 +291,7 @@ export default function AccountsPage() {
             ))}
             <option value="none">No plan ({planCounts.none || 0})</option>
           </select>
-          <select className="ad-select" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
+          <select className="sa-select" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
             {SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
           </select>
           <ResetButton show={filtersOn} onClick={resetFilters} />
@@ -299,40 +299,40 @@ export default function AccountsPage() {
       )}
 
       {selected.size > 0 && tab !== "deleted" && (
-        <div className="ad-bulk">
+        <div className="sa-bulk">
           <strong>{selected.size} selected</strong>
           {selected.size < total && rows.every((r) => selected.has(r.id)) && (
-            <button type="button" className="ad-link" style={{ border: 0, background: "none", cursor: "pointer", fontSize: 13 }} disabled={selectingAll} onClick={selectAllMatching}>
+            <button type="button" className="sa-link" style={{ border: 0, background: "none", cursor: "pointer", fontSize: 13 }} disabled={selectingAll} onClick={selectAllMatching}>
               {selectingAll ? "Selecting…" : `Select all ${total} matching`}
             </button>
           )}
           <span style={{ flex: 1 }} />
-          <button type="button" className="ad-btn pri" onClick={() => setWaOpen(true)}>
+          <button type="button" className="sa-btn pri" onClick={() => setWaOpen(true)}>
             <MessageCircle size={16} /> WhatsApp {selected.size}
           </button>
-          <button type="button" className="ad-btn ghost" onClick={() => setSelected(new Map())}>Clear</button>
+          <button type="button" className="sa-btn ghost" onClick={() => setSelected(new Map())}>Clear</button>
         </div>
       )}
-      {error && <div className="ad-card" style={{ color: "#b42358" }}>{error}</div>}
+      {error && <div className="sa-card" style={{ color: "#b42358" }}>{error}</div>}
 
-      <div className="ad-card" style={{ padding: 0, overflow: "hidden" }}>
-        <div className="ad-table-wrap">
+      <div className="sa-card" style={{ padding: 0, overflow: "hidden" }}>
+        <div className="sa-table-wrap">
           {tab === "deleted" ? (
-            <table className="ad-table">
+            <table className="sa-table">
               <thead><tr><th>Deleted on</th><th>Phone</th><th>Account id</th><th>Reason</th></tr></thead>
               <tbody>
                 {deleted.map((d) => (
                   <tr key={d.id}>
                     <td>{fmtDateTime(d.created_at)}</td>
                     <td>{phoneFmt(String(d.meta?.phone_snapshot || ""))}</td>
-                    <td className="ad-muted">{d.entity_id}</td>
+                    <td className="sa-muted">{d.entity_id}</td>
                     <td>{String(d.meta?.delete_reason || "—")}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           ) : (
-            <table className="ad-table">
+            <table className="sa-table">
               <thead>
                 <tr>
                   <th style={{ width: 36 }} onClick={(e) => e.stopPropagation()}>
@@ -343,7 +343,7 @@ export default function AccountsPage() {
               <tbody>
                 {loading && rows.length === 0 &&
                   Array.from({ length: 6 }).map((_, i) => (
-                    <tr key={i}><td colSpan={9}><div className="ad-skel" style={{ height: 28 }} /></td></tr>
+                    <tr key={i}><td colSpan={9}><div className="sa-skel" style={{ height: 28 }} /></td></tr>
                   ))}
                 {rows.map((a) => (
                   <tr key={a.id} className="clickable" onClick={() => router.push(`/superadmin/accounts/${a.id}`)}>
@@ -352,11 +352,11 @@ export default function AccountsPage() {
                     </td>
                     <td>
                       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                        <span className="ad-av" style={{ background: "#3f46b8" }}>{initials(a.name)}</span>
+                        <span className="sa-av" style={{ background: "#3f46b8" }}>{initials(a.name)}</span>
                         <div>
-                          <Link href={`/superadmin/accounts/${a.id}`} className="ad-link" onClick={(e) => e.stopPropagation()}>{a.name || "Unnamed"}</Link>
-                          <div className="ad-muted" style={{ fontSize: 12 }}>
-                            {a.accountCode || "—"} {a.suspended && <span className="ad-chip t-rose" style={{ marginLeft: 4 }}>Suspended</span>}
+                          <Link href={`/superadmin/accounts/${a.id}`} className="sa-link" onClick={(e) => e.stopPropagation()}>{a.name || "Unnamed"}</Link>
+                          <div className="sa-muted" style={{ fontSize: 12 }}>
+                            {a.accountCode || "—"} {a.suspended && <span className="sa-chip t-rose" style={{ marginLeft: 4 }}>Suspended</span>}
                           </div>
                         </div>
                       </div>
@@ -364,37 +364,37 @@ export default function AccountsPage() {
                     <td style={{ whiteSpace: "nowrap" }}>{phoneFmt(a.phone)}</td>
                     <td style={{ whiteSpace: "nowrap" }}>
                       {a.profiles === 0 ? (
-                        <span className="ad-muted">None yet</span>
+                        <span className="sa-muted">None yet</span>
                       ) : (
                         <>
                           <strong>{a.profiles}</strong>
-                          <span className="ad-muted"> · {a.liveProfiles} live</span>
-                          {a.pendingProfiles > 0 && <span className="ad-chip t-amber" style={{ marginLeft: 6 }}>{a.pendingProfiles} pending</span>}
+                          <span className="sa-muted"> · {a.liveProfiles} live</span>
+                          {a.pendingProfiles > 0 && <span className="sa-chip t-amber" style={{ marginLeft: 6 }}>{a.pendingProfiles} pending</span>}
                         </>
                       )}
                     </td>
                     <td style={{ whiteSpace: "nowrap" }}>
                       {a.plan ? (
                         <>
-                          <span className={`ad-chip ${a.plan.price > 0 ? "t-green" : "t-grey"}`}>{a.plan.name}</span>
-                          <div className="ad-muted" style={{ fontSize: 11, marginTop: 2 }}>
+                          <span className={`sa-chip ${a.plan.price > 0 ? "t-green" : "t-grey"}`}>{a.plan.name}</span>
+                          <div className="sa-muted" style={{ fontSize: 11, marginTop: 2 }}>
                             {a.plan.price > 0 ? inr(a.plan.price) + " · " : ""}ends {fmtDate(a.plan.expiresAt)}
                           </div>
                         </>
                       ) : (
-                        <span className="ad-muted">No plan</span>
+                        <span className="sa-muted">No plan</span>
                       )}
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <button type="button" className="ct-open" disabled={a.contactViews === 0} style={a.contactViews === 0 ? { cursor: "default" } : undefined}
                         onClick={() => a.contactViews > 0 && setContactsFor({ id: a.id, name: a.name })} title={a.contactViews > 0 ? "See which profiles' contacts were taken" : undefined}>
                       {a.plan ? (
-                        <div className="ad-quota" title={`Today: ${a.contactViewsToday}${a.plan.dailyLimit ? ` of ${a.plan.dailyLimit}` : ""}`}>
-                          <span><strong>{a.contactViews}</strong>{a.plan.totalLimit ? <span className="ad-muted"> / {a.plan.totalLimit}</span> : <span className="ad-muted"> · unlimited</span>}</span>
+                        <div className="sa-quota" title={`Today: ${a.contactViewsToday}${a.plan.dailyLimit ? ` of ${a.plan.dailyLimit}` : ""}`}>
+                          <span><strong>{a.contactViews}</strong>{a.plan.totalLimit ? <span className="sa-muted"> / {a.plan.totalLimit}</span> : <span className="sa-muted"> · unlimited</span>}</span>
                           {a.plan.totalLimit ? (
                             <span className="bar"><span className={a.contactViews / a.plan.totalLimit >= 0.8 ? "hot" : ""} style={{ width: `${Math.min(100, (a.contactViews / a.plan.totalLimit) * 100)}%` }} /></span>
                           ) : null}
-                          <span className="ad-muted" style={{ fontSize: 11 }}>today {a.contactViewsToday}{a.plan.dailyLimit ? ` / ${a.plan.dailyLimit}` : ""}</span>
+                          <span className="sa-muted" style={{ fontSize: 11 }}>today {a.contactViewsToday}{a.plan.dailyLimit ? ` / ${a.plan.dailyLimit}` : ""}</span>
                         </div>
                       ) : (
                         <span>{a.contactViews}</span>
@@ -403,9 +403,9 @@ export default function AccountsPage() {
                       </button>
                     </td>
                     <td style={{ whiteSpace: "nowrap" }}>{fmtDate(a.createdAt)}</td>
-                    <td style={{ whiteSpace: "nowrap" }} className="ad-muted">{a.lastSignInAt ? fmtDateTime(a.lastSignInAt) : "Never"}</td>
+                    <td style={{ whiteSpace: "nowrap" }} className="sa-muted">{a.lastSignInAt ? fmtDateTime(a.lastSignInAt) : "Never"}</td>
                     <td>
-                      <Link href={`/superadmin/accounts/${a.id}`} className="ad-btn ghost" style={{ minHeight: 32, fontSize: 12 }} onClick={(e) => e.stopPropagation()}>
+                      <Link href={`/superadmin/accounts/${a.id}`} className="sa-btn ghost" style={{ minHeight: 32, fontSize: 12 }} onClick={(e) => e.stopPropagation()}>
                         Open 360°
                       </Link>
                     </td>
@@ -415,9 +415,9 @@ export default function AccountsPage() {
             </table>
           )}
           {!loading && (tab === "deleted" ? deleted.length === 0 : rows.length === 0) && (
-            <div className="ad-empty">
+            <div className="sa-empty">
               No accounts match.{" "}
-              {filtersOn && <button type="button" className="ad-link" style={{ border: 0, background: "none", cursor: "pointer" }} onClick={resetFilters}>Reset filters</button>}
+              {filtersOn && <button type="button" className="sa-link" style={{ border: 0, background: "none", cursor: "pointer" }} onClick={resetFilters}>Reset filters</button>}
             </div>
           )}
         </div>

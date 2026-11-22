@@ -44,7 +44,7 @@ const tip = { borderRadius: 12, border: "1px solid #ecedf4", boxShadow: "0 12px 
 
 function Bars({ items, fmt = (n: number) => String(n) }: { items: KV[]; fmt?: (n: number) => string }) {
   const max = Math.max(1, ...items.map((i) => i.n));
-  if (!items.length) return <p className="ad-muted" style={{ margin: 0 }}>No data in this period.</p>;
+  if (!items.length) return <p className="sa-muted" style={{ margin: 0 }}>No data in this period.</p>;
   return (
     <div className="rp-bars">
       {items.map((i, idx) => (
@@ -59,28 +59,28 @@ function Bars({ items, fmt = (n: number) => String(n) }: { items: KV[]; fmt?: (n
 }
 function Stat({ label, value, sub }: { label: string; value: React.ReactNode; sub?: React.ReactNode }) {
   return (
-    <div className="ad-card rp-stat">
-      <span className="ad-muted" style={{ fontSize: 13 }}>{label}</span>
+    <div className="sa-card rp-stat">
+      <span className="sa-muted" style={{ fontSize: 13 }}>{label}</span>
       <span className="v">{value}</span>
-      {sub && <span className="ad-muted" style={{ fontSize: 12 }}>{sub}</span>}
+      {sub && <span className="sa-muted" style={{ fontSize: 12 }}>{sub}</span>}
     </div>
   );
 }
 function TopList({ title, rows, unit }: { title: string; rows: Top[]; unit: string }) {
   return (
-    <div className="ad-card">
-      <h2 className="ad-h2" style={{ marginBottom: 10 }}>{title}</h2>
-      {rows.length === 0 && <p className="ad-muted" style={{ margin: 0 }}>No data in this period.</p>}
+    <div className="sa-card">
+      <h2 className="sa-h2" style={{ marginBottom: 10 }}>{title}</h2>
+      {rows.length === 0 && <p className="sa-muted" style={{ margin: 0 }}>No data in this period.</p>}
       {rows.map((r, i) => (
-        <div key={i} className="ad-row">
-          <span className="ad-muted" style={{ width: 18 }}>{i + 1}</span>
+        <div key={i} className="sa-row">
+          <span className="sa-muted" style={{ width: 18 }}>{i + 1}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            {r.id ? <Link className="ad-link" href={`/superadmin/users/${r.id}/edit`}>{r.name || "Unnamed"}</Link>
-              : r.userId ? <Link className="ad-link" href={`/superadmin/accounts/${r.userId}`}>{r.name || "Account"}</Link>
+            {r.id ? <Link className="sa-link" href={`/superadmin/users/${r.id}/edit`}>{r.name || "Unnamed"}</Link>
+              : r.userId ? <Link className="sa-link" href={`/superadmin/accounts/${r.userId}`}>{r.name || "Account"}</Link>
               : <strong>{r.name}</strong>}
-            <span className="ad-muted" style={{ fontSize: 12 }}> · {r.publicId || r.accountCode || ""}</span>
+            <span className="sa-muted" style={{ fontSize: 12 }}> · {r.publicId || r.accountCode || ""}</span>
           </div>
-          <strong>{r.n}</strong><span className="ad-muted" style={{ fontSize: 12 }}>{unit}</span>
+          <strong>{r.n}</strong><span className="sa-muted" style={{ fontSize: 12 }}>{unit}</span>
         </div>
       ))}
     </div>
@@ -155,41 +155,41 @@ export default function ReportsPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <PageHeader title="Reports" subtitle="Exact numbers from the database for the selected period. Member mix reflects live profiles today.">
-        <div className="ad-pills">
+        <div className="sa-pills">
           {RANGES.map((r) => (
-            <button key={r.id} type="button" className={`ad-pill ${range === r.id ? "on" : ""}`} onClick={() => setRange(r.id)}>{r.label}</button>
+            <button key={r.id} type="button" className={`sa-pill ${range === r.id ? "on" : ""}`} onClick={() => setRange(r.id)}>{r.label}</button>
           ))}
         </div>
         {range === "custom" && (
           <>
-            <input type="date" className="ad-date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} aria-label="From" />
-            <input type="date" className="ad-date" value={to} min={from} max={isoDay(new Date())} onChange={(e) => setTo(e.target.value)} aria-label="To" />
+            <input type="date" className="sa-date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} aria-label="From" />
+            <input type="date" className="sa-date" value={to} min={from} max={isoDay(new Date())} onChange={(e) => setTo(e.target.value)} aria-label="To" />
           </>
         )}
         <CsvButton onClick={exportCsv} busy={!data} />
-        <button type="button" className="ad-btn ghost" onClick={load} aria-label="Refresh"><RefreshCw size={16} className={loading ? "animate-spin" : ""} /></button>
+        <button type="button" className="sa-btn ghost" onClick={load} aria-label="Refresh"><RefreshCw size={16} className={loading ? "animate-spin" : ""} /></button>
       </PageHeader>
 
-      <div className="ad-tabs" role="tablist">
+      <div className="sa-tabs" role="tablist">
         {TABS.map((t) => (
-          <button key={t} type="button" role="tab" aria-selected={tab === t} className={`ad-tab ${tab === t ? "on" : ""}`} onClick={() => setTab(t)}>{t}</button>
+          <button key={t} type="button" role="tab" aria-selected={tab === t} className={`sa-tab ${tab === t ? "on" : ""}`} onClick={() => setTab(t)}>{t}</button>
         ))}
       </div>
       {error && <div className="m3-error">{error}</div>}
       {!data ? (
-        <div className="ad-grid-2"><div className="ad-skel" style={{ height: 300 }} /><div className="ad-skel" style={{ height: 300 }} /></div>
+        <div className="sa-grid-2"><div className="sa-skel" style={{ height: 300 }} /><div className="sa-skel" style={{ height: 300 }} /></div>
       ) : (
         <div key={tab} style={{ display: "flex", flexDirection: "column", gap: 14, opacity: loading ? 0.6 : 1, transition: "opacity .2s" }}>
           {tab === "Growth" && (
             <>
-              <div className="ad-grid-kpi">
+              <div className="sa-grid-kpi">
                 <Stat label="New accounts" value={totals.signups} />
                 <Stat label="Profiles created" value={totals.profiles} />
                 <Stat label="Profiles approved" value={totals.approvals} />
                 <Stat label="WhatsApp leads" value={totals.leads} />
               </div>
-              <div className="ad-card">
-                <h2 className="ad-h2" style={{ marginBottom: 10 }}>Daily growth</h2>
+              <div className="sa-card">
+                <h2 className="sa-h2" style={{ marginBottom: 10 }}>Daily growth</h2>
                 <div style={{ height: 300 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={daily} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
@@ -210,13 +210,13 @@ export default function ReportsPage() {
 
           {tab === "Engagement" && (
             <>
-              <div className="ad-grid-kpi">
+              <div className="sa-grid-kpi">
                 <Stat label="Profile views" value={totals.profileViews.toLocaleString("en-IN")} />
                 <Stat label="Contact views" value={totals.contactViews} />
                 <Stat label="Interests sent" value={totals.interests} sub={toKV(data.engagement.interestStatus).map((s) => `${s.n} ${s.k}`).join(" · ") || undefined} />
               </div>
-              <div className="ad-card">
-                <h2 className="ad-h2" style={{ marginBottom: 10 }}>Daily engagement</h2>
+              <div className="sa-card">
+                <h2 className="sa-h2" style={{ marginBottom: 10 }}>Daily engagement</h2>
                 <div style={{ height: 280 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={daily} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
@@ -232,7 +232,7 @@ export default function ReportsPage() {
                   </ResponsiveContainer>
                 </div>
               </div>
-              <div className="ad-grid-2">
+              <div className="sa-grid-2">
                 <TopList title="Most viewed profiles" rows={data.engagement.topViewed} unit=" views" />
                 <TopList title="Most contacted profiles" rows={data.engagement.topContacted} unit=" contacts" />
               </div>
@@ -242,14 +242,14 @@ export default function ReportsPage() {
 
           {tab === "Revenue" && (
             <>
-              <div className="ad-grid-kpi">
+              <div className="sa-grid-kpi">
                 <Stat label="Revenue collected" value={inr(data.revenue.total)} sub={`${data.revenue.payments} paid payments`} />
                 <Stat label="Average payment" value={data.revenue.payments ? inr(data.revenue.total / data.revenue.payments) : "—"} />
                 <Stat label="Active plans now" value={sum(data.revenue.activePlans)} sub={toKV(data.revenue.activePlans).map((p) => `${p.n} ${p.k}`).join(" · ")} />
                 <Stat label="Expiring in 30 days" value={data.revenue.expiring30d} sub={<Link href="/superadmin/pipeline">Plan renewals →</Link>} />
               </div>
-              <div className="ad-card">
-                <h2 className="ad-h2" style={{ marginBottom: 10 }}>Revenue by month</h2>
+              <div className="sa-card">
+                <h2 className="sa-h2" style={{ marginBottom: 10 }}>Revenue by month</h2>
                 <div style={{ height: 260 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={data.revenue.byMonth} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -263,35 +263,35 @@ export default function ReportsPage() {
                   </ResponsiveContainer>
                 </div>
               </div>
-              <div className="ad-grid-2">
-                <div className="ad-card"><h2 className="ad-h2" style={{ marginBottom: 12 }}>Revenue by plan</h2><Bars items={data.revenue.byPlan.map((p) => ({ k: `${p.plan} (${p.count})`, n: Number(p.amount) }))} fmt={inr} /></div>
-                <div className="ad-card"><h2 className="ad-h2" style={{ marginBottom: 12 }}>Payments by mode</h2><Bars items={toKV(data.revenue.byMode).map((m) => ({ ...m, k: m.k.replace(/_/g, " ") }))} /></div>
+              <div className="sa-grid-2">
+                <div className="sa-card"><h2 className="sa-h2" style={{ marginBottom: 12 }}>Revenue by plan</h2><Bars items={data.revenue.byPlan.map((p) => ({ k: `${p.plan} (${p.count})`, n: Number(p.amount) }))} fmt={inr} /></div>
+                <div className="sa-card"><h2 className="sa-h2" style={{ marginBottom: 12 }}>Payments by mode</h2><Bars items={toKV(data.revenue.byMode).map((m) => ({ ...m, k: m.k.replace(/_/g, " ") }))} /></div>
               </div>
             </>
           )}
 
           {tab === "Members" && (
             <>
-              <div className="ad-grid-kpi">
+              <div className="sa-grid-kpi">
                 <Stat label="Live profiles" value={sum(data.members.gender)} />
                 <Stat label="Brides" value={data.members.gender.female || 0} />
                 <Stat label="Grooms" value={data.members.gender.male || 0} />
                 <Stat label="Managed by family" value={sum(data.members.relationship) - (data.members.relationship.self || 0)} sub="profiles for son, daughter, sibling…" />
               </div>
-              <div className="ad-grid-2">
-                <div className="ad-card"><h2 className="ad-h2" style={{ marginBottom: 12 }}>By state</h2><Bars items={toKV(data.members.state)} /></div>
-                <div className="ad-card"><h2 className="ad-h2" style={{ marginBottom: 12 }}>Top districts / cities</h2><Bars items={data.members.district} /></div>
-                <div className="ad-card"><h2 className="ad-h2" style={{ marginBottom: 12 }}>Age bands</h2><Bars items={["18-23", "24-28", "29-33", "34-40", "41+"].map((k) => ({ k, n: data.members.age[k] || 0 }))} /></div>
-                <div className="ad-card"><h2 className="ad-h2" style={{ marginBottom: 12 }}>Marital status</h2><Bars items={toKV(data.members.marital)} /></div>
-                <div className="ad-card"><h2 className="ad-h2" style={{ marginBottom: 12 }}>Profession</h2><Bars items={data.members.profession} /></div>
-                <div className="ad-card"><h2 className="ad-h2" style={{ marginBottom: 12 }}>Sub-caste</h2><Bars items={data.members.subCaste} /></div>
+              <div className="sa-grid-2">
+                <div className="sa-card"><h2 className="sa-h2" style={{ marginBottom: 12 }}>By state</h2><Bars items={toKV(data.members.state)} /></div>
+                <div className="sa-card"><h2 className="sa-h2" style={{ marginBottom: 12 }}>Top districts / cities</h2><Bars items={data.members.district} /></div>
+                <div className="sa-card"><h2 className="sa-h2" style={{ marginBottom: 12 }}>Age bands</h2><Bars items={["18-23", "24-28", "29-33", "34-40", "41+"].map((k) => ({ k, n: data.members.age[k] || 0 }))} /></div>
+                <div className="sa-card"><h2 className="sa-h2" style={{ marginBottom: 12 }}>Marital status</h2><Bars items={toKV(data.members.marital)} /></div>
+                <div className="sa-card"><h2 className="sa-h2" style={{ marginBottom: 12 }}>Profession</h2><Bars items={data.members.profession} /></div>
+                <div className="sa-card"><h2 className="sa-h2" style={{ marginBottom: 12 }}>Sub-caste</h2><Bars items={data.members.subCaste} /></div>
               </div>
             </>
           )}
 
           {tab === "Operations" && (
             <>
-              <div className="ad-grid-kpi">
+              <div className="sa-grid-kpi">
                 <Stat label="Profiles approved" value={data.operations.approved} />
                 <Stat label="Profiles rejected" value={data.operations.rejected} />
                 <Stat label="Avg time to approve" value={data.operations.avgHoursToApprove != null ? `${data.operations.avgHoursToApprove} h` : "—"} />
@@ -299,8 +299,8 @@ export default function ReportsPage() {
                 <Stat label="Photos rejected" value={data.operations.photosRejected} />
                 <Stat label="Deletion requests" value={data.operations.deletionRequests} />
               </div>
-              <div className="ad-card">
-                <h2 className="ad-h2" style={{ marginBottom: 12 }}>Rejection reasons (currently rejected profiles)</h2>
+              <div className="sa-card">
+                <h2 className="sa-h2" style={{ marginBottom: 12 }}>Rejection reasons (currently rejected profiles)</h2>
                 <Bars items={data.operations.rejectionReasons.map((r) => ({ ...r, k: r.k.replace(/\s+/g, " ").slice(0, 80) }))} />
               </div>
             </>
@@ -308,16 +308,16 @@ export default function ReportsPage() {
 
           {tab === "Leads" && (
             <>
-              <div className="ad-grid-kpi">
+              <div className="sa-grid-kpi">
                 <Stat label="WhatsApp leads" value={data.leads.total} />
                 <Stat label="Leads with an account" value={data.leads.withAccount} sub={data.leads.total ? `${Math.round((data.leads.withAccount / data.leads.total) * 100)}% signed up` : undefined} />
                 {toKV(data.leads.events).slice(0, 2).map((e) => <Stat key={e.k} label={e.k.replace(/_/g, " ")} value={e.n} sub="events" />)}
               </div>
-              <div className="ad-grid-2">
-                <div className="ad-card"><h2 className="ad-h2" style={{ marginBottom: 12 }}>Leads by page</h2><Bars items={data.leads.bySource} /></div>
-                <div className="ad-card"><h2 className="ad-h2" style={{ marginBottom: 12 }}>WhatsApp button events</h2><Bars items={toKV(data.leads.events).map((e) => ({ ...e, k: e.k.replace(/_/g, " ") }))} /></div>
+              <div className="sa-grid-2">
+                <div className="sa-card"><h2 className="sa-h2" style={{ marginBottom: 12 }}>Leads by page</h2><Bars items={data.leads.bySource} /></div>
+                <div className="sa-card"><h2 className="sa-h2" style={{ marginBottom: 12 }}>WhatsApp button events</h2><Bars items={toKV(data.leads.events).map((e) => ({ ...e, k: e.k.replace(/_/g, " ") }))} /></div>
               </div>
-              <Link href="/superadmin/leads" className="ad-btn ghost" style={{ alignSelf: "flex-start" }}>Open all leads →</Link>
+              <Link href="/superadmin/leads" className="sa-btn ghost" style={{ alignSelf: "flex-start" }}>Open all leads →</Link>
             </>
           )}
         </div>
