@@ -47,6 +47,8 @@ function envBool(name: string, def = false): boolean {
 }
 
 export function isCaptchaBypassed(): boolean {
+  // Local dev only: never honoured in production builds (Vercel Test/Prod).
+  if (process.env.NODE_ENV === "production") return false;
   return envBool("CAPTCHA_BYPASS", false);
 }
 

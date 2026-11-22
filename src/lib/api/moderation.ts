@@ -1,6 +1,6 @@
 import { createSupabaseClientSafe } from "@/lib/supabase";
 import { fromProfileRow, type ProfileRow } from "@/lib/profileMapper";
-import { generatePublicIdFromExistingIds } from "@/lib/memberId";
+import { adminFetch } from "@/lib/api/adminClient";
 import type { Profile, ProfilePhoto } from "@/types";
 async function getAuthHeader(): Promise<Record<string, string>> {
   const supabase = createSupabaseClientSafe();
@@ -64,81 +64,48 @@ function photoFromRow(row: PhotoRow): ProfilePhoto {
 // Pending queue listing
 // ---------------------------------------------------------------------------
 
-/**
- * Every profile currently waiting on admin review, newest submission first.
- * Each profile is returned WITH its approved_snapshot attached (so the UI
- * can diff pending vs live). The Profile type already carries
- * `approvedSnapshot` for this purpose.
- */
-export async function listPendingProfiles(): Promise<{
-  data: Profile[];
-  error: string | null;
-}> {
-  try {
-    const supabase = createSupabaseClientSafe();
-    if (!supabase) return { data: [], error: "Supabase not configured" };
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("moderation_status", "pending_review")
-      .order("last_submitted_at", { ascending: false });
-    if (error) return { data: [], error: error.message };
-    const rows = (data || []) as ProfileRow[];
-    const missing = rows.filter((r) => !(r.public_id as string | undefined));
-    if (missing.length > 0) {
-      const { data: existingIds } = await supabase
-        .from("profiles")
-        .select("public_id")
-        .like("public_id", "L%");
-      const seed = (existingIds || [])
-        .map((r) => (r as { public_id?: string | null }).public_id || "")
-        .filter(Boolean);
-      for (const m of missing) {
-        const id = String(m.id || "");
-        if (!id) continue;
-        const g = (m.gender as Profile["gender"] | undefined) || "male";
-        const next = generatePublicIdFromExistingIds(seed, g);
-        seed.push(next);
-        await supabase.from("profiles").update({ public_id: next }).eq("id", id);
-        m.public_id = next;
-      }
+type QueueResponse = {
+  profiles: ProfileRow[];
+  photos: PhotoRow[];
+  counts: { pendingProfiles: number; pendingPhotos: number; rejectedProfiles: number };
+};
+
+// The moderation page asks for profiles, photos and counts in parallel;
+// share one request between them.
+let queueInFlight: Promise<{ data: QueueResponse | null; error: string | null }> | null = null;
+
+function fetchModerationQueue() {
+  if (queueInFlight) return queueInFlight;
+  queueInFlight = (async () => {
+    try {
+      const res = await adminFetch("/api/superadmin/moderation/queue");
+      const json = (await res.json()) as QueueResponse & { error?: string };
+      if (!res.ok) return { data: null, error: json.error || "Failed to load moderation queue" };
+      return { data: json, error: null };
+    } catch (err) {
+      return { data: null, error: err instanceof Error ? err.message : "Failed to load moderation queue" };
+    } finally {
+      setTimeout(() => {
+        queueInFlight = null;
+      }, 0);
     }
-    return {
-      data: rows.map((r) => fromProfileRow(r)),
-      error: null,
-    };
-  } catch (err) {
-    return {
-      data: [],
-      error: err instanceof Error ? err.message : "Failed to list pending profiles",
-    };
-  }
+  })();
+  return queueInFlight;
+}
+
+/**
+ * Every profile currently waiting on admin review, newest submission first,
+ * WITH its approved_snapshot attached so the UI can diff pending vs live.
+ */
+export async function listPendingProfiles(): Promise<{ data: Profile[]; error: string | null }> {
+  const { data, error } = await fetchModerationQueue();
+  return { data: (data?.profiles || []).map((r) => fromProfileRow(r)), error };
 }
 
 /** Pending photos across all profiles. Oldest-first so we work FIFO. */
-export async function listPendingPhotos(): Promise<{
-  data: ProfilePhoto[];
-  error: string | null;
-}> {
-  try {
-    const supabase = createSupabaseClientSafe();
-    if (!supabase) return { data: [], error: "Supabase not configured" };
-    const { data, error } = await supabase
-      .from("profile_photos")
-      .select("*")
-      .eq("status", "pending")
-      .order("uploaded_at", { ascending: true });
-    if (error) return { data: [], error: error.message };
-    return {
-      data: (data || []).map((r) => photoFromRow(r as PhotoRow)),
-      error: null,
-    };
-  } catch (err) {
-    return {
-      data: [],
-      error: err instanceof Error ? err.message : "Failed to list pending photos",
-    };
-  }
+export async function listPendingPhotos(): Promise<{ data: ProfilePhoto[]; error: string | null }> {
+  const { data, error } = await fetchModerationQueue();
+  return { data: (data?.photos || []).map((r) => photoFromRow(r)), error };
 }
 
 /** Counts for the admin dashboard tiles. */
@@ -146,42 +113,8 @@ export async function getModerationCounts(): Promise<{
   data: { pendingProfiles: number; pendingPhotos: number; rejectedProfiles: number };
   error: string | null;
 }> {
-  try {
-    const supabase = createSupabaseClientSafe();
-    if (!supabase) {
-      return {
-        data: { pendingProfiles: 0, pendingPhotos: 0, rejectedProfiles: 0 },
-        error: "Supabase not configured",
-      };
-    }
-    const [pp, ph, rp] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("id", { count: "exact", head: true })
-        .eq("moderation_status", "pending_review"),
-      supabase
-        .from("profile_photos")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "pending"),
-      supabase
-        .from("profiles")
-        .select("id", { count: "exact", head: true })
-        .eq("moderation_status", "rejected"),
-    ]);
-    return {
-      data: {
-        pendingProfiles: pp.count ?? 0,
-        pendingPhotos: ph.count ?? 0,
-        rejectedProfiles: rp.count ?? 0,
-      },
-      error: pp.error?.message || ph.error?.message || rp.error?.message || null,
-    };
-  } catch (err) {
-    return {
-      data: { pendingProfiles: 0, pendingPhotos: 0, rejectedProfiles: 0 },
-      error: err instanceof Error ? err.message : "Failed to load counts",
-    };
-  }
+  const { data, error } = await fetchModerationQueue();
+  return { data: data?.counts || { pendingProfiles: 0, pendingPhotos: 0, rejectedProfiles: 0 }, error };
 }
 
 // ---------------------------------------------------------------------------

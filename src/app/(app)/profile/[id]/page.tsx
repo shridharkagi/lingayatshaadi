@@ -77,6 +77,7 @@ import { ContactsList } from "@/components/ui/ContactsList";
 import { ViewerForensicWatermark } from "@/components/ViewerForensicWatermark";
 import { Profile } from "@/types";
 import { trackContactView } from "@/lib/contactViewHistory";
+import type { RevealedContacts } from "@/lib/api/contactViews";
 import { hasMeaningfulPreferences } from "@/lib/partnerPreferenceDefaults";
 import { computeProfileCompletion } from "@/lib/profileCompletion";
 import { buildProfileSeoTitle } from "@/lib/profileSeo";
@@ -283,6 +284,8 @@ export default function OtherProfilePage() {
   const [fallbackProfile, setFallbackProfile] = useState<Profile | null>(null);
   const [fallbackLoading, setFallbackLoading] = useState(false);
   const [showContact, setShowContact] = useState(false);
+  // Contacts of other members come only from the server after a counted reveal.
+  const [revealedContacts, setRevealedContacts] = useState<RevealedContacts | null>(null);
   const [revealingContact, setRevealingContact] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -490,6 +493,7 @@ export default function OtherProfilePage() {
   // Reset showContact when profile changes
   useEffect(() => {
     setShowContact(false);
+    setRevealedContacts(null);
   }, [profile?.id]);
 
   useEffect(() => {
@@ -573,6 +577,7 @@ export default function OtherProfilePage() {
       if (res.error) {
         showToast(res.error, "error");
       } else {
+        if (res.revealed) setRevealedContacts(res.revealed);
         setShowContact(true);
       }
       setRevealingContact(false);
@@ -2599,9 +2604,9 @@ export default function OtherProfilePage() {
                 </div>
               )}
               <ContactsList
-                contacts={profile.contacts}
-                fallbackNumber={profile.contact}
-                fallbackBelongsTo={profile.contactType}
+                contacts={revealedContacts ? revealedContacts.contacts : profile.contacts}
+                fallbackNumber={revealedContacts ? revealedContacts.contact || undefined : profile.contact}
+                fallbackBelongsTo={revealedContacts ? revealedContacts.contactType || undefined : profile.contactType}
               />
             </div>
           </div>

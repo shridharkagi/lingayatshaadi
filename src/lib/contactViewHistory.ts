@@ -1,4 +1,5 @@
 import { Profile } from "@/types";
+import type { RevealedContacts } from "@/lib/api/contactViews";
 
 export interface ContactView {
   profileId: string;
@@ -31,7 +32,7 @@ export function loadContactViewHistory(): ContactView[] {
 export async function trackContactViewToDb(
   viewerProfileId: string,
   profile: Profile
-): Promise<{ error: string | null; code?: string }> {
+): Promise<{ error: string | null; code?: string; revealed?: RevealedContacts }> {
   try {
     const { recordContactView } = await import("@/lib/api/contactViews");
     return await recordContactView(viewerProfileId, profile.id);
@@ -43,12 +44,17 @@ export async function trackContactViewToDb(
 /**
  * Track a contact view (localStorage + optional DB)
  */
-export async function trackContactView(profile: Profile, viewerProfileId?: string): Promise<{ error: string | null; code?: string }> {
+export async function trackContactView(
+  profile: Profile,
+  viewerProfileId?: string
+): Promise<{ error: string | null; code?: string; revealed?: RevealedContacts }> {
   if (typeof window === 'undefined') return { error: null };
 
+  let revealed: RevealedContacts | undefined;
   if (viewerProfileId) {
     const dbRes = await trackContactViewToDb(viewerProfileId, profile);
     if (dbRes.error) return dbRes;
+    revealed = dbRes.revealed;
   }
   
   const contactView: ContactView = {
@@ -89,7 +95,7 @@ export async function trackContactView(profile: Profile, viewerProfileId?: strin
     const trimmedViews = existingViews.slice(0, MAX_HISTORY_ITEMS);
     saveContactViewHistory(trimmedViews);
   }
-  return { error: null };
+  return { error: null, revealed };
 }
 
 /**
