@@ -59,6 +59,7 @@ function ProfileCardComponent({ profile, displayName, variant = "card" }: Profil
             className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
             sizes="(max-width: 640px) 40vw, 176px"
             loading="lazy"
+            quality={85}
           />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/60 to-transparent" />
           {profile.verified && <VerifiedPill compact />}
@@ -100,6 +101,7 @@ function ProfileCardComponent({ profile, displayName, variant = "card" }: Profil
             className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
             sizes="(max-width: 1024px) 50vw, (max-width: 1280px) 25vw, 18vw"
             loading="lazy"
+            quality={85}
           />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/60 to-transparent" />
           {profile.verified && <VerifiedPill />}

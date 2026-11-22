@@ -11,7 +11,10 @@ const nextConfig: NextConfig = {
     root: projectRoot,
   },
   images: {
-    formats: ["image/avif", "image/webp"],
+    // WebP only: AVIF at default settings visibly smooths faces/skin detail.
+    formats: ["image/webp"],
+    // Allowed quality levels (Next 16 rejects unlisted values). 90 = profile hero/gallery, 85 = cards.
+    qualities: [75, 85, 90],
     // Member photos rarely change URL (new upload = new path), so cache optimised variants for 30 days.
     minimumCacheTTL: 60 * 60 * 24 * 30,
     remotePatterns: [

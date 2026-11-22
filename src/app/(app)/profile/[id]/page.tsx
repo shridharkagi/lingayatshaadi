@@ -1378,6 +1378,7 @@ export default function OtherProfilePage() {
                 alt={`${displayName || "Member"} photo ${currentImageIndex + 1}`}
                 fill
                 priority
+                quality={90}
                 className={`object-contain drop-shadow-[0_20px_50px_rgba(0,0,0,0.6)] ${
                   !canViewSensitiveFields ? "select-none pointer-events-none" : ""
                 }`}
@@ -1553,6 +1554,8 @@ export default function OtherProfilePage() {
               fill
               className="object-cover rounded-[18px] pointer-events-none"
               priority
+              quality={90}
+              sizes="(max-width: 1024px) 100vw, 45vw"
               draggable={false}
             />
             {navProfiles.length > 1 && currentIdx >= 0 && (
@@ -2498,6 +2501,7 @@ export default function OtherProfilePage() {
                         className="object-cover"
                         style={{ filter: "blur(var(--blur-md))" }}
                         sizes="(max-width: 640px) 33vw, 25vw"
+                      quality={85}
                       />
                     </div>
                   ))}
@@ -2539,6 +2543,7 @@ export default function OtherProfilePage() {
                       fill
                       className="object-cover"
                       sizes="(max-width: 640px) 33vw, 25vw"
+                      quality={85}
                     />
                   </button>
                 ))}
