@@ -3,6 +3,7 @@ import type { User } from "@supabase/supabase-js";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
 import { logAdminAudit } from "@/lib/server/adminAudit";
+import { moveProfileToTrash } from "@/lib/server/moveProfileToTrash";
 
 type AccountAction = "suspend" | "unsuspend" | "delete";
 
@@ -142,6 +143,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: loadDelErr || "User not found" }, { status: 404 });
     }
     const u = delUser;
+    // Move the account's profiles to Trash first so none are left public
+    // without an owner (they can be restored from Trash if needed).
+    const { data: owned } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("user_id", targetUserId)
+      .is("deleted_at", null);
+    for (const p of (owned || []) as { id: string }[]) {
+      const trashed = await moveProfileToTrash(admin, {
+        profileId: p.id,
+        actorUserId: auth.userId,
+        reason: "Account deleted by admin",
+        note: reason || null,
+      });
+      if (!trashed.ok) {
+        return NextResponse.json({ error: `Couldn't move profile to trash: ${trashed.error}` }, { status: 500 });
+      }
+    }
     await logAdminAudit({
       actorUserId: auth.userId,
       action: "account.delete",

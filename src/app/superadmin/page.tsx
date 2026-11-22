@@ -40,7 +40,10 @@ const RANGES = [
   { id: "30d", label: "30 days" },
   { id: "90d", label: "90 days" },
   { id: "365d", label: "12 months" },
+  { id: "custom", label: "Custom" },
 ];
+
+const isoDay = (d: Date) => new Date(d.getTime() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
 
 const inr = (n: number) => `₹${Math.round(n || 0).toLocaleString("en-IN")}`;
 const num = (n: number) => (n || 0).toLocaleString("en-IN");
@@ -147,16 +150,19 @@ function Skeleton() {
 
 export default function AdminOverviewPage() {
   const [range, setRange] = useState("30d");
+  const [customFrom, setCustomFrom] = useState(() => isoDay(new Date(Date.now() - 29 * 86400000)));
+  const [customTo, setCustomTo] = useState(() => isoDay(new Date()));
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
 
-  const load = useCallback(async (r: string) => {
+  const load = useCallback(async (r: string, from?: string, to?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await adminFetch(`/api/superadmin/overview?range=${r}`);
+      const qs = r === "custom" ? `range=custom&from=${from}&to=${to}` : `range=${r}`;
+      const res = await adminFetch(`/api/superadmin/overview?${qs}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to load overview");
       setData(json);
@@ -169,15 +175,21 @@ export default function AdminOverviewPage() {
   }, []);
 
   useEffect(() => {
+    if (range === "custom") {
+      if (customFrom && customTo && customFrom <= customTo) load(range, customFrom, customTo);
+      return;
+    }
     load(range);
-  }, [range, load]);
+  }, [range, customFrom, customTo, load]);
 
   const inbox = data?.inbox || {};
   const k = data?.kpis || ({} as Record<string, number>);
   const n = (key: string) => Number(inbox[key] || 0);
   const totalTasks =
     n("pendingProfiles") + n("pendingPhotos") + n("pendingKyc") + n("upgradeOpen") + n("deletionRequests");
-  const rangeLabel = RANGES.find((r) => r.id === range)?.label || "";
+  const fmtDay = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  const periodText =
+    range === "custom" ? `${fmtDay(customFrom)} – ${fmtDay(customTo)}` : `the last ${(RANGES.find((r) => r.id === range)?.label || "").toLowerCase()}`;
 
   const series = useMemo(
     () =>
@@ -221,7 +233,7 @@ export default function AdminOverviewPage() {
               : totalTasks > 0
                 ? `${num(totalTasks)} items need your attention.`
                 : "You're all caught up."}{" "}
-            Numbers below cover the last {rangeLabel.toLowerCase()}.
+            Numbers below cover {periodText}.
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -238,7 +250,19 @@ export default function AdminOverviewPage() {
               </button>
             ))}
           </div>
-          <button type="button" className="ad-btn ghost" onClick={() => load(range)} aria-label="Refresh" title={updatedAt ? `Updated ${updatedAt.toLocaleTimeString("en-IN")}` : "Refresh"}>
+          {range === "custom" && (
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <label className="ad-muted" style={{ fontSize: 12 }}>
+                From{" "}
+                <input type="date" className="ad-date" value={customFrom} max={customTo} onChange={(e) => setCustomFrom(e.target.value)} />
+              </label>
+              <label className="ad-muted" style={{ fontSize: 12 }}>
+                To{" "}
+                <input type="date" className="ad-date" value={customTo} min={customFrom} max={isoDay(new Date())} onChange={(e) => setCustomTo(e.target.value)} />
+              </label>
+            </div>
+          )}
+          <button type="button" className="ad-btn ghost" onClick={() => (range === "custom" ? load(range, customFrom, customTo) : load(range))} aria-label="Refresh" title={updatedAt ? `Updated ${updatedAt.toLocaleTimeString("en-IN")}` : "Refresh"}>
             <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
           </button>
         </div>
@@ -247,7 +271,7 @@ export default function AdminOverviewPage() {
       {error && (
         <div className="ad-card" style={{ borderColor: "#f3c4d4", color: "#b42358" }}>
           Couldn&apos;t load the dashboard: {error}{" "}
-          <button type="button" className="ad-btn ghost" style={{ marginLeft: 8 }} onClick={() => load(range)}>
+          <button type="button" className="ad-btn ghost" style={{ marginLeft: 8 }} onClick={() => (range === "custom" ? load(range, customFrom, customTo) : load(range))}>
             Try again
           </button>
         </div>
@@ -491,7 +515,7 @@ export default function AdminOverviewPage() {
                 );
               })}
               <div style={{ marginTop: 14, padding: 12, borderRadius: 12, background: "var(--ad-grad-soft)", fontSize: 13 }}>
-                <strong>Engagement</strong> in the last {rangeLabel.toLowerCase()}: {num(k.profileViews)} profile views,{" "}
+                <strong>Engagement</strong> in {periodText}: {num(k.profileViews)} profile views,{" "}
                 {num(k.contactViews)} contact views, {num(k.interests)} interests sent.
               </div>
             </div>

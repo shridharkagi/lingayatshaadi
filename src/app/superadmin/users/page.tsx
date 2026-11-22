@@ -424,6 +424,12 @@ export default function SuperAdminUsersPage() {
                   <td className="px-2.5 py-2.5 text-xs whitespace-nowrap">{u.publishedCount} / {u.pendingCount}</td>
                   <td className="px-2.5 py-2.5">
                     <div className="flex flex-wrap gap-x-2 gap-y-1 items-center">
+                      <Link
+                        href={`/superadmin/accounts/${u.id}`}
+                        className="rounded-md bg-[var(--primary)] px-2 py-0.5 text-xs font-semibold text-white hover:opacity-90"
+                      >
+                        Open 360°
+                      </Link>
                       <button
                         onClick={() => setExpandedUserId(expandedUserId === u.id ? null : u.id)}
                         className="text-[var(--primary)] text-sm font-medium hover:underline"

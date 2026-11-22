@@ -1,725 +1,573 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
-  X as XIcon,
-  Clock,
-  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
   ExternalLink,
-  Star,
+  FileText,
+  RefreshCw,
+  ShieldCheck,
+  SkipForward,
+  UserRound,
+  X,
 } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
 import { adminFetch } from "@/lib/api/adminClient";
-import { ProfileTransferModal } from "@/components/admin/ProfileTransferModal";
-import {
-  listPendingProfiles,
-  listPendingPhotos,
-  approveProfile,
-  rejectProfile,
-  getModerationCounts,
-} from "@/lib/api/moderation";
-import { approvePhoto, rejectPhoto } from "@/lib/api/photos";
-import { getProfileSlug } from "@/lib/memberId";
-import { profileFromSnapshot } from "@/lib/api/profiles";
-import type { Profile, ProfilePhoto } from "@/types";
 
-// -----------------------------------------------------------------------------
-// Pure helpers
-// -----------------------------------------------------------------------------
+type CheckItem = { level: "ok" | "warn" | "info"; title: string; detail: string };
+type Photo = { id: string; url: string; status: string; is_primary?: boolean; rejection_reason?: string | null };
+type Doc = { id: string; idType: string; fileType: string; fileName: string; url: string | null; createdAt: string };
+type Item = {
+  key: string;
+  type: "new" | "edit" | "photo" | "kyc";
+  submittedAt: string | null;
+  profile: {
+    id: string;
+    publicId: string | null;
+    name: string;
+    gender: string | null;
+    city: string | null;
+    profession: string | null;
+    age: number | null;
+    relationship: string | null;
+    photo: string | null;
+  };
+  account: { userId: string; accountCode: string | null; phone: string | null; name: string; profileCount: number };
+  checks: CheckItem[];
+  live?: Record<string, unknown>;
+  snapshot?: Record<string, unknown> | null;
+  photos?: Photo[];
+  docs?: Doc[];
+};
 
-/**
- * Human-readable timestamp — admins scan this queue quickly so a compact
- * "2 hours ago" style is more useful than a full ISO string.
- */
-function relativeTime(iso?: string): string {
-  if (!iso) return "";
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return "";
-  const diff = Date.now() - then;
-  const mins = Math.round(diff / 60_000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.round(hrs / 24);
-  return `${days}d ago`;
-}
+type Filter = "all" | "new" | "edit" | "photo" | "kyc";
+const FILTERS: { id: Filter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "new", label: "New" },
+  { id: "edit", label: "Edits" },
+  { id: "photo", label: "Photos" },
+  { id: "kyc", label: "KYC" },
+];
+const KIND: Record<Item["type"], { label: string; cls: string }> = {
+  new: { label: "New profile", cls: "t-indigo" },
+  edit: { label: "Edit after approval", cls: "t-amber" },
+  photo: { label: "Photos", cls: "t-plum" },
+  kyc: { label: "KYC", cls: "t-green" },
+};
+const REASONS: Record<Item["type"], string[]> = {
+  new: ["Incomplete details", "Contact details in text", "Photo not clear / group photo", "Suspected duplicate", "Fake or test profile", "Not from Lingayat community"],
+  edit: ["Contact details in text", "Incorrect information", "Photo not clear / group photo", "Inappropriate content"],
+  photo: ["Photo not clear", "Group photo", "Not the member", "Inappropriate photo", "Contains contact details"],
+  kyc: ["Document not readable", "Name doesn't match", "Wrong document type", "Expired document"],
+};
 
-/**
- * Which fields changed between the previous approved snapshot and the
- * current (pending) row. Keeps the queue surface scannable — admins can
- * see the 3-4 fields that actually changed rather than a full diff.
- */
-type FieldDiff = { label: string; before?: string; after?: string };
-function computeProfileDiff(current: Profile, prev: Profile | null): FieldDiff[] {
-  if (!prev) return [];
-  const fields: Array<[keyof Profile, string]> = [
-    ["fullName", "Full Name"],
-    ["dateOfBirth", "Date of Birth"],
-    ["gender", "Gender"],
-    ["maritalStatus", "Marital Status"],
-    ["height", "Height"],
-    ["caste", "Caste"],
-    ["subCaste", "Sub-caste"],
-    ["motherTongue", "Mother Tongue"],
-    ["qualification", "Qualification"],
-    ["profession", "Profession"],
-    ["companyName", "Company"],
-    ["annualIncome", "Annual Income"],
-    ["city", "City"],
-    ["state", "State"],
-    ["country", "Country"],
-    ["aboutMe", "About Me"],
-    ["fatherName", "Father's Name"],
-    ["motherName", "Mother's Name"],
-    ["siblingDetails", "Siblings"],
-    ["foodHabits", "Food Habits"],
-  ];
-  const diffs: FieldDiff[] = [];
-  for (const [key, label] of fields) {
-    const a = (current[key] ?? "") as string;
-    const b = (prev[key] ?? "") as string;
-    if (String(a).trim() !== String(b).trim()) {
-      diffs.push({ label, before: String(b), after: String(a) });
-    }
+// Fields shown in the change list / details, in display order.
+const FIELDS: [string, string][] = [
+  ["full_name", "Name"], ["gender", "Gender"], ["date_of_birth", "Date of birth"], ["marital_status", "Marital status"],
+  ["height", "Height"], ["sub_caste", "Sub-caste"], ["mother_tongue", "Mother tongue"], ["languages_known", "Languages"],
+  ["about_me", "About me"], ["hobbies", "Hobbies"], ["qualification", "Education"], ["profession_type", "Profession type"],
+  ["profession", "Profession"], ["company_name", "Company"], ["annual_income", "Annual income"],
+  ["time_of_birth", "Time of birth"], ["place_of_birth", "Place of birth"], ["rashi", "Rashi"], ["nakshatra", "Nakshatra"],
+  ["horoscope_other_details", "Horoscope notes"], ["father_name", "Father"], ["father_occupation", "Father's occupation"],
+  ["mother_name", "Mother"], ["mother_occupation", "Mother's occupation"], ["sibling_details", "Siblings"],
+  ["family_other_details", "Family notes"], ["food_habits", "Food habits"], ["city", "City"], ["district", "District"],
+  ["state", "State"], ["country", "Country"], ["profile_photo", "Main photo"], ["partner_preference", "Partner preferences"],
+];
+
+function show(v: unknown): string {
+  if (v === null || v === undefined || v === "") return "—";
+  if (Array.isArray(v)) return v.length ? v.join(", ") : "—";
+  if (typeof v === "object") {
+    const parts = Object.entries(v as Record<string, unknown>)
+      .filter(([, x]) => x !== null && x !== "" && !(Array.isArray(x) && x.length === 0))
+      .map(([k, x]) => `${k.replace(/([A-Z])/g, " $1").toLowerCase()}: ${Array.isArray(x) ? x.join("/") : String(x)}`);
+    return parts.length ? parts.join(" · ") : "—";
   }
-  return diffs;
+  return String(v);
+}
+const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+const initials = (n: string) => n.split(/\s+/).map((x) => x[0]).slice(0, 2).join("").toUpperCase();
+function ago(iso: string | null) {
+  if (!iso) return "";
+  const h = (Date.now() - new Date(iso).getTime()) / 3600000;
+  if (h < 1) return `${Math.max(1, Math.round(h * 60))}m`;
+  if (h < 48) return `${Math.round(h)}h`;
+  return `${Math.round(h / 24)}d`;
+}
+function phoneFmt(p: string | null) {
+  const d = (p || "").replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "");
+  return d.length === 10 ? `${d.slice(0, 5)} ${d.slice(5)}` : "—";
 }
 
-// -----------------------------------------------------------------------------
-// Page
-// -----------------------------------------------------------------------------
+type Pending = { item: Item; label: string; run: () => Promise<void>; timer: ReturnType<typeof setTimeout> };
 
-type Tab = "profiles" | "photos";
-
-export default function ModerationQueuePage() {
-  const { authUser } = useAuth();
-  const [tab, setTab] = useState<Tab>("profiles");
-  const [pendingProfiles, setPendingProfiles] = useState<Profile[]>([]);
-  const [pendingPhotos, setPendingPhotos] = useState<ProfilePhoto[]>([]);
-  const [counts, setCounts] = useState({
-    pendingProfiles: 0,
-    pendingPhotos: 0,
-    rejectedProfiles: 0,
-  });
+export default function ReviewWorkspacePage() {
+  const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Filter>("all");
+  const [selKey, setSelKey] = useState<string | null>(null);
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState<string | null>(null);
+  const [note, setNote] = useState("");
+  const [pending, setPending] = useState<Pending | null>(null);
+  const [toast, setToast] = useState<{ text: string; tone: "ok" | "err" } | null>(null);
+  const [busyPhoto, setBusyPhoto] = useState<string | null>(null);
+  const pendingRef = useRef<Pending | null>(null);
+  pendingRef.current = pending;
 
-  const reviewerId = authUser?.id ?? "";
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await adminFetch("/api/superadmin/review/queue");
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to load queue");
+      setItems(json.items || []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load queue");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const refresh = useCallback(async () => {
-    setRefreshing(true);
-    const [profilesRes, photosRes, countsRes] = await Promise.all([
-      listPendingProfiles(),
-      listPendingPhotos(),
-      getModerationCounts(),
-    ]);
-    if (profilesRes.error) setError(profilesRes.error);
-    else setPendingProfiles(profilesRes.data);
-    if (photosRes.data) setPendingPhotos(photosRes.data);
-    if (countsRes.data) setCounts(countsRes.data);
-    setRefreshing(false);
-    setLoading(false);
+  const visible = useMemo(
+    () => items.filter((i) => i.key !== pending?.item.key && (filter === "all" || i.type === filter)),
+    [items, filter, pending]
+  );
+  const counts = useMemo(() => {
+    const c: Record<Filter, number> = { all: 0, new: 0, edit: 0, photo: 0, kyc: 0 };
+    for (const i of items) {
+      if (i.key === pending?.item.key) continue;
+      c.all += 1;
+      c[i.type] += 1;
+    }
+    return c;
+  }, [items, pending]);
+
+  const sel = visible.find((i) => i.key === selKey) || visible[0] || null;
+  useEffect(() => {
+    if (sel && sel.key !== selKey) setSelKey(sel.key);
+  }, [sel, selKey]);
+  useEffect(() => {
+    setRejecting(false);
+    setReason(null);
+    setNote("");
+  }, [sel?.key]);
+
+  const flash = (text: string, tone: "ok" | "err" = "ok") => {
+    setToast({ text, tone });
+    setTimeout(() => setToast((t) => (t?.text === text ? null : t)), 4000);
+  };
+
+  const call = async (url: string, method: string, body: unknown) => {
+    const res = await adminFetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      throw new Error((j as { error?: string }).error || `Request failed (${res.status})`);
+    }
+  };
+
+  const commitPending = useCallback(async (p: Pending) => {
+    try {
+      await p.run();
+      setItems((list) => list.filter((i) => i.key !== p.item.key));
+    } catch (e) {
+      flash(`Couldn't save “${p.item.profile.name}”: ${e instanceof Error ? e.message : "error"}`, "err");
+    } finally {
+      setPending((cur) => (cur?.item.key === p.item.key ? null : cur));
+    }
   }, []);
 
+  // Actions are held for 5 seconds so they can be undone, then sent.
+  const schedule = (item: Item, label: string, run: () => Promise<void>) => {
+    if (pendingRef.current) {
+      clearTimeout(pendingRef.current.timer);
+      void commitPending(pendingRef.current);
+    }
+    const idx = visible.findIndex((i) => i.key === item.key);
+    const next = visible[idx + 1] || visible[idx - 1] || null;
+    const p: Pending = { item, label, run, timer: setTimeout(() => void commitPending(p), 5000) };
+    setPending(p);
+    setSelKey(next?.key || null);
+  };
+  const undo = () => {
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    setSelKey(pending.item.key);
+    setPending(null);
+  };
+  useEffect(() => () => {
+    if (pendingRef.current) {
+      clearTimeout(pendingRef.current.timer);
+      void pendingRef.current.run();
+    }
+  }, []);
+
+  const approve = (item: Item) => {
+    const pendingPhotos = (item.photos || []).filter((p) => p.status === "pending");
+    if (item.type === "new" || item.type === "edit") {
+      schedule(item, `${item.profile.name} approved`, () =>
+        call("/api/superadmin/moderation/profile", "POST", { profileId: item.profile.id, action: "approve" })
+      );
+    } else if (item.type === "photo") {
+      schedule(item, `${pendingPhotos.length} photo(s) approved for ${item.profile.name}`, async () => {
+        for (const ph of pendingPhotos) await call("/api/superadmin/moderation/photo", "POST", { photoId: ph.id, action: "approve" });
+      });
+    } else {
+      schedule(item, `KYC approved for ${item.profile.name}`, async () => {
+        for (const d of item.docs || []) await call(`/api/kyc-documents/${d.id}`, "PATCH", { status: "approved" });
+      });
+    }
+  };
+  const reject = (item: Item) => {
+    if (!rejecting) {
+      setRejecting(true);
+      return;
+    }
+    if (!reason) {
+      flash("Choose a reason first — the member will see it.", "err");
+      return;
+    }
+    const full = note.trim() ? `${reason}. ${note.trim()}` : reason;
+    const pendingPhotos = (item.photos || []).filter((p) => p.status === "pending");
+    if (item.type === "new" || item.type === "edit") {
+      schedule(item, `${item.profile.name} rejected · ${reason}`, () =>
+        call("/api/superadmin/moderation/profile", "POST", { profileId: item.profile.id, action: "reject", reason: full })
+      );
+    } else if (item.type === "photo") {
+      schedule(item, `Photos rejected for ${item.profile.name} · ${reason}`, async () => {
+        for (const ph of pendingPhotos) await call("/api/superadmin/moderation/photo", "POST", { photoId: ph.id, action: "reject", reason: full });
+      });
+    } else {
+      schedule(item, `KYC rejected for ${item.profile.name} · ${reason}`, async () => {
+        for (const d of item.docs || []) await call(`/api/kyc-documents/${d.id}`, "PATCH", { status: "rejected", rejectionReason: full });
+      });
+    }
+  };
+  const move = (dir: 1 | -1) => {
+    if (!visible.length) return;
+    const idx = Math.max(0, visible.findIndex((i) => i.key === sel?.key));
+    setSelKey(visible[(idx + dir + visible.length) % visible.length].key);
+  };
+
+  // Single photo approve / reject inside an item (immediate).
+  const photoAction = async (item: Item, ph: Photo, action: "approve" | "reject") => {
+    setBusyPhoto(ph.id);
+    try {
+      await call("/api/superadmin/moderation/photo", "POST", {
+        photoId: ph.id,
+        action,
+        reason: action === "reject" ? "Photo not clear" : undefined,
+      });
+      setItems((list) =>
+        list
+          .map((i) =>
+            i.key === item.key
+              ? { ...i, photos: (i.photos || []).map((p) => (p.id === ph.id ? { ...p, status: action === "approve" ? "approved" : "rejected" } : p)) }
+              : i
+          )
+          .filter((i) => i.type !== "photo" || (i.photos || []).some((p) => p.status === "pending"))
+      );
+      flash(action === "approve" ? "Photo approved" : "Photo rejected");
+    } catch (e) {
+      flash(e instanceof Error ? e.message : "Photo update failed", "err");
+    } finally {
+      setBusyPhoto(null);
+    }
+  };
+
+  // Keyboard: A approve · R reject · J/K next/previous · Esc cancel reject.
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || !sel) return;
+      const k = e.key.toLowerCase();
+      if (k === "a") approve(sel);
+      else if (k === "r") reject(sel);
+      else if (k === "j") move(1);
+      else if (k === "k") move(-1);
+      else if (k === "escape") setRejecting(false);
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  const changes = useMemo(() => {
+    if (!sel || sel.type !== "edit" || !sel.live || !sel.snapshot) return [];
+    return FIELDS.filter(([k]) => !same(sel.live?.[k], sel.snapshot?.[k])).map(([k, label]) => ({
+      key: k,
+      label,
+      before: show(sel.snapshot?.[k]),
+      after: show(sel.live?.[k]),
+    }));
+  }, [sel]);
+  const details = useMemo(() => {
+    if (!sel || sel.type !== "new" || !sel.live) return [];
+    return FIELDS.filter(([k]) => k !== "profile_photo" && show(sel.live?.[k]) !== "—").map(([k, label]) => ({ label, value: show(sel.live?.[k]) }));
+  }, [sel]);
 
   return (
-    <div>
-      <div className="flex items-center justify-between">
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: 12 }}>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Moderation Queue</h1>
-          <p className="text-gray-500 mt-1">
-            Review and approve pending profile changes and photo uploads.
+          <h1 className="ad-h1">Review</h1>
+          <p className="ad-muted" style={{ margin: "4px 0 0" }}>
+            Profiles, edits, photos and KYC in one queue. <span className="ad-kbd">A</span> approve ·{" "}
+            <span className="ad-kbd">R</span> reject · <span className="ad-kbd">J</span>/<span className="ad-kbd">K</span> next/previous
           </p>
         </div>
-        <button
-          onClick={refresh}
-          disabled={refreshing}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-        >
-          <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
-          Refresh
-        </button>
-      </div>
-
-      {/* Summary tiles */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
-        <SummaryTile
-          label="Profiles awaiting review"
-          value={counts.pendingProfiles}
-          tone="amber"
-        />
-        <SummaryTile
-          label="Photos awaiting review"
-          value={counts.pendingPhotos}
-          tone="blue"
-        />
-        <SummaryTile
-          label="Recently rejected"
-          value={counts.rejectedProfiles}
-          tone="red"
-        />
-      </div>
-
-      {/* Tabs */}
-      <div className="mt-6 flex items-center gap-2 border-b border-gray-200">
-        <TabButton active={tab === "profiles"} onClick={() => setTab("profiles")}>
-          Profiles <Count>{counts.pendingProfiles}</Count>
-        </TabButton>
-        <TabButton active={tab === "photos"} onClick={() => setTab("photos")}>
-          Photos <Count>{counts.pendingPhotos}</Count>
-        </TabButton>
-      </div>
-
-      {error && (
-        <div className="mt-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
-          {error}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div className="ad-pills" role="tablist" aria-label="Queue filter">
+            {FILTERS.map((f) => (
+              <button key={f.id} type="button" role="tab" aria-selected={filter === f.id} className={`ad-pill ${filter === f.id ? "on" : ""}`} onClick={() => setFilter(f.id)}>
+                {f.label} <span style={{ opacity: 0.7, marginLeft: 4 }}>{counts[f.id]}</span>
+              </button>
+            ))}
+          </div>
+          <button type="button" className="ad-btn ghost" onClick={load} aria-label="Refresh queue">
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+          </button>
         </div>
-      )}
-
-      {loading ? (
-        <div className="mt-6 bg-white rounded-xl shadow-sm p-8 text-center text-gray-500">
-          Loading queue…
-        </div>
-      ) : tab === "profiles" ? (
-        <ProfilesQueue
-          profiles={pendingProfiles}
-          reviewerId={reviewerId}
-          onChanged={refresh}
-        />
-      ) : (
-        <PhotosQueue
-          photos={pendingPhotos}
-          reviewerId={reviewerId}
-          onChanged={refresh}
-        />
-      )}
-    </div>
-  );
-}
-
-// -----------------------------------------------------------------------------
-// Summary tile + tab
-// -----------------------------------------------------------------------------
-
-function SummaryTile({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: "amber" | "blue" | "red";
-}) {
-  const toneClasses: Record<string, string> = {
-    amber: "bg-amber-50 text-amber-800 border-amber-200",
-    blue: "bg-blue-50 text-blue-800 border-blue-200",
-    red: "bg-red-50 text-red-800 border-red-200",
-  };
-  return (
-    <div
-      className={`rounded-xl border p-4 ${toneClasses[tone]}`}
-      role="status"
-      aria-label={`${value} ${label}`}
-    >
-      <p className="text-xs font-semibold uppercase tracking-wide opacity-80">
-        {label}
-      </p>
-      <p className="text-3xl font-bold mt-1 tabular-nums">{value}</p>
-    </div>
-  );
-}
-
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`px-4 py-2 -mb-px border-b-2 text-sm font-medium transition ${
-        active
-          ? "border-[var(--primary)] text-[var(--primary)]"
-          : "border-transparent text-gray-500 hover:text-gray-800"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Count({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="ml-1.5 inline-flex items-center justify-center min-w-[22px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold tabular-nums">
-      {children}
-    </span>
-  );
-}
-
-// -----------------------------------------------------------------------------
-// Profiles queue
-// -----------------------------------------------------------------------------
-
-function ProfilesQueue({
-  profiles,
-  reviewerId,
-  onChanged,
-}: {
-  profiles: Profile[];
-  reviewerId: string;
-  onChanged: () => void;
-}) {
-  if (profiles.length === 0) {
-    return (
-      <div className="mt-6 bg-white rounded-xl shadow-sm p-8 text-center">
-        <Check size={32} className="mx-auto text-emerald-500" />
-        <h2 className="mt-3 text-lg font-semibold text-gray-900">All caught up</h2>
-        <p className="mt-1 text-sm text-gray-500">
-          No profiles are currently pending review.
-        </p>
       </div>
-    );
-  }
-  return (
-    <div className="mt-6 space-y-4">
-      {profiles.map((p) => (
-        <PendingProfileCard
-          key={p.id}
-          profile={p}
-          reviewerId={reviewerId}
-          onChanged={onChanged}
-        />
-      ))}
-    </div>
-  );
-}
 
-function PendingProfileCard({
-  profile,
-  reviewerId,
-  onChanged,
-}: {
-  profile: Profile;
-  reviewerId: string;
-  onChanged: () => void;
-}) {
-  const [busy, setBusy] = useState<"approve" | "reject" | "transfer" | null>(null);
-  const [rejectMode, setRejectMode] = useState(false);
-  const [transferOpen, setTransferOpen] = useState(false);
-  const [reason, setReason] = useState("");
-  const [localError, setLocalError] = useState<string | null>(null);
+      {error && <div className="ad-card" style={{ color: "#b42358" }}>{error}</div>}
 
-  // Compute a compact diff when there's a previously-approved snapshot.
-  // For brand-new profiles (no snapshot), diff is empty and we render the
-  // full current profile instead.
-  const prevProfile = useMemo(
-    () => profileFromSnapshot(profile.approvedSnapshot),
-    [profile.approvedSnapshot]
-  );
-  const diffs = useMemo(
-    () => computeProfileDiff(profile, prevProfile),
-    [profile, prevProfile]
-  );
-  const isFirstSubmission = !prevProfile;
-
-  const handleApprove = async () => {
-    setBusy("approve");
-    setLocalError(null);
-    const { error } = await approveProfile(profile.id, reviewerId);
-    setBusy(null);
-    if (error) {
-      setLocalError(error);
-      return;
-    }
-    onChanged();
-  };
-
-  const handleReject = async () => {
-    if (!reason.trim()) {
-      setLocalError("Please provide a reason so the member knows what to fix.");
-      return;
-    }
-    setBusy("reject");
-    setLocalError(null);
-    const { error } = await rejectProfile(profile.id, reviewerId, reason.trim());
-    setBusy(null);
-    if (error) {
-      setLocalError(error);
-      return;
-    }
-    setRejectMode(false);
-    setReason("");
-    onChanged();
-  };
-
-  const viewHref = `/profile/${getProfileSlug(profile)}?preview=admin`;
-  const memberId = profile.publicId || profile.memberId || profile.id;
-
-  return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 border-b border-gray-100">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          {profile.profilePhoto ? (
-            <Image
-              src={profile.profilePhoto}
-              alt={profile.fullName}
-              width={48}
-              height={48}
-              unoptimized
-              className="w-12 h-12 rounded-xl object-cover flex-shrink-0"
-            />
-          ) : (
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[var(--primary)]/15 to-[var(--primary)]/5 flex items-center justify-center text-[var(--primary)] font-semibold">
-              {(profile.fullName || "?").charAt(0).toUpperCase()}
+      <div className="rv-ws">
+        <section className="ad-card rv-queue" aria-label="Review queue" style={{ padding: 0 }}>
+          <div className="rv-qhead">
+            <strong>Queue</strong>
+            <span className="ad-muted" style={{ fontSize: 12 }}>Oldest first</span>
+          </div>
+          {loading && items.length === 0 &&
+            Array.from({ length: 5 }).map((_, i) => <div key={i} className="ad-skel" style={{ height: 64, margin: 12 }} />)}
+          {!loading && visible.length === 0 && (
+            <div style={{ padding: 32, textAlign: "center" }} className="ad-muted">
+              <Check size={28} style={{ color: "#11734b", marginBottom: 8 }} />
+              <div>All caught up — nothing waiting here.</div>
             </div>
           )}
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-gray-900 truncate">
-              {profile.fullName || "(unnamed profile)"}
-            </p>
-            <p className="text-xs text-gray-500 flex items-center gap-2 mt-0.5 flex-wrap">
-              <span>{memberId}</span>
-              <span>•</span>
-              <span>{profile.city || "—"}</span>
-              <span>•</span>
-              <span className="inline-flex items-center gap-1">
-                <Clock size={11} />
-                submitted {relativeTime(profile.lastSubmittedAt)}
+          {visible.map((it) => (
+            <button key={it.key} type="button" className={`rv-qi ${sel?.key === it.key ? "on" : ""}`} onClick={() => setSelKey(it.key)}>
+              <span className="ad-av" style={{ background: it.profile.gender === "female" ? "#c2367a" : "#5b3aa8", width: 40, height: 40 }}>
+                {it.profile.photo ? <img src={it.profile.photo} alt="" /> : initials(it.profile.name)}
               </span>
-              {isFirstSubmission && (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-semibold text-[10px] uppercase">
-                  First submission
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                  <strong className="rv-ellipsis">{it.profile.name}</strong>
+                  <span className="ad-muted" style={{ fontSize: 12 }}>{ago(it.submittedAt)}</span>
                 </span>
-              )}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link
-            href={viewHref}
-            target="_blank"
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm font-medium text-gray-700 border border-gray-200"
-          >
-            <ExternalLink size={14} />
-            Open profile
-          </Link>
-          <Link
-            href={`/superadmin/users/${profile.id}/edit`}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--primary)]/10 hover:bg-[var(--primary)]/15 text-sm font-medium text-[var(--primary)] border border-[var(--primary)]/20"
-          >
-            Edit
-          </Link>
-          <button
-            type="button"
-            onClick={() => setTransferOpen(true)}
-            disabled={busy !== null}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-sm font-medium text-indigo-700 border border-indigo-200 disabled:opacity-60"
-          >
-            Transfer
-          </button>
-        </div>
-      </div>
+                <span className="ad-muted rv-ellipsis" style={{ display: "block", fontSize: 12 }}>
+                  {it.profile.gender === "female" ? "Bride" : "Groom"}
+                  {it.profile.age ? ` · ${it.profile.age}` : ""}
+                  {it.profile.city ? ` · ${it.profile.city}` : ""}
+                </span>
+                <span className={`ad-chip ${KIND[it.type].cls}`} style={{ marginTop: 6 }}>
+                  {KIND[it.type].label}
+                  {it.type === "photo" ? ` · ${(it.photos || []).filter((p) => p.status === "pending").length}` : ""}
+                  {it.type === "kyc" ? ` · ${(it.docs || []).length}` : ""}
+                </span>
+              </span>
+            </button>
+          ))}
+        </section>
 
-      {/* Body: either diff or full-profile snapshot for first-time submissions */}
-      <div className="p-4">
-        {isFirstSubmission ? (
-          <FullProfilePreview profile={profile} />
-        ) : diffs.length === 0 ? (
-          <p className="text-sm text-gray-500">
-            The submission is identical to the last-approved version. You can
-            approve to refresh the approval timestamp, or reject to request
-            further changes.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              Changes requested ({diffs.length})
-            </p>
-            <div className="divide-y divide-gray-100 border border-gray-100 rounded-lg overflow-hidden">
-              {diffs.map((d) => (
-                <div key={d.label} className="grid grid-cols-12 gap-2 p-2.5 text-sm">
-                  <div className="col-span-12 sm:col-span-3 font-medium text-gray-700">
-                    {d.label}
+        <section className="rv-detail" aria-label="Selected item">
+          {!sel ? (
+            <div className="ad-card ad-muted" style={{ textAlign: "center", padding: 48 }}>
+              {loading ? "Loading…" : "Select an item from the queue."}
+            </div>
+          ) : (
+            <div key={sel.key} style={{ display: "flex", flexDirection: "column", gap: 14, animation: "ad-rise .3s ease both" }}>
+              <div className="ad-card rv-hero">
+                <div className="rv-photo">
+                  {sel.profile.photo ? <img src={sel.profile.photo} alt="" /> : <UserRound size={34} />}
+                </div>
+                <div style={{ flex: 1, minWidth: 220 }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                    <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{sel.profile.name}</h2>
+                    <span className={`ad-chip ${KIND[sel.type].cls}`}>{KIND[sel.type].label}</span>
                   </div>
-                  <div className="col-span-12 sm:col-span-4 text-gray-400 line-through break-words">
-                    {d.before || <em className="not-italic opacity-60">(empty)</em>}
+                  <div className="ad-muted" style={{ marginTop: 4 }}>
+                    {sel.profile.publicId || "No member ID yet"} · {sel.profile.gender === "female" ? "Bride" : "Groom"}
+                    {sel.profile.age ? ` · ${sel.profile.age}` : ""}
+                    {sel.profile.city ? ` · ${sel.profile.city}` : ""}
+                    {sel.profile.profession ? ` · ${sel.profile.profession}` : ""}
                   </div>
-                  <div className="col-span-12 sm:col-span-5 text-gray-900 break-words">
-                    {d.after || <em className="italic opacity-60">(empty)</em>}
+                  <div className="ad-muted" style={{ fontSize: 12, marginTop: 8 }}>
+                    {[
+                      `Account ${sel.account.accountCode || "—"}`,
+                      phoneFmt(sel.account.phone),
+                      sel.account.name,
+                      `${sel.account.profileCount} profile${sel.account.profileCount === 1 ? "" : "s"}`,
+                      sel.profile.relationship ? `for ${sel.profile.relationship}` : "",
+                      `submitted ${ago(sel.submittedAt)} ago`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </div>
                 </div>
-              ))}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <Link href={`/superadmin/accounts/${sel.account.userId}`} className="ad-btn ghost">Account 360°</Link>
+                  <Link href={`/superadmin/users/${sel.profile.id}/edit`} className="ad-btn ghost">
+                    Edit <ExternalLink size={14} />
+                  </Link>
+                </div>
+              </div>
+
+              {sel.checks.length > 0 && (
+                <div className="ad-card">
+                  <h3 className="ad-h2" style={{ marginBottom: 12 }}>Automatic checks</h3>
+                  <div className="rv-checks">
+                    {sel.checks.map((c, i) => (
+                      <div key={i} className="rv-check">
+                        <span className={`ad-chip ${c.level === "ok" ? "t-green" : c.level === "warn" ? "t-amber" : "t-indigo"}`}>
+                          {c.level === "ok" ? "OK" : c.level === "warn" ? "Check" : "Info"}
+                        </span>
+                        <div>
+                          <strong style={{ fontSize: 13 }}>{c.title}</strong>
+                          <div className="ad-muted" style={{ fontSize: 12 }}>{c.detail}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {sel.type === "edit" && (
+                <div className="ad-card">
+                  <h3 className="ad-h2" style={{ marginBottom: 12 }}>What changed since last approval</h3>
+                  {changes.length === 0 ? (
+                    <p className="ad-muted">No visible field changes — likely a photo or settings update.</p>
+                  ) : (
+                    <div style={{ overflowX: "auto" }}>
+                      <table className="rv-diff">
+                        <thead>
+                          <tr><th>Field</th><th>Before (live now)</th><th>After (pending)</th></tr>
+                        </thead>
+                        <tbody>
+                          {changes.map((c) => (
+                            <tr key={c.key}>
+                              <td><strong>{c.label}</strong></td>
+                              <td><span className="rv-old">{c.before}</span></td>
+                              <td><span className="rv-new">{c.after}</span></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {sel.type === "new" && (
+                <div className="ad-card">
+                  <h3 className="ad-h2" style={{ marginBottom: 12 }}>Profile details</h3>
+                  <div className="rv-details">
+                    {details.map((d) => (
+                      <div key={d.label}>
+                        <div className="ad-muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em" }}>{d.label}</div>
+                        <div style={{ fontSize: 14, marginTop: 2, wordBreak: "break-word" }}>{d.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(sel.photos || []).length > 0 && (
+                <div className="ad-card">
+                  <h3 className="ad-h2" style={{ marginBottom: 12 }}>Photos</h3>
+                  <div className="rv-thumbs">
+                    {(sel.photos || []).map((ph) => (
+                      <div key={ph.id} className={`rv-th ${ph.status === "pending" ? "pending" : ""}`}>
+                        <a href={ph.url} target="_blank" rel="noreferrer"><img src={ph.url} alt="" /></a>
+                        <span className={`ad-chip ${ph.status === "approved" ? "t-green" : ph.status === "pending" ? "t-amber" : "t-rose"}`} style={{ position: "absolute", left: 6, top: 6 }}>
+                          {ph.status}
+                        </span>
+                        {ph.status === "pending" && (
+                          <div className="rv-th-actions">
+                            <button type="button" aria-label="Approve photo" disabled={busyPhoto === ph.id} onClick={() => photoAction(sel, ph, "approve")}><Check size={16} /></button>
+                            <button type="button" aria-label="Reject photo" disabled={busyPhoto === ph.id} onClick={() => photoAction(sel, ph, "reject")}><X size={16} /></button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {(sel.type === "new" || sel.type === "edit") && (
+                    <p className="ad-muted" style={{ fontSize: 12, margin: "10px 0 0" }}>Approving the profile also approves its pending photos.</p>
+                  )}
+                </div>
+              )}
+
+              {sel.type === "kyc" && (
+                <div className="ad-card">
+                  <h3 className="ad-h2" style={{ marginBottom: 12 }}>KYC documents</h3>
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {(sel.docs || []).map((d) => (
+                      <a key={d.id} href={d.url || "#"} target="_blank" rel="noreferrer" className="rv-doc">
+                        <span className="ad-ico t-indigo">{/image/.test(d.fileType || "") ? <ShieldCheck size={18} /> : <FileText size={18} />}</span>
+                        <span style={{ flex: 1 }}>
+                          <strong style={{ textTransform: "capitalize" }}>{(d.idType || "document").replace(/_/g, " ")}</strong>
+                          <span className="ad-muted" style={{ display: "block", fontSize: 12 }}>{d.fileName} · uploaded {ago(d.createdAt)} ago</span>
+                        </span>
+                        <span className="ad-muted" style={{ fontSize: 12 }}>{d.url ? "Open ↗" : "File unavailable"}</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {rejecting && (
+                <div className="ad-card" style={{ borderColor: "#f3c4d4" }}>
+                  <h3 className="ad-h2" style={{ color: "#b42358", marginBottom: 10 }}>Reject — choose a reason (the member sees this)</h3>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {REASONS[sel.type].map((r) => (
+                      <button key={r} type="button" className={`rv-reason ${reason === r ? "on" : ""}`} onClick={() => setReason(r)}>{r}</button>
+                    ))}
+                  </div>
+                  <label className="ad-muted" style={{ display: "block", fontSize: 12, marginTop: 12 }}>
+                    Optional note to the member
+                    <input className="rv-input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Please remove the phone number from About me" />
+                  </label>
+                </div>
+              )}
+
+              <div className="rv-bar">
+                <button type="button" className="ad-btn rv-ok" onClick={() => approve(sel)}>
+                  <Check size={16} /> Approve <span className="ad-kbd" style={{ background: "transparent", color: "#fff", borderColor: "rgba(255,255,255,.4)" }}>A</span>
+                </button>
+                <button type="button" className="ad-btn rv-no" onClick={() => reject(sel)}>
+                  <X size={16} /> {rejecting ? "Confirm reject" : "Reject"} <span className="ad-kbd">R</span>
+                </button>
+                {rejecting && <button type="button" className="ad-btn ghost" onClick={() => setRejecting(false)}>Cancel</button>}
+                <span style={{ flex: 1 }} />
+                <button type="button" className="ad-btn ghost" onClick={() => move(-1)} aria-label="Previous"><ChevronLeft size={16} /></button>
+                <button type="button" className="ad-btn ghost" onClick={() => move(1)}>
+                  Skip <SkipForward size={14} /> <ChevronRight size={16} style={{ display: "none" }} />
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </section>
       </div>
 
-      {/* Actions */}
-      <div className="p-4 border-t border-gray-100 bg-gray-50">
-        {localError && (
-          <p className="mb-3 text-sm text-red-600">{localError}</p>
-        )}
-        {rejectMode ? (
-          <div className="space-y-2">
-            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide">
-              Rejection reason (shown to the member)
-            </label>
-            <textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              rows={3}
-              placeholder="e.g. Profile photo is unclear. Please upload a front-facing photo."
-              className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40"
-            />
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleReject}
-                disabled={busy !== null}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-60"
-              >
-                <XIcon size={14} />
-                Confirm reject
-              </button>
-              <button
-                onClick={() => {
-                  setRejectMode(false);
-                  setReason("");
-                  setLocalError(null);
-                }}
-                disabled={busy !== null}
-                className="px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleApprove}
-              disabled={busy !== null}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60"
-            >
-              <Check size={14} />
-              {busy === "approve" ? "Approving…" : "Approve"}
-            </button>
-            <button
-              onClick={() => setRejectMode(true)}
-              disabled={busy !== null}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-red-300 text-red-700 text-sm font-medium hover:bg-red-50"
-            >
-              <XIcon size={14} />
-              Reject…
-            </button>
-          </div>
-        )}
-      </div>
-      <ProfileTransferModal
-        open={transferOpen}
-        profileId={profile.id}
-        note="Transferred from moderation queue"
-        onClose={() => setTransferOpen(false)}
-        onTransferred={onChanged}
-      />
-    </div>
-  );
-}
-
-/**
- * Compact snapshot of the core fields — used when there's no prior
- * approved version to diff against.
- */
-function FullProfilePreview({ profile }: { profile: Profile }) {
-  const rows: Array<[string, string | undefined]> = [
-    ["Full Name", profile.fullName],
-    ["DoB", profile.dateOfBirth],
-    ["Gender", profile.gender],
-    ["Marital Status", profile.maritalStatus],
-    ["Height", profile.height],
-    ["Caste / Sub-caste", [profile.caste, profile.subCaste].filter(Boolean).join(" / ")],
-    ["Qualification", profile.qualification],
-    ["Profession", [profile.profession, profile.companyName].filter(Boolean).join(" @ ")],
-    ["Income", profile.annualIncome],
-    ["Location", [profile.city, profile.state, profile.country].filter(Boolean).join(", ")],
-    ["Father", profile.fatherName],
-    ["Mother", profile.motherName],
-    ["Food", profile.foodHabits],
-  ];
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
-      {rows.map(([k, v]) => (
-        <div key={k} className="flex items-start gap-2 py-1">
-          <span className="text-gray-500 w-32 flex-shrink-0">{k}</span>
-          <span className="text-gray-900 font-medium break-words">{v || "—"}</span>
-        </div>
-      ))}
-      {profile.aboutMe && (
-        <div className="col-span-1 sm:col-span-2 mt-1">
-          <span className="text-gray-500 text-xs">About</span>
-          <p className="text-gray-800 text-sm mt-1 whitespace-pre-wrap">
-            {profile.aboutMe}
-          </p>
+      {pending && (
+        <div className="rv-toast" role="status">
+          <span>{pending.label}</span>
+          <button type="button" onClick={undo}>Undo</button>
         </div>
       )}
-    </div>
-  );
-}
-
-// -----------------------------------------------------------------------------
-// Photos queue
-// -----------------------------------------------------------------------------
-
-function PhotosQueue({
-  photos,
-  reviewerId,
-  onChanged,
-}: {
-  photos: ProfilePhoto[];
-  reviewerId: string;
-  onChanged: () => void;
-}) {
-  if (photos.length === 0) {
-    return (
-      <div className="mt-6 bg-white rounded-xl shadow-sm p-8 text-center">
-        <Check size={32} className="mx-auto text-emerald-500" />
-        <h2 className="mt-3 text-lg font-semibold text-gray-900">All caught up</h2>
-        <p className="mt-1 text-sm text-gray-500">No photos are currently pending review.</p>
-      </div>
-    );
-  }
-  return (
-    <div className="mt-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-      {photos.map((p) => (
-        <PendingPhotoCard
-          key={p.id}
-          photo={p}
-          reviewerId={reviewerId}
-          onChanged={onChanged}
-        />
-      ))}
-    </div>
-  );
-}
-
-function PendingPhotoCard({
-  photo,
-  reviewerId,
-  onChanged,
-}: {
-  photo: ProfilePhoto;
-  reviewerId: string;
-  onChanged: () => void;
-}) {
-  const [busy, setBusy] = useState<"approve" | "reject" | null>(null);
-  const [reason, setReason] = useState("");
-  const [rejectMode, setRejectMode] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  const handleApprove = async () => {
-    setBusy("approve");
-    setErr(null);
-    const { error } = await approvePhoto(photo.id, reviewerId);
-    setBusy(null);
-    if (error) setErr(error);
-    else onChanged();
-  };
-
-  const handleReject = async () => {
-    setBusy("reject");
-    setErr(null);
-    const { error } = await rejectPhoto(photo.id, reviewerId, reason.trim() || undefined);
-    setBusy(null);
-    if (error) {
-      setErr(error);
-      return;
-    }
-    setRejectMode(false);
-    setReason("");
-    onChanged();
-  };
-
-  return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
-      <div className="relative aspect-square bg-gray-100">
-        <Image
-          src={photo.url}
-          alt={`Pending photo`}
-          fill
-          unoptimized
-          className="object-cover"
-          sizes="(max-width: 768px) 50vw, 25vw"
-        />
-        {photo.isPrimary && (
-          <span className="absolute top-2 left-2 inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full bg-[var(--primary)] text-white shadow">
-            <Star size={11} />
-            Primary
-          </span>
-        )}
-      </div>
-      <div className="p-2 text-xs text-gray-500">
-        <p>Profile: {photo.profileId.slice(0, 8)}…</p>
-        <p>Uploaded {relativeTime(photo.uploadedAt)}</p>
-      </div>
-      {err && <p className="px-2 text-xs text-red-600">{err}</p>}
-      {rejectMode ? (
-        <div className="p-2 border-t border-gray-100 space-y-2">
-          <textarea
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            rows={2}
-            placeholder="Optional reason"
-            className="w-full px-2 py-1 text-xs rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/40"
-          />
-          <div className="flex gap-1">
-            <button
-              onClick={handleReject}
-              disabled={busy !== null}
-              className="flex-1 px-2 py-1.5 rounded bg-red-600 text-white text-xs font-medium hover:bg-red-700 disabled:opacity-60"
-            >
-              Confirm
-            </button>
-            <button
-              onClick={() => {
-                setRejectMode(false);
-                setReason("");
-              }}
-              className="flex-1 px-2 py-1.5 rounded text-xs font-medium text-gray-700 hover:bg-gray-100"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="p-2 border-t border-gray-100 flex gap-1">
-          <button
-            onClick={handleApprove}
-            disabled={busy !== null}
-            className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 disabled:opacity-60"
-          >
-            <Check size={12} />
-            {busy === "approve" ? "…" : "Approve"}
-          </button>
-          <button
-            onClick={() => setRejectMode(true)}
-            disabled={busy !== null}
-            className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded bg-white border border-red-300 text-red-700 text-xs font-medium hover:bg-red-50"
-          >
-            <XIcon size={12} />
-            Reject
-          </button>
+      {!pending && toast && (
+        <div className={`rv-toast ${toast.tone === "err" ? "err" : ""}`} role="status">
+          <span>{toast.text}</span>
         </div>
       )}
     </div>

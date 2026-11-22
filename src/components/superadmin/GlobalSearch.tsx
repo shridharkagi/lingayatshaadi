@@ -102,7 +102,7 @@ export default function GlobalSearch() {
 
   const links = useMemo(
     () => [
-      ...accounts.map((a) => `/superadmin/users?focus=${a.id}`),
+      ...accounts.map((a) => `/superadmin/accounts/${a.id}`),
       ...profiles.map((p) => `/superadmin/users/${p.id}/edit`),
     ],
     [accounts, profiles]

@@ -427,6 +427,24 @@ export async function POST(req: NextRequest) {
       return { data: r.data as Record<string, unknown> | null, error: null as { message: string } | null };
     }
     if (isSchemaMismatchError(r.error.message)) {
+      // Some databases lack the newer bookkeeping columns (profile_id, source,
+      // assigned_by, notes, metadata). Keep the plan snapshot — especially the
+      // contact limits, since a missing limit is treated as unlimited.
+      const snapshotPayload = {
+        ...fallbackSubscriptionBase,
+        plan_name_snapshot: fullSubscriptionBase.plan_name_snapshot,
+        price_snapshot: fullSubscriptionBase.price_snapshot,
+        currency_snapshot: fullSubscriptionBase.currency_snapshot,
+        duration_days_snapshot: fullSubscriptionBase.duration_days_snapshot,
+        total_contact_views_snapshot: fullSubscriptionBase.total_contact_views_snapshot,
+        daily_contact_view_limit_snapshot: fullSubscriptionBase.daily_contact_view_limit_snapshot,
+        user_id: forUserId,
+        plan_id: planIdForRow,
+      };
+      r = await admin.from("user_subscriptions").insert(snapshotPayload).select("*").single();
+      if (!r.error || !isSchemaMismatchError(r.error.message)) {
+        return { data: r.data as Record<string, unknown> | null, error: r.error };
+      }
       const minPayload = { ...fallbackSubscriptionBase, user_id: forUserId, plan_id: planIdForRow };
       r = await admin.from("user_subscriptions").insert(minPayload).select("*").single();
       return { data: r.data as Record<string, unknown> | null, error: r.error };
@@ -443,7 +461,13 @@ export async function POST(req: NextRequest) {
   const ownedProfileIds = (ownedProfiles || [])
     .map((r) => String((r as { id?: string }).id || ""))
     .filter(Boolean);
-  const legacyLookupUserIds = Array.from(new Set([normalizedUserId, ...ownedProfileIds]));
+  // Existing plans may be attached to ANY profile this account has ever owned
+  // (including soft-deleted and legacy "shadow" profiles), so look them all up;
+  // otherwise an old plan stays active next to the new one and wins.
+  const { data: everOwned } = await admin.from("profiles").select("id").eq("user_id", normalizedUserId).limit(1000);
+  const legacyLookupUserIds = Array.from(
+    new Set([normalizedUserId, ...ownedProfileIds, ...((everOwned || []) as { id: string }[]).map((r) => r.id)])
+  );
 
   // Enforce account-level single active plan:
   // expire existing active rows for this account before creating a new one.
