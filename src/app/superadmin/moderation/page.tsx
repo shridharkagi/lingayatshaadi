@@ -564,11 +564,16 @@ export default function ReviewWorkspacePage() {
 
       <div className="rv-ws">
         <section className="ad-card rv-queue" aria-label="Review queue" style={{ padding: 0 }}>
-          <div className="rv-qhead" style={{ flexWrap: "wrap", gap: 8 }}>
-            <strong>Queue</strong>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+          <div className="rv-qhead" style={{ flexWrap: "wrap", gap: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", flexWrap: "nowrap" }}>
+              <strong style={{ whiteSpace: "nowrap" }}>Queue</strong>
+              <span className="ad-muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
+                {dateWin !== "any" ? `${visible.length}/${items.length}` : visible.length}
+              </span>
+              <span style={{ flex: 1 }} />
               <select
                 className={`ad-select ad-select-sm ${dateWin !== "any" ? "is-set" : ""}`}
+                style={{ flex: "0 1 auto", minWidth: 0, maxWidth: 140 }}
                 value={dateWin}
                 onChange={(e) => setDateWin(e.target.value as DateWindow)}
                 aria-label="Filter queue by submitted date"
@@ -581,6 +586,7 @@ export default function ReviewWorkspacePage() {
               </select>
               <select
                 className={`ad-select ad-select-sm ${sortDir !== "oldest" ? "is-set" : ""}`}
+                style={{ flex: "0 1 auto", minWidth: 0, maxWidth: 120 }}
                 value={sortDir}
                 onChange={(e) => setSortDir(e.target.value as SortDir)}
                 aria-label="Sort queue"
@@ -588,42 +594,13 @@ export default function ReviewWorkspacePage() {
                 <option value="oldest">Oldest first</option>
                 <option value="newest">Newest first</option>
               </select>
-            </div>
-            {dateWin === "custom" && (
-              <div style={{ display: "flex", gap: 6, alignItems: "center", width: "100%", fontSize: 12 }}>
-                <label className="ad-muted" style={{ display: "flex", alignItems: "center", gap: 4, flex: 1 }}>
-                  From
-                  <input
-                    type="date"
-                    className="ad-input"
-                    style={{ height: 32, fontSize: 12, padding: "0 8px", flex: 1, minWidth: 0 }}
-                    value={customFrom}
-                    max={customTo || undefined}
-                    onChange={(e) => setCustomFrom(e.target.value)}
-                  />
-                </label>
-                <label className="ad-muted" style={{ display: "flex", alignItems: "center", gap: 4, flex: 1 }}>
-                  To
-                  <input
-                    type="date"
-                    className="ad-input"
-                    style={{ height: 32, fontSize: 12, padding: "0 8px", flex: 1, minWidth: 0 }}
-                    value={customTo}
-                    min={customFrom || undefined}
-                    onChange={(e) => setCustomTo(e.target.value)}
-                  />
-                </label>
-              </div>
-            )}
-            {(dateWin !== "any" || sortDir !== "oldest") && (
-              <div style={{ display: "flex", justifyContent: "space-between", width: "100%", fontSize: 12 }} className="ad-muted">
-                <span>
-                  {visible.length} of {items.length} shown
-                </span>
+              {(dateWin !== "any" || sortDir !== "oldest") && (
                 <button
                   type="button"
-                  className="ad-link"
-                  style={{ fontSize: 12, background: "none", border: 0, padding: 0, cursor: "pointer", color: "var(--ad-saffron)", fontWeight: 600 }}
+                  className="ad-btn ghost"
+                  style={{ height: 32, width: 32, padding: 0, flex: "none", justifyContent: "center" }}
+                  aria-label="Reset queue filters"
+                  title="Reset"
                   onClick={() => {
                     setDateWin("any");
                     setSortDir("oldest");
@@ -631,8 +608,31 @@ export default function ReviewWorkspacePage() {
                     setCustomTo("");
                   }}
                 >
-                  Reset
+                  <X size={14} />
                 </button>
+              )}
+            </div>
+            {dateWin === "custom" && (
+              <div style={{ display: "flex", gap: 6, alignItems: "center", width: "100%", fontSize: 12 }}>
+                <input
+                  type="date"
+                  className="ad-input"
+                  style={{ height: 32, fontSize: 12, padding: "0 8px", flex: 1, minWidth: 0 }}
+                  value={customFrom}
+                  max={customTo || undefined}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  aria-label="From date"
+                />
+                <span className="ad-muted">to</span>
+                <input
+                  type="date"
+                  className="ad-input"
+                  style={{ height: 32, fontSize: 12, padding: "0 8px", flex: 1, minWidth: 0 }}
+                  value={customTo}
+                  min={customFrom || undefined}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  aria-label="To date"
+                />
               </div>
             )}
           </div>

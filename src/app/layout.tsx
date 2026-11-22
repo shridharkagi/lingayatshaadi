@@ -52,9 +52,10 @@ export async function generateMetadata(): Promise<Metadata> {
       description,
       images: [
         {
-          url: "/og/lingayatbandhu-og-home-v2.png",
+          url: "/og/lingayatbandhu-og-home-v3.jpg",
           width: 1200,
           height: 630,
+          type: "image/jpeg",
           alt: "LingayatBandhu — Lingayat matrimony",
         },
       ],
@@ -63,7 +64,7 @@ export async function generateMetadata(): Promise<Metadata> {
       card: "summary_large_image",
       title: "LingayatBandhu — Find your Lingayat match",
       description,
-      images: ["/og/lingayatbandhu-og-home-v2.png"],
+      images: ["/og/lingayatbandhu-og-home-v3.jpg"],
     },
     metadataBase: new URL(siteUrl),
     robots: {

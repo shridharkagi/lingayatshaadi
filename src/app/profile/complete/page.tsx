@@ -32,6 +32,7 @@ import {
   Loader2,
   type LucideIcon,
 } from "lucide-react";
+import { BrideIcon, GroomIcon } from "@/components/ui/icons/BrideGroomIcons";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { HobbiesSelector } from "@/components/ui/HobbiesSelector";
@@ -525,6 +526,13 @@ function ProfileCompleteInner() {
   const [step, setStep] = useState(1);
   const [profile, setProfile] = useState<Partial<Profile>>(initialProfile);
   const [saving, setSaving] = useState(false);
+  /** Final-submit feedback: "saving" shows an overlay immediately, "done" confirms before we leave. */
+  const [submitPhase, setSubmitPhase] = useState<"idle" | "saving" | "done">("idle");
+
+  // Warm up /account so the redirect after submit is near-instant.
+  useEffect(() => {
+    router.prefetch("/account");
+  }, [router]);
   const [error, setError] = useState("");
   const [hydrating, setHydrating] = useState(hasUrlProfileId);
   // Draft tracking: once a draft row exists on the server we keep its id
@@ -676,6 +684,11 @@ function ProfileCompleteInner() {
         base.managedBy = "self";
       } else if (relationshipFromUrl) {
         base.managedBy = relationshipFromUrl === "other" ? "guardian" : "parent";
+        // Son/brother → groom, daughter/sister → bride (still editable in step 1).
+        if (!base.gender) {
+          if (relationshipFromUrl === "son" || relationshipFromUrl === "brother") base.gender = "male";
+          if (relationshipFromUrl === "daughter" || relationshipFromUrl === "sister") base.gender = "female";
+        }
         if (accountMeta?.fullName) base.accountHolderName = accountMeta.fullName;
       }
 
@@ -856,6 +869,7 @@ function ProfileCompleteInner() {
         : authUser.email || `user_${authUser.id}@profile.lingayatbandhu`);
 
     setSaving(true);
+    setSubmitPhase("saving");
     const payload: Partial<Profile> = {
       ...profile,
       email,
@@ -905,9 +919,11 @@ function ProfileCompleteInner() {
     }
 
     if (saveErr || !saved) {
+      setSubmitPhase("idle");
       setError(saveErr || "Failed to save profile");
       return;
     }
+    setSubmitPhase("done");
 
     if (hasUrlProfileId && !isDraftFlow) {
       router.push(
@@ -941,6 +957,35 @@ function ProfileCompleteInner() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[var(--background)] via-white to-[var(--background)]">
+      {submitPhase !== "idle" && (
+        <div
+          className="fixed inset-0 z-[95] flex items-center justify-center bg-[#05050A]/70 p-6 backdrop-blur-md animate-[lb-fade-in_.15s_ease-out]"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="w-full max-w-xs rounded-[20px] border border-[var(--lb-line-strong)] bg-[#15141E] p-6 text-center shadow-[0_30px_80px_rgba(0,0,0,0.6)] animate-[lb-pop-in_.2s_cubic-bezier(.2,.8,.2,1)]">
+            <div
+              className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${
+                submitPhase === "done"
+                  ? "bg-[image:var(--lb-accent-grad)] text-[var(--lb-on-accent)]"
+                  : "bg-[var(--lb-accent-tint)] text-[var(--lb-accent-text)]"
+              }`}
+            >
+              {submitPhase === "done" ? <Check size={28} strokeWidth={3} /> : <Loader2 size={26} className="animate-spin" />}
+            </div>
+            <p className="mt-4 text-[17px] font-semibold text-[var(--lb-text)]">
+              {submitPhase === "done"
+                ? hasUrlProfileId && !isDraftFlow
+                  ? "Changes saved"
+                  : "Submitted for review"
+                : "Submitting your profile…"}
+            </p>
+            <p className="mt-1 text-sm text-[var(--lb-muted)]">
+              {submitPhase === "done" ? "Taking you to your account…" : "This only takes a moment."}
+            </p>
+          </div>
+        </div>
+      )}
       <header className="sticky top-0 bg-white/95 backdrop-blur border-b border-[var(--border)] px-4 py-3 flex items-center justify-between z-20">
         <button
           onClick={prev}
@@ -1102,27 +1147,44 @@ function ProfileCompleteInner() {
                   onChange={(e) => update("fullName", e.target.value)}
                   placeholder="Profile holder's name"
                 />
-                <IconField icon={UserIcon} label="Gender" required>
-                  <div className="inline-flex gap-2">
+                <IconField icon={UserIcon} label="This profile is a" required>
+                  <div className="grid grid-cols-2 gap-2.5" role="radiogroup" aria-label="Bride or groom">
                     {[
-                      { v: "male", label: "Male" },
-                      { v: "female", label: "Female" },
+                      { v: "male", label: "Groom", sub: "Male", Icon: GroomIcon },
+                      { v: "female", label: "Bride", sub: "Female", Icon: BrideIcon },
                     ].map((g) => {
                       const active = profile.gender === g.v;
                       return (
                         <button
                           key={g.v}
                           type="button"
-                          onClick={() =>
-                            update("gender", g.v as "male" | "female")
-                          }
-                          className={`px-4 py-2 rounded-full text-sm font-medium border transition-all ${
+                          role="radio"
+                          aria-checked={active}
+                          onClick={() => update("gender", g.v as "male" | "female")}
+                          className={`relative flex items-center gap-3 rounded-2xl border p-3 text-left transition-all duration-200 active:scale-[0.98] ${
                             active
-                              ? "bg-[var(--primary)] text-white border-[var(--primary)] shadow-sm"
-                              : "bg-white text-gray-700 border-[var(--border)] hover:border-[var(--primary)]/40 hover:bg-[var(--primary)]/5"
+                              ? "border-[var(--lb-accent)]/60 bg-[var(--lb-accent-tint)] shadow-[0_8px_24px_var(--lb-accent-glow)]"
+                              : "border-[var(--lb-line)] bg-white/[0.04] hover:border-[var(--lb-line-strong)] hover:bg-white/[0.07]"
                           }`}
                         >
-                          {g.label}
+                          <span
+                            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${
+                              active
+                                ? "bg-[image:var(--lb-accent-grad)] text-[var(--lb-on-accent)]"
+                                : "bg-white/[0.06] text-[var(--lb-accent-text)]"
+                            }`}
+                          >
+                            <g.Icon size={24} />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block text-[15px] font-semibold text-[var(--lb-text)]">{g.label}</span>
+                            <span className="block text-xs text-[var(--lb-muted)]">{g.sub}</span>
+                          </span>
+                          {active && (
+                            <span className="absolute right-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-[image:var(--lb-accent-grad)] text-[var(--lb-on-accent)]">
+                              <Check size={12} strokeWidth={3} />
+                            </span>
+                          )}
                         </button>
                       );
                     })}

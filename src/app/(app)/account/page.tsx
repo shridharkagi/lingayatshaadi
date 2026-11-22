@@ -1482,7 +1482,7 @@ function RelationshipPickerModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="rel-picker-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-[fadeIn_120ms_ease-out]"
+      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-md animate-[fadeIn_120ms_ease-out]"
       onClick={onClose}
       style={{
         // Inline keyframes keep the entrance animation self-contained
@@ -1501,7 +1501,7 @@ function RelationshipPickerModal({
         }
       `}</style>
       <div
-        className="relative bg-[var(--lb-surface)] border border-[var(--lb-line)] rounded-[16px] shadow-2xl w-full max-w-lg p-5 sm:p-6"
+        className="relative w-full max-w-lg rounded-t-[22px] sm:rounded-[20px] border border-[var(--lb-line-strong)] bg-[#15141E] p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-6 shadow-[0_-20px_60px_rgba(0,0,0,0.55)]"
         onClick={(e) => e.stopPropagation()}
         style={{ animation: "popIn 160ms ease-out" }}
       >
@@ -1509,7 +1509,7 @@ function RelationshipPickerModal({
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="absolute top-3 right-3 p-2 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition"
+          className="lb-btn-glass absolute top-3 right-3 flex h-10 w-10 items-center justify-center rounded-full"
         >
           <XIcon size={18} />
         </button>
@@ -1520,27 +1520,27 @@ function RelationshipPickerModal({
         >
           {heading}
         </h3>
-        <p className="text-sm text-gray-500 mt-1 mb-4">{subheading}</p>
+        <p className="text-sm text-[var(--lb-muted)] mt-1 mb-4">{subheading}</p>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
           {RELATIONSHIP_OPTIONS.map((opt) => {
             const Icon = opt.icon;
             const isCurrent = mode === "edit" && currentValue === opt.value;
             const baseTile =
-              "group relative flex flex-col items-center gap-1.5 p-3 sm:p-4 rounded-xl border text-center transition focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40";
+              "group relative flex flex-col items-center gap-1.5 p-3.5 sm:p-4 rounded-2xl border text-center transition-all duration-200 active:scale-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lb-accent)]/50";
             const toneIdle =
-              "border-gray-200 bg-white hover:border-[var(--primary)] hover:bg-[var(--primary)]/5";
+              "border-[var(--lb-line)] bg-white/[0.04] hover:border-[var(--lb-accent)]/45 hover:bg-[var(--lb-accent-tint)]";
             const toneCurrent =
-              "border-[var(--primary)] bg-[var(--primary)]/10 ring-1 ring-[var(--primary)]/20";
+              "border-[var(--lb-accent)]/60 bg-[var(--lb-accent-tint)] shadow-[0_8px_24px_var(--lb-accent-glow)]";
             const className = `${baseTile} ${isCurrent ? toneCurrent : toneIdle}`;
 
             const body = (
               <>
                 <span
-                  className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                  className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${
                     isCurrent
-                      ? "bg-[var(--primary)] text-white"
-                      : "bg-[var(--primary)]/10 text-[var(--primary)] group-hover:bg-[var(--primary)]/20"
+                      ? "bg-[image:var(--lb-accent-grad)] text-[var(--lb-on-accent)]"
+                      : "bg-white/[0.06] text-[var(--lb-accent-text)] group-hover:bg-[image:var(--lb-accent-grad)] group-hover:text-[var(--lb-on-accent)]"
                   }`}
                 >
                   <Icon size={22} />
@@ -1548,11 +1548,11 @@ function RelationshipPickerModal({
                 <span className="text-sm font-semibold text-[var(--foreground)]">
                   {opt.label}
                 </span>
-                <span className="text-[11px] text-gray-500 leading-tight">
+                <span className="text-[11px] text-[var(--lb-muted)] leading-tight">
                   {opt.hint}
                 </span>
                 {isCurrent && (
-                  <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-[var(--primary)] text-white flex items-center justify-center">
+                  <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-[image:var(--lb-accent-grad)] text-[var(--lb-on-accent)] flex items-center justify-center">
                     <Check size={12} />
                   </span>
                 )}
@@ -1596,7 +1596,7 @@ function RelationshipPickerModal({
         <button
           onClick={onClose}
           disabled={saving}
-          className="w-full mt-5 py-2.5 rounded-xl text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition disabled:opacity-60"
+          className="lb-btn-glass w-full mt-5 h-12 rounded-xl text-sm font-medium disabled:opacity-60"
         >
           {saving ? "Saving..." : "Cancel"}
         </button>
