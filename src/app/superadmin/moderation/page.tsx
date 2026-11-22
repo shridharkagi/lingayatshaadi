@@ -3,8 +3,15 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Briefcase,
   Check,
   ChevronLeft,
+  HeartHandshake,
+  MapPin,
+  Phone,
+  Sparkles,
+  Users,
+  type LucideIcon,
   ChevronRight,
   ExternalLink,
   FileText,
@@ -108,6 +115,58 @@ function val(k: string, v: unknown): string {
   if (k === "contact" && v) return phoneFmt(String(v)) === "—" ? String(v) : phoneFmt(String(v));
   return show(v);
 }
+/** Review details, grouped so the reviewer can scan by topic. */
+const DETAIL_GROUPS: { title: string; icon: LucideIcon; tone: string; keys: string[]; wide?: boolean }[] = [
+  { title: "Contact", icon: Phone, tone: "t-green", keys: ["contacts", "contact", "address", "relationship", "managed_by"] },
+  { title: "Personal", icon: UserRound, tone: "t-indigo", keys: ["full_name", "nickname", "gender", "date_of_birth", "marital_status", "height", "caste", "sub_caste", "mother_tongue", "languages_known", "food_habits", "hobbies"] },
+  { title: "Education & career", icon: Briefcase, tone: "t-amber", keys: ["qualification", "profession_type", "profession", "company_name", "annual_income"] },
+  { title: "Family", icon: Users, tone: "t-plum", keys: ["father_name", "father_occupation", "mother_name", "mother_occupation", "sibling_details", "family_other_details"] },
+  { title: "Horoscope", icon: Sparkles, tone: "t-rose", keys: ["time_of_birth", "place_of_birth", "rashi", "nakshatra", "horoscope_other_details"] },
+  { title: "Location", icon: MapPin, tone: "t-teal", keys: ["city", "district", "state", "country"] },
+  { title: "About me", icon: UserRound, tone: "t-grey", keys: ["about_me"], wide: true },
+  { title: "Partner preferences", icon: HeartHandshake, tone: "t-plum", keys: ["partner_preference"], wide: true },
+];
+const LONG_KEYS = new Set(["address", "contacts", "hobbies", "sibling_details", "family_other_details", "horoscope_other_details", "about_me"]);
+
+/** Nicer display for a few fields in the grouped details view. */
+function detailVal(k: string, v: unknown, row: Record<string, unknown>): string {
+  if (k === "gender" && typeof v === "string") return v.charAt(0).toUpperCase() + v.slice(1);
+  if (k === "date_of_birth" && v) {
+    const d = new Date(String(v));
+    if (!Number.isNaN(d.getTime())) {
+      const now = new Date();
+      const age = now.getFullYear() - d.getFullYear() - (now < new Date(now.getFullYear(), d.getMonth(), d.getDate()) ? 1 : 0);
+      return `${d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} · ${age} yrs`;
+    }
+  }
+  // Primary phone is already listed under contact numbers.
+  if (k === "contact" && Array.isArray(row.contacts) && row.contacts.length) return "—";
+  if (k === "relationship" && v) return `For ${String(v)}`;
+  return val(k, v);
+}
+
+/** Partner preferences as readable label/value pairs. */
+function prefRows(v: unknown): { label: string; value: string }[] {
+  if (!v || typeof v !== "object") return [];
+  const p = v as Record<string, unknown>;
+  const has = (x: unknown) => x !== undefined && x !== null && x !== "" && !(Array.isArray(x) && x.length === 0);
+  const txt = (x: unknown) => (Array.isArray(x) ? x.join(", ") : String(x)).replace(/,\s*/g, ", ");
+  const out: { label: string; value: string }[] = [];
+  if (has(p.ageMin) || has(p.ageMax)) out.push({ label: "Age", value: `${p.ageMin ?? "any"} – ${p.ageMax ?? "any"} yrs` });
+  if (has(p.heightMin) || has(p.heightMax)) out.push({ label: "Height", value: `${p.heightMin ?? "any"} – ${p.heightMax ?? "any"}` });
+  if (has(p.incomeMin) || has(p.incomeMax)) out.push({ label: "Income", value: `${p.incomeMin ?? "any"} – ${p.incomeMax ?? "any"}` });
+  const named: Record<string, string> = {
+    maritalStatus: "Marital status", caste: "Caste", subCaste: "Sub-caste", education: "Education", profession: "Profession",
+    foodHabits: "Food habits", state: "State", city: "City", district: "District", motherTongue: "Mother tongue", other: "Other",
+  };
+  for (const [k, label] of Object.entries(named)) if (has(p[k])) out.push({ label, value: txt(p[k]) });
+  const known = new Set(["ageMin", "ageMax", "heightMin", "heightMax", "incomeMin", "incomeMax", ...Object.keys(named)]);
+  for (const [k, x] of Object.entries(p)) {
+    if (!known.has(k) && has(x) && typeof x !== "object") out.push({ label: k.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()), value: txt(x) });
+  }
+  return out;
+}
+
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 const initials = (n: string) => n.split(/\s+/).map((x) => x[0]).slice(0, 2).join("").toUpperCase();
 function ago(iso: string | null) {
@@ -333,7 +392,17 @@ export default function ReviewWorkspacePage() {
   }, [sel]);
   const details = useMemo(() => {
     if (!sel || sel.type !== "new" || !sel.live) return [];
-    return FIELDS.filter(([k]) => k !== "profile_photo" && val(k, sel.live?.[k]) !== "—").map(([k, label]) => ({ label, value: val(k, sel.live?.[k]) }));
+    const row = sel.live as Record<string, unknown>;
+    const label = Object.fromEntries(FIELDS);
+    return DETAIL_GROUPS.map((g) => ({
+      ...g,
+      items:
+        g.keys[0] === "partner_preference"
+          ? prefRows(row.partner_preference)
+          : g.keys
+              .map((k) => ({ key: k, label: label[k] || k, value: detailVal(k, row[k], row) }))
+              .filter((d) => d.value !== "—"),
+    })).filter((g) => g.items.length > 0);
   }, [sel]);
 
   return (
@@ -490,16 +559,27 @@ export default function ReviewWorkspacePage() {
               )}
 
               {sel.type === "new" && (
-                <div className="ad-card">
-                  <h3 className="ad-h2" style={{ marginBottom: 12 }}>Profile details</h3>
-                  <div className="rv-details">
-                    {details.map((d) => (
-                      <div key={d.label}>
-                        <div className="ad-muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em" }}>{d.label}</div>
-                        <div style={{ fontSize: 14, marginTop: 2, wordBreak: "break-word", whiteSpace: "pre-line" }}>{d.value}</div>
-                      </div>
-                    ))}
-                  </div>
+                <div className="rv-groups">
+                  {details.map((g) => {
+                    const Icon = g.icon;
+                    return (
+                      <section key={g.title} className={`ad-card rv-group ${g.wide ? "wide" : ""}`}>
+                        <h3 className="rv-group-h">
+                          <span className={`ad-ico ${g.tone}`}><Icon size={15} /></span>
+                          {g.title}
+                          <span className="ad-muted" style={{ fontSize: 11, fontWeight: 500, marginLeft: "auto" }}>{g.items.length}</span>
+                        </h3>
+                        <dl className={`rv-dl ${g.wide ? "cols" : ""}`}>
+                          {g.items.map((d) => (
+                            <div key={d.label} className={"key" in d && LONG_KEYS.has(String(d.key)) ? "long" : ""}>
+                              <dt>{d.label}</dt>
+                              <dd>{d.value}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </section>
+                    );
+                  })}
                 </div>
               )}
 

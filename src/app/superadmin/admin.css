@@ -460,3 +460,19 @@ html:has(.ad-root) { overflow-x: clip; }
 .ad-root .pc-trust { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
 .ad-root .pc-trust input { width: 70px; height: 32px; border: 1px solid var(--ad-line-2); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 13px; }
 .ad-root .pc-dirty { color: #c25a00; font-weight: 600; }
+
+/* Review: grouped profile details */
+/* Masonry-style: cards flow down two columns, no gaps beside short cards. */
+.rv-groups { columns: 2; column-gap: 12px; }
+.rv-group { padding: 14px 16px !important; break-inside: avoid; margin-bottom: 12px; display: block; width: 100%; }
+.rv-group.wide { column-span: all; }
+.rv-group-h { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid #f1f2f6; }
+.rv-group-h .ad-ico { width: 26px; height: 26px; border-radius: 8px; }
+.rv-dl { margin: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
+.rv-dl > div { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 10px; padding: 6px 0; border-bottom: 1px dashed #eef0f5; }
+.rv-dl > div:last-child { border-bottom: 0; }
+.rv-dl dt { font-size: 12px; color: var(--ad-muted); }
+.rv-dl dd { margin: 0; font-size: 13.5px; color: var(--ad-text); word-break: break-word; white-space: pre-line; }
+.rv-dl.cols { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; }
+.rv-dl.cols > div.long { grid-column: 1 / -1; grid-template-columns: 1fr; gap: 2px; }
+@media (max-width: 1100px) { .rv-groups { columns: 1; } .rv-dl.cols { grid-template-columns: 1fr; } }
