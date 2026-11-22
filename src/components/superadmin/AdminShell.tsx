@@ -112,7 +112,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   }, []);
 
   const loadInbox = useCallback(() => {
-    adminFetch("/api/superadmin/overview?range=7d")
+    adminFetch("/api/superadmin/inbox")
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => j?.inbox && setInbox(j.inbox))
       .catch(() => undefined);
