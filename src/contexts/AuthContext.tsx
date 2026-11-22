@@ -531,6 +531,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     const id = identifier.trim();
     if (!id) return { error: "Enter mobile number" };
+    // Local development only: the server answers 404 unless DEV_LOGIN_* is
+    // configured in .env.local, so this is a no-op on Test/Prod builds.
+    if (process.env.NODE_ENV !== "production" && !id.includes("@")) {
+      try {
+        const res = await fetch("/api/auth/dev-password-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: id, password }),
+        });
+        if (res.ok) {
+          const tokens = (await res.json()) as { access_token: string; refresh_token: string };
+          const { error } = await supabase.auth.setSession(tokens);
+          if (!error) return {};
+        }
+      } catch {
+        // fall through to the normal password login
+      }
+    }
     if (id.includes("@")) {
       try {
         const cap = await acquireCaptchaToken();
