@@ -485,7 +485,7 @@ export function ProfileFormSections({
           </select>
         </div>
         <Input label="Profession" placeholder="e.g. Software Engineer, Senior CA" value={profile.profession || ""} onChange={(e) => update("profession", e.target.value)} />
-        <Input label="Company Name" value={profile.companyName || ""} onChange={(e) => update("companyName", e.target.value)} />
+        <Input label="Company Name" placeholder="e.g. Accenture" value={profile.companyName || ""} onChange={(e) => update("companyName", e.target.value)} />
         {adminMode ? (
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-2">Annual Income (range)</label>

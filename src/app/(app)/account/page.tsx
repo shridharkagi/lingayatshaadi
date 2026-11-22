@@ -153,6 +153,7 @@ export default function AccountPage() {
   const [profileApprovalModalVariant, setProfileApprovalModalVariant] = useState<
     "created" | "updated"
   >("created");
+  const [submittedProfileGender, setSubmittedProfileGender] = useState<"male" | "female" | null>(null);
 
   const loadPendingDeletionRequests = useCallback(async () => {
     const res = await adminFetch("/api/profile-deletion-request");
@@ -207,6 +208,8 @@ export default function AccountPage() {
     const isCreated = params.get("profileCreated") === "1";
     const isUpdated = params.get("profileUpdated") === "1";
     if (!isCreated && !isUpdated) return;
+    const g = params.get("gender");
+    setSubmittedProfileGender(g === "male" || g === "female" ? g : null);
 
     if (isCreated) {
       const createdProfileId = params.get("createdProfileId") || "generic";
@@ -1090,6 +1093,7 @@ export default function AccountPage() {
       <ProfileCreatedApprovalModal
         open={showCreatedModal}
         variant={profileApprovalModalVariant}
+        profileGender={submittedProfileGender}
         accountName={accountMeta?.fullName || authUser?.email || "User"}
         onClose={() => setShowCreatedModal(false)}
       />

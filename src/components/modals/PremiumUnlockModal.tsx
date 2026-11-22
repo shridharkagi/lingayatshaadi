@@ -144,7 +144,7 @@ export function PremiumUnlockModal({
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-[90] bg-black/45 backdrop-blur-[2px] flex items-end justify-center"
+          className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm flex items-end justify-center"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -155,7 +155,8 @@ export function PremiumUnlockModal({
             role="dialog"
             aria-modal="true"
             aria-labelledby="premium-unlock-title"
-            className="w-full max-w-lg rounded-t-[18px] bg-white text-slate-900 shadow-[0_-12px_45px_rgba(0,0,0,0.22)] dark:bg-zinc-900 dark:text-zinc-100"
+            className="w-full max-w-lg rounded-t-[18px] border-t shadow-[0_-12px_45px_rgba(0,0,0,0.5)]"
+            style={{ background: "var(--lb-surface)", color: "var(--lb-text)", borderColor: "var(--lb-line-strong)" }}
             initial={{ y: 480, opacity: 0.85 }}
             animate={{ y: dragDeltaY, opacity: 1 }}
             exit={{ y: 520, opacity: 0.9 }}
@@ -164,30 +165,40 @@ export function PremiumUnlockModal({
             onTouchMove={handleSheetTouchMove}
             onTouchEnd={handleSheetTouchEnd}
           >
-            <div className="mx-auto mt-2.5 h-1.5 w-14 rounded-full bg-slate-300/85 dark:bg-zinc-700" />
+            <div className="mx-auto mt-2.5 h-1.5 w-14 rounded-full" style={{ background: "rgba(255,255,255,0.18)" }} />
 
             <div className="px-5 pt-4 pb-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h2 id="premium-unlock-title" className="text-[1.15rem] font-bold tracking-tight">
+                  <h2 id="premium-unlock-title" className="text-[1.15rem] font-bold tracking-tight" style={{ color: "var(--lb-text)" }}>
                     Unlock Full Profile Access
                   </h2>
-                  <p className="mt-1.5 text-sm text-slate-600 dark:text-zinc-300">
+                  <p className="mt-1.5 text-sm" style={{ color: "var(--lb-text-2)" }}>
                     Connect directly with this profile and access complete details.
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="rounded-full p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 active:scale-95 transition dark:hover:bg-zinc-800 dark:text-zinc-400"
+                  className="lb-btn-glass flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                  style={{ color: "var(--lb-text-2)" }}
                   aria-label="Close premium unlock modal"
                 >
                   <X size={18} />
                 </button>
               </div>
 
-              <div className="mt-4 rounded-2xl border border-[var(--lb-accent)]/25 bg-gradient-to-br from-[#2A2418] to-[#1A1824] px-4 py-3 dark:border-zinc-700 dark:from-zinc-900 dark:to-zinc-900">
-                <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-[var(--lb-accent-tint)] px-2.5 py-1 text-[11px] font-semibold text-[var(--lb-accent-text)] dark:bg-zinc-800 dark:text-zinc-200">
+              <div
+                className="mt-4 rounded-2xl border px-4 py-3"
+                style={{
+                  borderColor: "rgba(235, 201, 131, 0.28)",
+                  background: "linear-gradient(135deg, #2A2418 0%, var(--lb-raised) 70%)",
+                }}
+              >
+                <div
+                  className="mb-2.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                  style={{ background: "var(--lb-accent-tint)", color: "var(--lb-accent-text)" }}
+                >
                   <Sparkles size={12} />
                   Premium Benefits
                 </div>
@@ -195,7 +206,8 @@ export function PremiumUnlockModal({
                   {benefits.map((item) => (
                     <li
                       key={item}
-                      className="inline-flex items-center gap-2 rounded-xl bg-white/85 px-2.5 py-2 text-[13px] font-medium text-slate-700 shadow-sm dark:bg-zinc-800 dark:text-zinc-200"
+                      className="inline-flex items-center gap-2 rounded-xl border px-3 py-2.5 text-[13.5px] font-medium"
+                      style={{ background: "rgba(255,255,255,0.05)", borderColor: "var(--lb-line)", color: "var(--lb-text)" }}
                     >
                       <CheckCircle2 size={14} style={{ color: GOLD }} />
                       {item}
@@ -204,9 +216,12 @@ export function PremiumUnlockModal({
                 </ul>
               </div>
 
-              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                <div className="inline-flex items-center gap-1.5 font-semibold text-slate-700 dark:text-zinc-200">
-                  <ShieldCheck size={13} />
+              <div
+                className="mt-3 rounded-xl border px-3 py-2.5 text-xs"
+                style={{ background: "var(--lb-glass)", borderColor: "var(--lb-line)", color: "var(--lb-text-2)" }}
+              >
+                <div className="inline-flex items-center gap-1.5 font-semibold" style={{ color: "var(--lb-text)" }}>
+                  <ShieldCheck size={13} style={{ color: "var(--lb-verified)" }} />
                   Trusted by Lingayat families across Karnataka.
                 </div>
                 <p className="mt-1 text-[11.5px] opacity-90">
@@ -215,7 +230,10 @@ export function PremiumUnlockModal({
               </div>
             </div>
 
-            <div className="sticky bottom-0 rounded-t-2xl border-t border-slate-200 bg-white/95 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/95">
+            <div
+              className="sticky bottom-0 border-t px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"
+              style={{ background: "var(--lb-surface)", borderColor: "var(--lb-line)" }}
+            >
               <div className="space-y-2.5">
                 <button
                   type="button"
@@ -240,11 +258,12 @@ export function PremiumUnlockModal({
                   type="button"
                   onClick={callSupport}
                   disabled={callLoading}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 active:scale-[0.99] disabled:opacity-70 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                  className="lb-btn-glass w-full inline-flex items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-semibold disabled:opacity-70"
+                  style={{ color: "var(--lb-accent-text)" }}
                 >
                   {callLoading ? (
                     <span className="inline-flex items-center gap-2">
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-400/70 border-t-slate-700 dark:border-zinc-500 dark:border-t-zinc-100" />
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                       Calling...
                     </span>
                   ) : (
@@ -256,11 +275,11 @@ export function PremiumUnlockModal({
                 </button>
               </div>
 
-              <div className="mt-2.5 flex items-center justify-center gap-1.5 text-[11px] text-slate-500 dark:text-zinc-400">
+              <div className="mt-2.5 flex items-center justify-center gap-1.5 text-[11px]" style={{ color: "var(--lb-muted)" }}>
                 <Headset size={12} />
                 Activation support available instantly.
               </div>
-              <div className="mt-1 text-center text-[10px] text-slate-400 dark:text-zinc-500">
+              <div className="mt-1 text-center text-[10px]" style={{ color: "var(--lb-subtle)" }}>
                 {accountName || accountCode ? (
                   <span className="inline-flex items-center gap-1">
                     <UserRound size={11} />

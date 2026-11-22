@@ -66,23 +66,6 @@ type MemberSummaryRow = {
     amountPaid: number;
   }>;
 };
-type UpgradeRequest = {
-  id: string;
-  user_id: string;
-  plan_name: string;
-  plan_code?: string;
-  plan_price: number;
-  callback_number: string;
-  note?: string;
-  status: "new" | "contacted" | "closed";
-  email_notification_status?: string;
-  email_notification_error?: string;
-  whatsapp_notification_status?: string;
-  whatsapp_notification_error?: string;
-  created_at: string;
-  member_account_code?: string | null;
-  member_full_name?: string | null;
-};
 type UserLookup = {
   userId: string | null;
   profileId: string | null;
@@ -103,7 +86,6 @@ export default function SuperAdminSubscriptionsPage() {
   const [overview, setOverview] = useState<Record<string, unknown> | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [upgradeRequests, setUpgradeRequests] = useState<UpgradeRequest[]>([]);
   const [busyPlanCode, setBusyPlanCode] = useState<string | null>(null);
   const [resolvingUser, setResolvingUser] = useState(false);
   const [resolvedUser, setResolvedUser] = useState<UserLookup | null>(null);
@@ -149,10 +131,9 @@ export default function SuperAdminSubscriptionsPage() {
 
   const load = async () => {
     setError(null);
-    const [ovRes, planRes, reqRes] = await Promise.all([
+    const [ovRes, planRes] = await Promise.all([
       adminFetch("/api/superadmin/subscriptions/overview"),
       adminFetch("/api/superadmin/subscriptions/plans"),
-      adminFetch("/api/superadmin/subscriptions/upgrade-requests"),
     ]);
     const safeJson = async <T,>(res: Response, fallback: T): Promise<T> => {
       try {
@@ -163,10 +144,8 @@ export default function SuperAdminSubscriptionsPage() {
     };
     const ovJson = await safeJson<Record<string, unknown>>(ovRes, {});
     const planJson = await safeJson<{ plans?: Plan[]; error?: string }>(planRes, {});
-    const reqJson = await safeJson<{ requests?: UpgradeRequest[]; error?: string }>(reqRes, {});
     if (!ovRes.ok) setError(String(ovJson.error || `Failed to load overview (${ovRes.status})`));
     if (!planRes.ok) setError(planJson.error || `Failed to load plans (${planRes.status})`);
-    if (!reqRes.ok) setError(reqJson.error || `Failed to load upgrade requests (${reqRes.status})`);
     setOverview(ovRes.ok ? ovJson : null);
     const basePlans = planJson.plans || [];
     if (ovRes.ok && Array.isArray(ovJson.plans)) {
@@ -180,7 +159,6 @@ export default function SuperAdminSubscriptionsPage() {
     } else {
       setPlans(basePlans);
     }
-    setUpgradeRequests(reqJson?.requests || []);
   };
 
   useEffect(() => {
@@ -518,17 +496,6 @@ export default function SuperAdminSubscriptionsPage() {
     setEditingSub(null);
     setSubEditForm({ expiresAt: "", totalContactViews: "", dailyContactViewLimit: "", reason: "" });
     await load();
-  };
-
-  const updateUpgradeStatus = async (id: string, status: UpgradeRequest["status"]) => {
-    const res = await adminFetch("/api/superadmin/subscriptions/upgrade-requests", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, status }),
-    });
-    const json = (await res.json()) as { error?: string };
-    if (!res.ok) setError(json.error || "Failed to update request");
-    else await load();
   };
 
   return (
@@ -1126,64 +1093,13 @@ export default function SuperAdminSubscriptionsPage() {
         </div>
       )}
 
-      <div className="mt-8 rounded-xl border bg-white p-6">
-        <h2 className="text-lg font-semibold">Upgrade Requests</h2>
-        <p className="text-sm text-gray-500 mt-1">Requests submitted from membership page.</p>
-        <div className="mt-4 space-y-3">
-          {upgradeRequests.length === 0 ? (
-            <p className="text-sm text-gray-500">No upgrade requests yet.</p>
-          ) : (
-            upgradeRequests.map((r) => (
-              <div key={r.id} className="rounded-lg border border-gray-200 p-3">
-                <p className="text-sm font-semibold text-gray-900">
-                  {r.plan_name} (₹{Number(r.plan_price || 0)})
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  User: {r.member_account_code || r.user_id.slice(0, 8) + "…"} | {r.member_full_name || "—"} |
-                  Callback: {r.callback_number}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Requested: {new Date(r.created_at).toLocaleString("en-IN")}
-                </p>
-                {r.note && <p className="text-xs text-gray-600 mt-1">Note: {r.note}</p>}
-                <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
-                  <span className={`rounded-full px-2 py-0.5 ${
-                    r.email_notification_status === "sent" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
-                  }`}>
-                    Email: {r.email_notification_status || "pending"}
-                  </span>
-                  <span className={`rounded-full px-2 py-0.5 ${
-                    r.whatsapp_notification_status === "sent" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
-                  }`}>
-                    WhatsApp: {r.whatsapp_notification_status || "pending"}
-                  </span>
-                </div>
-                {r.email_notification_error && (
-                  <p className="text-[11px] text-amber-700 mt-1">Email error: {r.email_notification_error}</p>
-                )}
-                {r.whatsapp_notification_error && (
-                  <p className="text-[11px] text-amber-700 mt-1">WhatsApp error: {r.whatsapp_notification_error}</p>
-                )}
-                <div className="mt-2 flex gap-2">
-                  {(["new", "contacted", "closed"] as const).map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => updateUpgradeStatus(r.id, s)}
-                      className={`rounded-md px-2.5 py-1 text-xs font-medium border ${
-                        r.status === s
-                          ? "bg-[var(--primary)] text-white border-[var(--primary)]"
-                          : "bg-white text-gray-600 border-gray-200"
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+      <p className="mt-8 text-sm text-gray-500">
+        Upgrade requests from members are handled in{" "}
+        <Link href="/superadmin/pipeline" className="text-[var(--primary)] font-medium underline">
+          Upgrade pipeline
+        </Link>
+        .
+      </p>
     </div>
   );
 }

@@ -555,6 +555,11 @@ function ProfileCompleteInner() {
   // debounce fires again, we queue the second one instead of racing two
   // INSERTs that would both create a draft row.
   const savingRef = useRef(false);
+  // Which draft/start the wizard has already loaded. Auth refreshes (e.g. when
+  // the user returns from the phone's file picker) give new authUser /
+  // accountMeta objects; without this guard the wizard re-fetched the draft and
+  // wiped unsaved work such as a just-added photo or an ID mid-upload.
+  const hydratedKeyRef = useRef<string | null>(null);
   const normalizedCountry = (profile.country || "").trim().toLowerCase();
   const isIndiaSelected = normalizedCountry === "" || normalizedCountry === "india";
   const districtOptions = isIndiaSelected ? getIndiaDistrictsForState(profile.state || "") : [];
@@ -600,6 +605,10 @@ function ProfileCompleteInner() {
 
   useEffect(() => {
     let cancelled = false;
+    const hydrateKey = hasUrlProfileId
+      ? `id:${profileIdParam}`
+      : `new:${relationshipFromUrl ?? ""}:${authUser?.id ?? ""}`;
+    if (hydratedKeyRef.current === hydrateKey) return;
     const init = async () => {
       // -----------------------------------------------------------------
       // Path 1: URL points at a specific profile row.
@@ -618,6 +627,7 @@ function ProfileCompleteInner() {
           setHydrating(false);
           return;
         }
+        hydratedKeyRef.current = hydrateKey;
         setProfile({ ...initialProfile, ...data });
         setDraftId(data.id);
         const isDraft = data.moderationStatus === "draft";
@@ -646,6 +656,8 @@ function ProfileCompleteInner() {
           return;
         }
         if (existingDraft) {
+          // The URL switches to ?profileId=… below; that load is already done.
+          hydratedKeyRef.current = `id:${existingDraft.id}`;
           setProfile({ ...initialProfile, ...existingDraft });
           setDraftId(existingDraft.id);
           setIsDraftFlow(true);
@@ -691,6 +703,7 @@ function ProfileCompleteInner() {
         if (accountMeta?.fullName) base.accountHolderName = accountMeta.fullName;
       }
 
+      hydratedKeyRef.current = hydrateKey;
       setProfile(base);
       setIsDraftFlow(true);
       setHydrating(false);
@@ -763,6 +776,7 @@ function ProfileCompleteInner() {
             return;
           }
           if (data?.id) {
+            hydratedKeyRef.current = `id:${data.id}`;
             setDraftId(data.id);
             const qs = new URLSearchParams({ profileId: data.id });
             if (relationshipFromUrl) qs.set("relationship", relationshipFromUrl);
@@ -819,6 +833,7 @@ function ProfileCompleteInner() {
             setError(createErr || "Could not save this step. Please try again.");
             return;
           }
+          hydratedKeyRef.current = `id:${data.id}`;
           setDraftId(data.id);
           const qs = new URLSearchParams({ profileId: data.id });
           const rel = (profile.relationship || relationshipFromUrl) as Relationship | undefined;
@@ -924,13 +939,18 @@ function ProfileCompleteInner() {
     }
     setSubmitPhase("done");
 
+    // Gender lets the success popup offer the opposite list (bride → grooms).
+    const genderParam =
+      saved.gender === "male" || saved.gender === "female" ? `&gender=${saved.gender}` : "";
     if (hasUrlProfileId && !isDraftFlow) {
       router.push(
-        `/account?profileUpdated=1&updatedProfileId=${encodeURIComponent(saved.id)}`,
+        `/account?profileUpdated=1&updatedProfileId=${encodeURIComponent(saved.id)}${genderParam}`,
       );
       return;
     }
-    router.push(`/account?profileCreated=1&createdProfileId=${encodeURIComponent(saved.id)}`);
+    router.push(
+      `/account?profileCreated=1&createdProfileId=${encodeURIComponent(saved.id)}${genderParam}`,
+    );
   };
 
   const prev = () => {
@@ -1348,7 +1368,7 @@ function ProfileCompleteInner() {
                 />
                 <IconField icon={Building2} label="Company Name">
                   <input
-                    placeholder="e.g. Acme Corp"
+                    placeholder="e.g. Accenture"
                     value={profile.companyName || ""}
                     onChange={(e) => update("companyName", e.target.value)}
                     className={selectClass}
@@ -1555,6 +1575,7 @@ function ProfileCompleteInner() {
                   ...(profile.photos || []).filter((p) => p !== profile.profilePhoto),
                 ]}
                 onAdd={(url) => {
+                  dirtyRef.current = true;
                   setProfile((prev) => {
                     const isFirst = !prev.profilePhoto && (prev.photos?.length ?? 0) === 0;
                     if (isFirst) {
@@ -1567,6 +1588,7 @@ function ProfileCompleteInner() {
                   });
                 }}
                 onRemove={(url) => {
+                  dirtyRef.current = true;
                   setProfile((prev) => {
                     if (url === prev.profilePhoto) {
                       const rest = (prev.photos || []).filter((p) => p !== url);
@@ -1578,6 +1600,7 @@ function ProfileCompleteInner() {
                 primaryUrl={profile.profilePhoto}
                 onSetPrimary={(url) => {
                   if (url === profile.profilePhoto) return;
+                  dirtyRef.current = true;
                   setProfile((prev) => ({
                     ...prev,
                     profilePhoto: url,

@@ -50,7 +50,10 @@ export function KycDocumentsUpload({
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [canUserEdit, setCanUserEdit] = useState(true);
+  // Images-only input opens the phone's photo gallery (like photo upload);
+  // mixing in PDF made Android open the Files app instead.
   const inputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
     if (!profileId) return;
@@ -180,13 +183,32 @@ export function KycDocumentsUpload({
           className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
         >
           <Upload size={16} />
-          {loading ? "Uploading..." : "Upload ID"}
+          {loading ? "Uploading..." : "Upload ID photo"}
+        </button>
+        <button
+          type="button"
+          onClick={() => pdfInputRef.current?.click()}
+          disabled={loading || (!adminMode && !canUserEdit)}
+          className="text-xs font-medium text-gray-500 underline underline-offset-2 hover:text-gray-800 disabled:opacity-50"
+        >
+          or upload a PDF
         </button>
       </div>
       <input
         ref={inputRef}
         type="file"
-        accept=".png,.jpg,.jpeg,.webp,.pdf,image/png,image/jpeg,image/webp,application/pdf"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (file) void onUpload(file);
+        }}
+      />
+      <input
+        ref={pdfInputRef}
+        type="file"
+        accept="application/pdf,.pdf"
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];

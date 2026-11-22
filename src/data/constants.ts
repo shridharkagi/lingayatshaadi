@@ -102,6 +102,7 @@ export const PROFESSION_TYPES = [
   "IT / Software",
   "Government Job",
   "Business",
+  "Farmer",
   "Doctor",
   "Engineer",
   "Lawyer / Legal",

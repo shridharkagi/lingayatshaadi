@@ -241,7 +241,8 @@ export function ContactsEditor({
               role="switch"
               aria-checked={!!c.showOnProfile}
               onClick={() => update(idx, { showOnProfile: !c.showOnProfile })}
-              className="mt-3 w-full flex items-center justify-between gap-3 p-3 rounded-lg bg-white/60 border border-[var(--border)] hover:border-[var(--primary)]/30 transition text-left"
+              data-on={c.showOnProfile ? "true" : "false"}
+              className="lb-public-toggle mt-3 w-full flex items-center justify-between gap-3 p-3 rounded-lg bg-white/60 border border-[var(--border)] hover:border-[var(--primary)]/30 transition text-left"
             >
               <span className="flex items-start gap-2 min-w-0 flex-1">
                 {c.showOnProfile ? (
@@ -250,10 +251,10 @@ export function ContactsEditor({
                   <EyeOff size={16} className="text-gray-400 shrink-0 mt-0.5" />
                 )}
                 <span className="min-w-0 flex-1">
-                  <span className="block text-xs sm:text-sm font-medium text-gray-800 leading-tight">
+                  <span className="lb-public-toggle-title block text-xs sm:text-sm font-medium text-gray-800 leading-tight">
                     Show on public profile
                   </span>
-                  <span className="block text-[11px] text-gray-500 mt-0.5 leading-tight">
+                  <span className="lb-public-toggle-sub block text-[11px] text-gray-500 mt-0.5 leading-tight">
                     {c.showOnProfile
                       ? "Visible to other members"
                       : "Hidden — only you can see it"}
@@ -262,13 +263,14 @@ export function ContactsEditor({
               </span>
               <span
                 aria-hidden
-                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                className={`lb-switch-track relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
                   c.showOnProfile ? "bg-[var(--primary)]" : "bg-gray-300"
                 }`}
               >
                 <span
-                  className="inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"
+                  className="inline-block h-4 w-4 rounded-full shadow transition-transform"
                   style={{
+                    backgroundColor: "#fff",
                     transform: c.showOnProfile
                       ? "translateX(18px)"
                       : "translateX(2px)",

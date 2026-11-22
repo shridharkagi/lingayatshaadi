@@ -9,6 +9,7 @@ const PROFESSION_CATEGORY_KEYWORDS: Record<string, string[]> = {
   "IT / Software": ["it", "software", "developer", "data scientist", "product manager", "cloud architect", "tech"],
   "Government Job": ["government", "govt", "psu", "public sector", "rtd.", "retired", "railway"],
   "Business": ["business", "entrepreneur", "owner", "founder", "manufacturing", "construction"],
+  "Farmer": ["farmer", "farming", "agriculture", "agriculturist", "agri", "krishi"],
   "Doctor": ["doctor", "physician", "cardiologist", "dentist", "surgeon", "mbbs", "md", "bds", "mds"],
   "Engineer": ["engineer", "architect", "civil", "mechanical", "electrical", "b.e", "b.tech", "b.arch"],
   "Teacher": ["teacher", "professor", "lecturer", "educator"],

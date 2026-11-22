@@ -18,6 +18,8 @@ function isStandaloneMode() {
 export function InstallPWAButton() {
   const pathname = usePathname() ?? "";
   const isAdminRoute = pathname === "/superadmin" || pathname.startsWith("/superadmin/");
+  // Not on the profile wizard (covers its action bar) or the account page.
+  const isHiddenRoute = pathname === "/profile/complete" || pathname === "/account";
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
 
@@ -56,7 +58,7 @@ export function InstallPWAButton() {
   };
 
   // Not offered inside the admin console (and its styles are Midnight-only).
-  if (isAdminRoute || isInstalled || !deferredPrompt) return null;
+  if (isAdminRoute || isHiddenRoute || isInstalled || !deferredPrompt) return null;
 
   return (
     <button

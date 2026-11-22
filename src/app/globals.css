@@ -566,3 +566,22 @@ body:has(> .lb-midnight) {
   background: none;
   text-shadow: 0 0 18px rgba(235, 201, 131, 0.18);
 }
+
+/* Contacts editor: "Show on public profile" row (shared with admin, so the
+   light look stays the default and only the Midnight scope is restyled). */
+.lb-midnight .lb-public-toggle {
+  background: var(--lb-raised);
+  border-color: var(--lb-field-line);
+}
+.lb-midnight .lb-public-toggle:hover { border-color: var(--lb-field-line-hover); }
+.lb-midnight .lb-public-toggle[data-on="true"] {
+  background: rgba(235, 201, 131, 0.08);
+  border-color: rgba(235, 201, 131, 0.45);
+}
+.lb-midnight .lb-public-toggle .lb-public-toggle-title { color: var(--lb-text); }
+.lb-midnight .lb-public-toggle .lb-public-toggle-sub { color: var(--lb-text-2); }
+.lb-midnight .lb-public-toggle[data-on="true"] .lb-public-toggle-sub { color: var(--lb-accent); }
+.lb-midnight .lb-public-toggle svg { color: var(--lb-text-2); }
+.lb-midnight .lb-public-toggle[data-on="true"] svg { color: var(--lb-accent); }
+.lb-midnight .lb-public-toggle .lb-switch-track { background: rgba(255, 255, 255, 0.18); }
+.lb-midnight .lb-public-toggle[data-on="true"] .lb-switch-track { background: var(--lb-accent-grad); }

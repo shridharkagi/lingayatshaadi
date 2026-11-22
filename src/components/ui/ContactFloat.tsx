@@ -20,8 +20,13 @@ export function ContactFloat() {
   // Hide on message/chat pages and superadmin pages to avoid covering controls.
   const isMessagePage = pathname && pathname.startsWith("/messages/");
   const isSuperAdminPage = pathname && pathname.startsWith("/superadmin");
+  // The profile wizard has its own bottom action bar; the float would cover it.
+  const isProfileWizard = pathname === "/profile/complete";
   const shouldHide =
-    (!hasCall && !hasWhatsApp && !hasWhatsAppGroup) || Boolean(isMessagePage) || Boolean(isSuperAdminPage);
+    (!hasCall && !hasWhatsApp && !hasWhatsAppGroup) ||
+    Boolean(isMessagePage) ||
+    Boolean(isSuperAdminPage) ||
+    isProfileWizard;
 
   const whatsappNumber = config.whatsappContactNumber?.replace(/\D/g, "");
 
