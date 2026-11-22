@@ -276,7 +276,7 @@
 .ad-link:hover { color: #b4480b; }
 .ad-tabs { display: flex; gap: 2px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--ad-line); }
 .ad-tabs::-webkit-scrollbar { display: none; }
-.ad-tab { white-space: nowrap; flex: none; border: 0; background: transparent; font: inherit; font-size: 13.5px; padding: 10px 12px; color: var(--ad-muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.ad-tab { white-space: nowrap; flex: none; border: 0; background: transparent; font: inherit; font-size: 13.5px; padding: 10px 12px; color: var(--ad-muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: 0; }
 .ad-tab.on { color: var(--ad-text); font-weight: 600; border-bottom-color: var(--ad-saffron); }
 .ad-tab .cnt { font-size: 11px; background: #f0f1f6; border-radius: 999px; padding: 1px 7px; margin-left: 6px; }
 .ad-menu { position: relative; display: inline-block; }
