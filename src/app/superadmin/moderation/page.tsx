@@ -6,6 +6,8 @@ import {
   Briefcase,
   Check,
   ChevronLeft,
+  Pencil,
+  Save,
   HeartHandshake,
   MapPin,
   Phone,
@@ -22,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { adminFetch } from "@/lib/api/adminClient";
+import { validateMatrimonyDob } from "@/lib/dateOfBirth";
 
 type CheckItem = { level: "ok" | "warn" | "info"; title: string; detail: string };
 type Photo = { id: string; url: string; status: string; is_primary?: boolean; rejection_reason?: string | null };
@@ -126,6 +129,20 @@ const DETAIL_GROUPS: { title: string; icon: LucideIcon; tone: string; keys: stri
   { title: "About me", icon: UserRound, tone: "t-grey", keys: ["about_me"], wide: true },
   { title: "Partner preferences", icon: HeartHandshake, tone: "t-plum", keys: ["partner_preference"], wide: true },
 ];
+/* ---- Inline editing in the review workspace ---- */
+const EDIT_SELECTS: Record<string, string[]> = {
+  gender: ["male", "female"],
+  marital_status: ["Never Married", "Divorced", "Widowed", "Awaiting Divorce", "Separated"],
+  relationship: ["self", "son", "daughter", "brother", "sister", "other"],
+};
+/** Shown read-only while editing (derived, or edited in the full editor). */
+const EDIT_SKIP = new Set(["contact", "managed_by", "partner_preference"]);
+const EDIT_TEXTAREA = new Set(["address", "about_me", "sibling_details", "family_other_details", "horoscope_other_details"]);
+const EDIT_ARRAY = new Set(["hobbies"]);
+type ContactEntry = { number?: string; methods?: string[]; belongsTo?: string; showOnProfile?: boolean };
+const snakeToCamel = (k: string) => k.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+const editText = (k: string, v: unknown) => (k === "relationship" && !v ? "self" : Array.isArray(v) ? v.join(", ") : v === null || v === undefined ? "" : String(v)).slice(0, k === "date_of_birth" ? 10 : undefined);
+
 const LONG_KEYS = new Set(["address", "contacts", "hobbies", "sibling_details", "family_other_details", "horoscope_other_details", "about_me"]);
 
 /** Nicer display for a few fields in the grouped details view. */
@@ -234,10 +251,16 @@ export default function ReviewWorkspacePage() {
   useEffect(() => {
     if (sel && sel.key !== selKey) setSelKey(sel.key);
   }, [sel, selKey]);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<Record<string, unknown>>({});
+  const [savingEdit, setSavingEdit] = useState(false);
+  const dirtyEdit = Object.keys(draft).length > 0;
   useEffect(() => {
     setRejecting(false);
     setReason(null);
     setNote("");
+    setEditing(false);
+    setDraft({});
   }, [sel?.key]);
 
   const flash = (text: string, tone: "ok" | "err" = "ok") => {
@@ -288,6 +311,55 @@ export default function ReviewWorkspacePage() {
       void pendingRef.current.run();
     }
   }, []);
+
+  /** Save inline edits (only changed fields), optionally approve right after. */
+  const saveEdits = async (andApprove: boolean) => {
+    if (!sel) return;
+    let item = sel;
+    if (dirtyEdit) {
+      const profile: Record<string, unknown> = {};
+      const liveUpdate: Record<string, unknown> = {};
+      for (const [k, raw] of Object.entries(draft)) {
+        let v: unknown = raw;
+        if (EDIT_ARRAY.has(k)) v = String(raw).split(",").map((x) => x.trim()).filter(Boolean);
+        if (k === "date_of_birth") {
+          const chk = validateMatrimonyDob(String(raw || ""));
+          if (!chk.ok) {
+            flash(chk.error, "err");
+            return;
+          }
+          v = chk.iso;
+        }
+        if (typeof v === "string") v = v.trim();
+        if (k === "full_name" && !v) {
+          flash("Name can't be empty", "err");
+          return;
+        }
+        profile[snakeToCamel(k)] = v;
+        liveUpdate[k] = v;
+        if (k === "contacts") liveUpdate.contact = (v as ContactEntry[])[0]?.number || "";
+      }
+      setSavingEdit(true);
+      try {
+        await call(`/api/superadmin/users/${sel.profile.id}`, "PATCH", { profile });
+      } catch (e) {
+        flash(`Couldn't save: ${e instanceof Error ? e.message : "error"}`, "err");
+        setSavingEdit(false);
+        return;
+      }
+      setSavingEdit(false);
+      item = {
+        ...sel,
+        live: { ...(sel.live || {}), ...liveUpdate },
+        profile: { ...sel.profile, name: String(liveUpdate.full_name ?? sel.profile.name), city: String(liveUpdate.city ?? sel.profile.city ?? "") || null },
+      };
+      setItems((list) => list.map((i) => (i.key === sel.key ? item : i)));
+    }
+    setDraft({});
+    setEditing(false);
+    if (andApprove) approve(item);
+    else flash(dirtyEdit ? "Changes saved" : "No changes to save");
+  };
 
   const approve = (item: Item) => {
     const pendingPhotos = (item.photos || []).filter((p) => p.status === "pending");
@@ -366,8 +438,8 @@ export default function ReviewWorkspacePage() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
-      if (e.metaKey || e.ctrlKey || e.altKey || !sel) return;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || !sel || editing) return;
       const k = e.key.toLowerCase();
       if (k === "a") approve(sel);
       else if (k === "r") reject(sel);
@@ -507,8 +579,17 @@ export default function ReviewWorkspacePage() {
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <Link href={`/superadmin/accounts/${sel.account.userId}`} className="ad-btn ghost">Account 360°</Link>
-                  <Link href={`/superadmin/users/${sel.profile.id}/edit`} className="ad-btn ghost">
-                    Edit <ExternalLink size={14} />
+                  {(sel.type === "new" || sel.type === "edit") && (
+                    <button type="button" className={`ad-btn ${editing ? "pri" : "ghost"}`} onClick={() => {
+                      if (editing && dirtyEdit && !window.confirm("Discard your unsaved changes?")) return;
+                      setEditing((v) => !v);
+                      setDraft({});
+                    }}>
+                      <Pencil size={14} /> {editing ? "Stop editing" : "Edit here"}
+                    </button>
+                  )}
+                  <Link href={`/superadmin/users/${sel.profile.id}/edit`} className="ad-btn ghost" title="Open the full profile editor">
+                    Full editor <ExternalLink size={14} />
                   </Link>
                 </div>
               </div>
@@ -558,7 +639,97 @@ export default function ReviewWorkspacePage() {
                 </div>
               )}
 
-              {sel.type === "new" && (
+              {editing && sel.live && (
+                <div className="rv-editwrap">
+                  <div className="rv-editbar">
+                    <span><Pencil size={14} /> Editing {sel.profile.name}{dirtyEdit ? <strong className="rv-dirty"> · {Object.keys(draft).length} change{Object.keys(draft).length === 1 ? "" : "s"}</strong> : null}</span>
+                    <span style={{ flex: 1 }} />
+                    <button type="button" className="ad-btn ghost" disabled={savingEdit} onClick={() => {
+                      if (dirtyEdit && !window.confirm("Discard your unsaved changes?")) return;
+                      setEditing(false);
+                      setDraft({});
+                    }}>Cancel</button>
+                    <button type="button" className="ad-btn ghost" disabled={savingEdit || !dirtyEdit} onClick={() => void saveEdits(false)}>
+                      <Save size={14} /> {savingEdit ? "Saving…" : "Save"}
+                    </button>
+                    <button type="button" className="ad-btn rv-ok" disabled={savingEdit} onClick={() => void saveEdits(true)}>
+                      <Check size={14} /> {dirtyEdit ? "Save & approve" : "Approve"}
+                    </button>
+                  </div>
+                  <div className="rv-groups">
+                    {DETAIL_GROUPS.map((g) => {
+                      const Icon = g.icon;
+                      const row = sel.live as Record<string, unknown>;
+                      const label = Object.fromEntries(FIELDS) as Record<string, string>;
+                      return (
+                        <section key={g.title} className={`ad-card rv-group ${g.wide ? "wide" : ""}`}>
+                          <h3 className="rv-group-h">
+                            <span className={`ad-ico ${g.tone}`}><Icon size={15} /></span>
+                            {g.title}
+                          </h3>
+                          {g.keys[0] === "partner_preference" ? (
+                            <p className="ad-muted" style={{ fontSize: 13, margin: 0 }}>
+                              Partner preferences are edited in the{" "}
+                              <Link className="ad-link" href={`/superadmin/users/${sel.profile.id}/edit`}>full editor</Link>.
+                            </p>
+                          ) : (
+                            <div className={`rv-form ${g.wide ? "cols" : ""}`}>
+                              {g.keys.filter((k) => !EDIT_SKIP.has(k)).map((k) => {
+                                const cur = k in draft ? draft[k] : row[k];
+                                const changed = k in draft;
+                                const set = (v: unknown) =>
+                                  setDraft((d) => {
+                                    const n = { ...d };
+                                    if (JSON.stringify(v) === JSON.stringify(k === "contacts" ? row[k] : editText(k, row[k]))) delete n[k];
+                                    else n[k] = v;
+                                    return n;
+                                  });
+                                if (k === "contacts") {
+                                  const list = (Array.isArray(cur) ? cur : []) as ContactEntry[];
+                                  return (
+                                    <label key={k} className={`rv-f long ${changed ? "chg" : ""}`}>
+                                      <span>Contact numbers</span>
+                                      {list.length === 0 && <em className="ad-muted" style={{ fontSize: 12 }}>No contact numbers. Add them in the full editor.</em>}
+                                      {list.map((c, i) => (
+                                        <span key={i} className="rv-contact">
+                                          <input className="ad-input" value={c.number || ""} inputMode="tel"
+                                            onChange={(e) => set(list.map((x, j) => (j === i ? { ...x, number: e.target.value.replace(/[^\d+ ]/g, "") } : x)))} />
+                                          <small className="ad-muted">{c.belongsTo || "—"} · {(c.methods || []).join("/") || "—"}{c.showOnProfile === false ? " · hidden" : ""}</small>
+                                        </span>
+                                      ))}
+                                    </label>
+                                  );
+                                }
+                                const text = editText(k, cur);
+                                const opts = EDIT_SELECTS[k];
+                                return (
+                                  <label key={k} className={`rv-f ${EDIT_TEXTAREA.has(k) ? "long" : ""} ${changed ? "chg" : ""}`}>
+                                    <span>{label[k] || k}{EDIT_ARRAY.has(k) ? " (comma separated)" : ""}</span>
+                                    {opts ? (
+                                      <select className="ad-select" value={text} onChange={(e) => set(e.target.value)}>
+                                        <option value="">—</option>
+                                        {[...new Set([...opts, ...(text && !opts.includes(text) ? [text] : [])])].map((o) => (
+                                          <option key={o} value={o}>{k === "relationship" ? (o === "self" ? "Self" : `For ${o}`) : o.charAt(0).toUpperCase() + o.slice(1)}</option>
+                                        ))}
+                                      </select>
+                                    ) : EDIT_TEXTAREA.has(k) ? (
+                                      <textarea className="ad-input" rows={k === "about_me" ? 4 : 2} value={text} onChange={(e) => set(e.target.value)} />
+                                    ) : (
+                                      <input className="ad-input" type={k === "date_of_birth" ? "date" : "text"} value={text} onChange={(e) => set(e.target.value)} />
+                                    )}
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </section>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {sel.type === "new" && !editing && (
                 <div className="rv-groups">
                   {details.map((g) => {
                     const Icon = g.icon;
@@ -642,8 +813,8 @@ export default function ReviewWorkspacePage() {
               )}
 
               <div className="rv-bar">
-                <button type="button" className="ad-btn rv-ok" onClick={() => approve(sel)}>
-                  <Check size={16} /> Approve <span className="ad-kbd" style={{ background: "transparent", color: "#fff", borderColor: "rgba(255,255,255,.4)" }}>A</span>
+                <button type="button" className="ad-btn rv-ok" disabled={savingEdit} onClick={() => (editing ? void saveEdits(true) : approve(sel))}>
+                  <Check size={16} /> {editing && dirtyEdit ? "Save & approve" : "Approve"} <span className="ad-kbd" style={{ background: "transparent", color: "#fff", borderColor: "rgba(255,255,255,.4)" }}>A</span>
                 </button>
                 <button type="button" className="ad-btn rv-no" onClick={() => reject(sel)}>
                   <X size={16} /> {rejecting ? "Confirm reject" : "Reject"} <span className="ad-kbd">R</span>
