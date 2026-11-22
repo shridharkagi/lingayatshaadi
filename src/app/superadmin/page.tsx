@@ -39,6 +39,9 @@ type Overview = {
     activeFree: number;
     expiring7: number;
     expiring30: number;
+    paidExpiring7: number;
+    paidExpiring30: number;
+    freeExpiring30: number;
     lapsedPaid30: number;
     liveNoPlan: number;
     revenue: number;
@@ -169,10 +172,11 @@ function PlansCard({ p, periodText }: { p: NonNullable<Overview["plans"]>; perio
   const tiles: { label: string; value: string; hint: string; href?: string }[] = [
     { label: "Paid plans (active)", value: num(p.activePaid), hint: `${num(p.activeFree)} on Free` },
     { label: `New paid plans`, value: num(p.newPaidPlans), hint: `${p.newPaidPlansPrev ? `${num(p.newPaidPlansPrev)} the period before` : "in this period"}` },
-    { label: "Renewals due", value: num(p.expiring30), hint: `${num(p.expiring7)} within 7 days`, href: "/superadmin/subscriptions?status=expiring" },
-    { label: "Paid plans lapsed", value: num(p.lapsedPaid30), hint: "ended in last 30 days, not renewed", href: "/superadmin/subscriptions?status=expired" },
+    { label: "Paid renewals due (30 days)", value: num(p.paidExpiring30), hint: `${num(p.paidExpiring7)} within 7 days`, href: "/superadmin/subscriptions?status=expiring" },
+    { label: "Free plans ending (30 days)", value: num(p.freeExpiring30), hint: "contacts lock when they end", href: "/superadmin/subscriptions?status=active" },
+    { label: "Paid plans lapsed", value: num(p.lapsedPaid30), hint: "ran out in last 30 days, not renewed", href: "/superadmin/subscriptions?status=expired" },
     { label: "Live but no plan", value: num(p.liveNoPlan), hint: "can't see contacts — upgrade leads", href: "/superadmin/subscriptions?status=none" },
-    { label: "Refunds", value: inr(p.refunds), hint: `${inr(p.revenueAllTime)} net all time` },
+    { label: "Refunds given", value: inr(p.refunds), hint: `in this period · net revenue all time ${inr(p.revenueAllTime)}` },
   ];
   return (
     <section className="sa-card">

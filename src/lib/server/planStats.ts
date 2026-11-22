@@ -15,6 +15,10 @@ export type PlanStats = {
   activeFree: number;
   expiring7: number;
   expiring30: number;
+  /** Paid plans ending soon — the real renewal pipeline. */
+  paidExpiring7: number;
+  paidExpiring30: number;
+  freeExpiring30: number;
   /** Paid plans that ended in the last 30 days and were not renewed (win-back list). */
   lapsedPaid30: number;
   /** Accounts with a live profile but no usable plan (cannot see contacts). */
@@ -45,6 +49,9 @@ export async function getPlanStats(admin: SupabaseClient, from: Date, to: Date):
   let activeFree = 0;
   let expiring7 = 0;
   let expiring30 = 0;
+  let paidExpiring7 = 0;
+  let paidExpiring30 = 0;
+  let freeExpiring30 = 0;
   for (const s of usableByAccount.values()) {
     const paid = Number(s.price_snapshot || 0) > 0;
     if (paid) activePaid += 1;
@@ -52,6 +59,9 @@ export async function getPlanStats(admin: SupabaseClient, from: Date, to: Date):
     const left = new Date(s.expires_at).getTime() - now;
     if (left <= 7 * DAY) expiring7 += 1;
     if (left <= 30 * DAY) expiring30 += 1;
+    if (paid && left <= 7 * DAY) paidExpiring7 += 1;
+    if (paid && left <= 30 * DAY) paidExpiring30 += 1;
+    if (!paid && left <= 30 * DAY) freeExpiring30 += 1;
     const key = s.plan_id || s.plan_name_snapshot || "plan";
     const cur = byPlanMap.get(key) || { planId: s.plan_id, name: s.plan_name_snapshot || "Plan", code: s.plan_code, active: 0, paid };
     cur.active += 1;
@@ -63,7 +73,7 @@ export async function getPlanStats(admin: SupabaseClient, from: Date, to: Date):
   for (const s of subs) {
     if (Number(s.price_snapshot || 0) <= 0 || usableByAccount.has(s.user_id)) continue;
     const endedAt = new Date(s.ended_at && s.ended_at < s.expires_at ? s.ended_at : s.expires_at).getTime();
-    if (endedAt <= now && endedAt >= now - 30 * DAY && s.status !== "refunded") lapsed.add(s.user_id);
+    if (endedAt <= now && endedAt >= now - 30 * DAY && s.status !== "refunded" && s.status !== "cancelled") lapsed.add(s.user_id);
   }
 
   const liveAccounts = new Set(((liveRes.data || []) as Row[]).map((r) => String(r.user_id || "")).filter(Boolean));
@@ -104,6 +114,9 @@ export async function getPlanStats(admin: SupabaseClient, from: Date, to: Date):
     activeFree,
     expiring7,
     expiring30,
+    paidExpiring7,
+    paidExpiring30,
+    freeExpiring30,
     lapsedPaid30: lapsed.size,
     liveNoPlan,
     revenue: Math.round(revenue * 100) / 100,
