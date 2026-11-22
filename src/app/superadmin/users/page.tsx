@@ -7,8 +7,12 @@ import { Search } from "lucide-react";
 import { adminFetch } from "@/lib/api/adminClient";
 import {
   CsvButton,
+  DateFilter,
+  NO_DATES,
   PageHeader,
   Pager,
+  ResetButton,
+  type DateFilterValue,
   downloadCsv,
   fmtDate,
   fmtDateTime,
@@ -37,20 +41,43 @@ type Deleted = { id: string; entity_id: string; created_at: string; meta: Record
 const TABS = [
   { id: "all", label: "All accounts" },
   { id: "paid", label: "Paid plan" },
-  { id: "no_plan", label: "No active plan" },
-  { id: "no_profile", label: "No profile yet" },
-  { id: "pending", label: "Profile pending" },
+  { id: "no_plan", label: "No plan" },
+  { id: "expiring", label: "Plan ending soon" },
+  { id: "no_profile", label: "No profile" },
+  { id: "pending", label: "Pending review" },
   { id: "suspended", label: "Suspended" },
   { id: "deleted", label: "Deleted" },
 ];
 const SORTS = [
-  { id: "newest", label: "Newest first" },
-  { id: "oldest", label: "Oldest first" },
-  { id: "last_login", label: "Last login" },
-  { id: "most_active", label: "Most contact views" },
-  { id: "name", label: "Name A–Z" },
+  { id: "newest", label: "Joined: newest first" },
+  { id: "oldest", label: "Joined: oldest first" },
+  { id: "name_asc", label: "Name: A → Z" },
+  { id: "name_desc", label: "Name: Z → A" },
+  { id: "views_desc", label: "Contact views: most first" },
+  { id: "views_asc", label: "Contact views: fewest first" },
+  { id: "login_desc", label: "Last login: most recent" },
+  { id: "login_asc", label: "Last login: longest ago" },
 ];
-const LIMIT = 25;
+/** Sortable columns: [first click, second click]. */
+const COL_SORT: Record<string, [string, string]> = {
+  name: ["name_asc", "name_desc"],
+  views: ["views_desc", "views_asc"],
+  joined: ["newest", "oldest"],
+  login: ["login_desc", "login_asc"],
+};
+const DATE_FIELDS = [
+  { id: "joined", label: "Joined" },
+  { id: "last_login", label: "Last login" },
+];
+const LIMIT_KEY = "ad.accounts.limit";
+const readLimit = () => {
+  try {
+    const n = Number(localStorage.getItem(LIMIT_KEY));
+    return [25, 50, 75, 100].includes(n) ? n : 25;
+  } catch {
+    return 25;
+  }
+};
 
 export default function AccountsPage() {
   const router = useRouter();
@@ -58,6 +85,10 @@ export default function AccountsPage() {
   const [q, setQ] = useState("");
   const dq = useDebounced(q);
   const [sort, setSort] = useState("newest");
+  const [dates, setDates] = useState<DateFilterValue>(NO_DATES);
+  const [dateOn, setDateOn] = useState("joined");
+  const [limit, setLimit] = useState(25);
+  const [counts, setCounts] = useState<Record<string, number>>({});
   const [offset, setOffset] = useState(0);
   const [rows, setRows] = useState<Account[]>([]);
   const [deleted, setDeleted] = useState<Deleted[]>([]);
@@ -66,18 +97,57 @@ export default function AccountsPage() {
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
+  useEffect(() => setLimit(readLimit()), []);
+  const changeLimit = (n: number) => {
+    setLimit(n);
+    setOffset(0);
+    try {
+      localStorage.setItem(LIMIT_KEY, String(n));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  // A custom range only applies once both ends are valid.
+  const dateOk = dates.preset === "any" || (dates.from && dates.to && dates.from <= dates.to);
+  const fromQ = dateOk ? dates.from : "";
+  const toQ = dateOk ? dates.to : "";
+
   const fetchPage = useCallback(
     async (lim: number, off: number) => {
-      const qs = new URLSearchParams({ q: dq, filter: tab, sort, limit: String(lim), offset: String(off) });
+      const qs = new URLSearchParams({ q: dq, filter: tab, sort, from: fromQ, to: toQ, dateOn, limit: String(lim), offset: String(off) });
       const res = await adminFetch(`/api/superadmin/accounts?${qs}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to load accounts");
-      return json as { total: number; rows: Account[] };
+      return json as { total: number; rows: Account[]; counts?: Record<string, number> };
     },
-    [dq, tab, sort]
+    [dq, tab, sort, fromQ, toQ, dateOn]
   );
 
-  useEffect(() => setOffset(0), [dq, tab, sort]);
+  useEffect(() => setOffset(0), [dq, tab, sort, fromQ, toQ, dateOn]);
+
+  const filtersOn = q !== "" || sort !== "newest" || dates.preset !== "any" || dateOn !== "joined" || tab !== "all";
+  const resetFilters = () => {
+    setQ("");
+    setSort("newest");
+    setDates(NO_DATES);
+    setDateOn("joined");
+    setTab("all");
+  };
+  const colSort = (col: string) => {
+    const [a, b] = COL_SORT[col];
+    setSort(sort === a ? b : a);
+  };
+  const sortTh = (col: string, children: string) => {
+    const [a, b] = COL_SORT[col];
+    const on = sort === a || sort === b;
+    const up = sort === "name_asc" || sort === "views_asc" || sort === "oldest" || sort === "login_asc";
+    return (
+      <th key={col} className={`sortable ${on ? "on" : ""}`} onClick={() => colSort(col)} aria-sort={on ? (up ? "ascending" : "descending") : "none"}>
+        {children}<span className="arr">{on ? (up ? "▲" : "▼") : "↕"}</span>
+      </th>
+    );
+  };
 
   useEffect(() => {
     let alive = true;
@@ -95,10 +165,11 @@ export default function AccountsPage() {
             setTotal(list.length);
           }
         } else {
-          const json = await fetchPage(LIMIT, offset);
+          const json = await fetchPage(limit, offset);
           if (alive) {
             setRows(json.rows);
             setTotal(json.total);
+            setCounts(json.counts || {});
           }
         }
       } catch (e) {
@@ -110,7 +181,7 @@ export default function AccountsPage() {
     return () => {
       alive = false;
     };
-  }, [tab, offset, fetchPage]);
+  }, [tab, offset, limit, fetchPage]);
 
   const exportCsv = async () => {
     setExporting(true);
@@ -142,7 +213,7 @@ export default function AccountsPage() {
         {TABS.map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={`ad-tab ${tab === t.id ? "on" : ""}`} onClick={() => setTab(t.id)}>
             {t.label}
-            {tab === t.id && !loading && <span className="cnt">{total}</span>}
+            {t.id === "deleted" ? (tab === t.id && !loading && <span className="cnt">{total}</span>) : counts[t.id] !== undefined && <span className="cnt">{counts[t.id]}</span>}
           </button>
         ))}
       </div>
@@ -153,9 +224,11 @@ export default function AccountsPage() {
             <Search size={16} aria-hidden="true" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, phone or U-code" aria-label="Search accounts" />
           </label>
+          <DateFilter value={dates} onChange={setDates} fields={DATE_FIELDS} field={dateOn} onFieldChange={setDateOn} />
           <select className="ad-select" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
             {SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
           </select>
+          <ResetButton show={filtersOn} onClick={resetFilters} />
         </div>
       )}
 
@@ -180,7 +253,7 @@ export default function AccountsPage() {
           ) : (
             <table className="ad-table">
               <thead>
-                <tr><th>Account</th><th>Phone</th><th>Profiles</th><th>Plan</th><th>Contact views</th><th>Joined</th><th>Last login</th><th /></tr>
+                <tr>{sortTh("name", "Account")}<th>Phone</th><th>Profiles</th><th>Plan</th>{sortTh("views", "Contact views")}{sortTh("joined", "Joined")}{sortTh("login", "Last login")}<th /></tr>
               </thead>
               <tbody>
                 {loading && rows.length === 0 &&
@@ -237,10 +310,15 @@ export default function AccountsPage() {
               </tbody>
             </table>
           )}
-          {!loading && (tab === "deleted" ? deleted.length === 0 : rows.length === 0) && <div className="ad-empty">No accounts match.</div>}
+          {!loading && (tab === "deleted" ? deleted.length === 0 : rows.length === 0) && (
+            <div className="ad-empty">
+              No accounts match.{" "}
+              {filtersOn && <button type="button" className="ad-link" style={{ border: 0, background: "none", cursor: "pointer" }} onClick={resetFilters}>Reset filters</button>}
+            </div>
+          )}
         </div>
       </div>
-      {tab !== "deleted" && <Pager total={total} limit={LIMIT} offset={offset} onChange={setOffset} />}
+      {tab !== "deleted" && <Pager total={total} limit={limit} offset={offset} onChange={setOffset} onLimitChange={changeLimit} />}
     </div>
   );
 }

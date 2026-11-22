@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Handshake, RotateCcw, UserRound, Users, UsersRound, type LucideIcon } from "lucide-react";
 
 /** Debounce a changing value (e.g. a search box). */
 export function useDebounced<T>(value: T, ms = 300): T {
@@ -25,24 +25,166 @@ export function PageHeader({ title, subtitle, children }: { title: string; subti
   );
 }
 
-export function Pager({ total, limit, offset, onChange }: { total: number; limit: number; offset: number; onChange: (offset: number) => void }) {
-  if (total <= limit) return <div className="ad-muted" style={{ fontSize: 12 }}>{total.toLocaleString("en-IN")} result{total === 1 ? "" : "s"}</div>;
-  const from = offset + 1;
+export const PAGE_SIZES = [25, 50, 75, 100];
+
+export function Pager({
+  total, limit, offset, onChange, onLimitChange,
+}: { total: number; limit: number; offset: number; onChange: (offset: number) => void; onLimitChange?: (limit: number) => void }) {
+  const from = total === 0 ? 0 : offset + 1;
   const to = Math.min(offset + limit, total);
+  const n = (x: number) => x.toLocaleString("en-IN");
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "space-between", flexWrap: "wrap" }}>
-      <span className="ad-muted" style={{ fontSize: 12 }}>
-        {from.toLocaleString("en-IN")}–{to.toLocaleString("en-IN")} of {total.toLocaleString("en-IN")}
+    <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between", flexWrap: "wrap" }}>
+      <span style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <span className="ad-muted" style={{ fontSize: 12 }}>
+          {total <= limit ? `${n(total)} result${total === 1 ? "" : "s"}` : `${n(from)}–${n(to)} of ${n(total)}`}
+        </span>
+        {onLimitChange && (
+          <label className="ad-muted" style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6 }}>
+            Show
+            <select className="ad-select ad-select-sm" value={limit} onChange={(e) => onLimitChange(Number(e.target.value))} aria-label="Rows per page">
+              {PAGE_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+            per page
+          </label>
+        )}
       </span>
-      <span style={{ display: "flex", gap: 6 }}>
-        <button type="button" className="ad-btn ghost" style={{ minHeight: 34 }} disabled={offset === 0} onClick={() => onChange(Math.max(0, offset - limit))} aria-label="Previous page">
-          <ChevronLeft size={16} />
-        </button>
-        <button type="button" className="ad-btn ghost" style={{ minHeight: 34 }} disabled={to >= total} onClick={() => onChange(offset + limit)} aria-label="Next page">
-          <ChevronRight size={16} />
-        </button>
-      </span>
+      {total > limit && (
+        <span style={{ display: "flex", gap: 6 }}>
+          <button type="button" className="ad-btn ghost" style={{ minHeight: 34 }} disabled={offset === 0} onClick={() => onChange(Math.max(0, offset - limit))} aria-label="Previous page">
+            <ChevronLeft size={16} />
+          </button>
+          <button type="button" className="ad-btn ghost" style={{ minHeight: 34 }} disabled={to >= total} onClick={() => onChange(offset + limit)} aria-label="Next page">
+            <ChevronRight size={16} />
+          </button>
+        </span>
+      )}
     </div>
+  );
+}
+
+/* ---------- Date filter (presets + custom range, IST days) ---------- */
+
+export type DateFilterValue = { preset: string; from: string; to: string };
+export const NO_DATES: DateFilterValue = { preset: "any", from: "", to: "" };
+const DATE_PRESETS = [
+  { id: "any", label: "Any time" },
+  { id: "today", label: "Today" },
+  { id: "7d", label: "Last 7 days" },
+  { id: "30d", label: "Last 30 days" },
+  { id: "90d", label: "Last 90 days" },
+  { id: "this_month", label: "This month" },
+  { id: "last_month", label: "Last month" },
+  { id: "this_year", label: "This year" },
+  { id: "custom", label: "Custom dates…" },
+];
+/** YYYY-MM-DD for a date in India time. */
+export const istDay = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+
+function presetDates(id: string): { from: string; to: string } {
+  const now = new Date();
+  const today = istDay(now);
+  const back = (days: number) => istDay(new Date(now.getTime() - days * 86400000));
+  const [y, m] = today.split("-").map(Number);
+  const pad = (x: number) => String(x).padStart(2, "0");
+  switch (id) {
+    case "today": return { from: today, to: today };
+    case "7d": return { from: back(6), to: today };
+    case "30d": return { from: back(29), to: today };
+    case "90d": return { from: back(89), to: today };
+    case "this_month": return { from: `${y}-${pad(m)}-01`, to: today };
+    case "last_month": {
+      const py = m === 1 ? y - 1 : y;
+      const pm = m === 1 ? 12 : m - 1;
+      const last = new Date(Date.UTC(py, pm, 0)).getUTCDate();
+      return { from: `${py}-${pad(pm)}-01`, to: `${py}-${pad(pm)}-${pad(last)}` };
+    }
+    case "this_year": return { from: `${y}-01-01`, to: today };
+    default: return { from: "", to: "" };
+  }
+}
+
+export function DateFilter({
+  value, onChange, fields, field, onFieldChange,
+}: {
+  value: DateFilterValue;
+  onChange: (v: DateFilterValue) => void;
+  /** Optional choice of which date the filter applies to, e.g. Joined / Last login. */
+  fields?: { id: string; label: string }[];
+  field?: string;
+  onFieldChange?: (f: string) => void;
+}) {
+  const today = istDay(new Date());
+  return (
+    <div className="ad-datefilter">
+      {fields && onFieldChange && (
+        <select className="ad-select" value={field} onChange={(e) => onFieldChange(e.target.value)} aria-label="Date applies to">
+          {fields.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+        </select>
+      )}
+      <select
+        className={`ad-select ${value.preset !== "any" ? "is-set" : ""}`}
+        value={value.preset}
+        aria-label="Date range"
+        onChange={(e) => {
+          const preset = e.target.value;
+          if (preset === "custom") onChange({ preset, from: value.from || presetDates("30d").from, to: value.to || today });
+          else onChange({ preset, ...presetDates(preset) });
+        }}
+      >
+        {DATE_PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+      </select>
+      {value.preset === "custom" && (
+        <span className="ad-daterange">
+          <input type="date" className="ad-date" value={value.from} max={value.to || today} aria-label="From date"
+            onChange={(e) => onChange({ ...value, from: e.target.value })} />
+          <span className="ad-muted">to</span>
+          <input type="date" className="ad-date" value={value.to} min={value.from} max={today} aria-label="To date"
+            onChange={(e) => onChange({ ...value, to: e.target.value })} />
+        </span>
+      )}
+    </div>
+  );
+}
+
+export function ResetButton({ show, onClick }: { show: boolean; onClick: () => void }) {
+  if (!show) return null;
+  return (
+    <button type="button" className="ad-btn ghost ad-reset" onClick={onClick}>
+      <RotateCcw size={14} /> Reset filters
+    </button>
+  );
+}
+
+/* ---------- "Profile for" chip ---------- */
+
+const REL: Record<string, { label: string; cls: string; icon: LucideIcon }> = {
+  self: { label: "Self", cls: "rel-self", icon: UserRound },
+  son: { label: "Son", cls: "rel-parent", icon: Users },
+  daughter: { label: "Daughter", cls: "rel-parent", icon: Users },
+  brother: { label: "Brother", cls: "rel-sibling", icon: UsersRound },
+  sister: { label: "Sister", cls: "rel-sibling", icon: UsersRound },
+  other: { label: "Relative", cls: "rel-other", icon: Handshake },
+};
+export const REL_OPTIONS = [
+  { id: "", label: "Created for: anyone" },
+  { id: "self", label: "Self" },
+  { id: "family", label: "Family-managed (all)" },
+  { id: "parent", label: "By parent (son / daughter)" },
+  { id: "son", label: "— Son" },
+  { id: "daughter", label: "— Daughter" },
+  { id: "sibling", label: "By sibling (brother / sister)" },
+  { id: "brother", label: "— Brother" },
+  { id: "sister", label: "— Sister" },
+  { id: "other", label: "Other relative" },
+];
+export function RelChip({ rel }: { rel: string | null | undefined }) {
+  const r = REL[rel || "self"] || { label: rel || "Self", cls: "rel-other", icon: Handshake };
+  const Icon = r.icon;
+  return (
+    <span className={`ad-rel ${r.cls}`} title={r.label === "Self" ? "Created by the person themselves" : `Created by family — for their ${r.label.toLowerCase()}`}>
+      <Icon size={13} aria-hidden="true" /> {r.label === "Self" ? "Self" : `For ${r.label.toLowerCase()}`}
+    </span>
   );
 }
 

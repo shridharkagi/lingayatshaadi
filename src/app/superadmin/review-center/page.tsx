@@ -7,13 +7,20 @@ import { adminFetch } from "@/lib/api/adminClient";
 import { ProfileTransferModal } from "@/components/admin/ProfileTransferModal";
 import {
   CsvButton,
+  DateFilter,
+  NO_DATES,
   PageHeader,
   Pager,
   ProfileStatusChip,
+  REL_OPTIONS,
+  RelChip,
+  ResetButton,
   downloadCsv,
   fmtDate,
   initials,
+  phoneFmt,
   useDebounced,
+  type DateFilterValue,
 } from "@/components/superadmin/ui";
 
 type ProfileRow = {
@@ -30,6 +37,8 @@ type ProfileRow = {
   photo: string | null;
   userId: string | null;
   accountCode: string | null;
+  accountName: string | null;
+  accountPhone: string | null;
   createdAt: string;
   approvedAt: string | null;
   rejectionReason: string | null;
@@ -46,7 +55,24 @@ const TABS = [
   { id: "suspended", label: "Suspended", key: "suspended" },
   { id: "deleted", label: "Deleted", key: "deleted" },
 ];
-const LIMIT = 25;
+const SORTS = [
+  { id: "newest", label: "Newest first" },
+  { id: "oldest", label: "Oldest first" },
+  { id: "name", label: "Name A → Z" },
+  { id: "most_viewed", label: "Most viewed" },
+  { id: "most_contacted", label: "Most contacted" },
+  { id: "recently_approved", label: "Recently approved" },
+];
+const DATE_FIELDS = [
+  { id: "created", label: "Created" },
+  { id: "approved", label: "Approved" },
+];
+const REL_GROUPS: Record<string, string[]> = {
+  family: ["son", "daughter", "brother", "sister", "other"],
+  parent: ["son", "daughter"],
+  sibling: ["brother", "sister"],
+};
+const LIMIT_KEY = "ad.profiles.limit";
 type Action = "suspend" | "unsuspend" | "to_draft" | "trash" | "restore";
 const ACTION_LABEL: Record<Action, string> = {
   suspend: "Suspend (hide from members)",
@@ -101,6 +127,12 @@ export default function ProfilesPage() {
   const [gender, setGender] = useState("");
   const [stateF, setStateF] = useState("");
   const [photo, setPhoto] = useState("");
+  const [rel, setRel] = useState("");
+  const [sort, setSort] = useState("newest");
+  const [dates, setDates] = useState<DateFilterValue>(NO_DATES);
+  const [dateOn, setDateOn] = useState("created");
+  const [limit, setLimit] = useState(25);
+  const [relCounts, setRelCounts] = useState<Record<string, number>>({});
   const [offset, setOffset] = useState(0);
   const [rows, setRows] = useState<ProfileRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -114,39 +146,80 @@ export default function ProfilesPage() {
   const [transferId, setTransferId] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
 
+  useEffect(() => {
+    try {
+      const n = Number(localStorage.getItem(LIMIT_KEY));
+      if ([25, 50, 75, 100].includes(n)) setLimit(n);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const changeLimit = (n: number) => {
+    setLimit(n);
+    setOffset(0);
+    try {
+      localStorage.setItem(LIMIT_KEY, String(n));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const dateOk = dates.preset === "any" || (dates.from && dates.to && dates.from <= dates.to);
+  const fromQ = dateOk ? dates.from : "";
+  const toQ = dateOk ? dates.to : "";
+
   const fetchPage = useCallback(
     async (lim: number, off: number) => {
-      const qs = new URLSearchParams({ q: dq, status: tab, gender, state: stateF, photo, limit: String(lim), offset: String(off) });
+      const qs = new URLSearchParams({
+        q: dq, status: tab, gender, state: stateF, photo, rel, sort, from: fromQ, to: toQ, dateOn,
+        limit: String(lim), offset: String(off),
+      });
       const res = await adminFetch(`/api/superadmin/profiles?${qs}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to load profiles");
-      return json as { total: number; rows: ProfileRow[]; counts: Record<string, number> };
+      return json as { total: number; rows: ProfileRow[]; counts: Record<string, number>; relCounts?: Record<string, number> };
     },
-    [dq, tab, gender, stateF, photo]
+    [dq, tab, gender, stateF, photo, rel, sort, fromQ, toQ, dateOn]
   );
 
   useEffect(() => {
     setOffset(0);
     setSelected(new Set());
-  }, [dq, tab, gender, stateF, photo]);
+  }, [dq, tab, gender, stateF, photo, rel, sort, fromQ, toQ, dateOn]);
+
+  const filtersOn =
+    q !== "" || gender !== "" || stateF !== "" || photo !== "" || rel !== "" || sort !== "newest" || dates.preset !== "any" || dateOn !== "created";
+  const resetFilters = () => {
+    setQ("");
+    setGender("");
+    setStateF("");
+    setPhoto("");
+    setRel("");
+    setSort("newest");
+    setDates(NO_DATES);
+    setDateOn("created");
+  };
+  const relCount = (id: string) =>
+    id === "" ? undefined : (REL_GROUPS[id] || [id]).reduce((sum, k) => sum + (relCounts[k] || 0), 0);
 
   useEffect(() => {
     let alive = true;
     setLoading(true);
     setError(null);
-    fetchPage(LIMIT, offset)
+    fetchPage(limit, offset)
       .then((json) => {
         if (!alive) return;
         setRows(json.rows);
         setTotal(json.total);
         setCounts(json.counts || {});
+        setRelCounts(json.relCounts || {});
       })
       .catch((e) => alive && setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
     };
-  }, [fetchPage, offset, reload]);
+  }, [fetchPage, offset, limit, reload]);
 
   const runAction = async (ids: string[], action: Action) => {
     let reason: string | undefined;
@@ -184,8 +257,8 @@ export default function ProfilesPage() {
       for (let off = 0; off < Math.max(total, 1); off += 500) all.push(...(await fetchPage(500, off)).rows);
       downloadCsv(
         `profiles-${tab}-${new Date().toISOString().slice(0, 10)}.csv`,
-        ["Member ID", "Name", "Gender", "Age", "City", "State", "Profession", "For", "Status", "Account code", "Created", "Approved", "Views", "Contacted by"],
-        all.map((p) => [p.publicId, p.name, p.gender, p.age, p.city, p.state, p.profession, p.relationship, p.status, p.accountCode, fmtDate(p.createdAt), fmtDate(p.approvedAt), p.views, p.contactedBy])
+        ["Member ID", "Name", "Gender", "Age", "City", "State", "Profession", "Created for", "Status", "Account code", "Account name", "Account phone", "Created", "Approved", "Views", "Contacted by"],
+        all.map((p) => [p.publicId, p.name, p.gender, p.age, p.city, p.state, p.profession, p.relationship, p.status, p.accountCode, p.accountName, phoneFmt(p.accountPhone), fmtDate(p.createdAt), fmtDate(p.approvedAt), p.views, p.contactedBy])
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Export failed");
@@ -209,7 +282,6 @@ export default function ProfilesPage() {
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <PageHeader title="Profiles" subtitle="Matrimony profiles created by accounts (for self or family members).">
         <CsvButton onClick={exportCsv} busy={exporting} />
-        <Link href="/superadmin/users/create" className="ad-btn pri">Create profile</Link>
       </PageHeader>
 
       <div className="ad-tabs" role="tablist">
@@ -244,6 +316,17 @@ export default function ProfilesPage() {
           <option value="with">With photo</option>
           <option value="without">Without photo</option>
         </select>
+        <select className={`ad-select ${rel ? "is-set" : ""}`} value={rel} onChange={(e) => setRel(e.target.value)} aria-label="Created for">
+          {REL_OPTIONS.map((o) => {
+            const n = relCount(o.id);
+            return <option key={o.id} value={o.id}>{o.label}{n !== undefined ? ` (${n})` : ""}</option>;
+          })}
+        </select>
+        <DateFilter value={dates} onChange={setDates} fields={DATE_FIELDS} field={dateOn} onFieldChange={setDateOn} />
+        <select className={`ad-select ${sort !== "newest" ? "is-set" : ""}`} value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
+          {SORTS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+        </select>
+        <ResetButton show={filtersOn} onClick={resetFilters} />
       </div>
 
       {selected.size > 0 && (
@@ -273,19 +356,23 @@ export default function ProfilesPage() {
                   <input type="checkbox" aria-label="Select all on this page" checked={allChecked}
                     onChange={() => setSelected(allChecked ? new Set() : new Set(rows.map((r) => r.id)))} />
                 </th>
-                <th>Profile</th><th>Details</th><th>Status</th><th>Account</th><th>Views</th><th>Created</th><th />
+                <th>Profile</th><th>Created for</th><th>Details</th><th>Status</th><th>Account</th><th>Views</th><th>{dateOn === "approved" ? "Approved" : "Created"}</th><th />
               </tr>
             </thead>
             <tbody>
               {loading && rows.length === 0 &&
-                Array.from({ length: 6 }).map((_, i) => <tr key={i}><td colSpan={8}><div className="ad-skel" style={{ height: 30 }} /></td></tr>)}
+                Array.from({ length: 6 }).map((_, i) => <tr key={i}><td colSpan={9}><div className="ad-skel" style={{ height: 30 }} /></td></tr>)}
               {rows.map((p) => (
                 <tr key={p.id}>
                   <td><input type="checkbox" aria-label={`Select ${p.name || "profile"}`} checked={selected.has(p.id)} onChange={() => toggle(p.id)} /></td>
                   <td>
                     <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                      <span className="ad-av" style={{ background: p.gender === "female" ? "#c2367a" : "#5b3aa8", width: 38, height: 38 }}>
-                        {p.photo ? <img src={p.photo} alt="" /> : p.name ? initials(p.name) : <UserRound size={16} />}
+                      <span className="ad-av" style={{ background: p.gender === "female" ? "#c2367a" : "#5b3aa8", width: 38, height: 38, position: "relative" }}>
+                        {p.name ? initials(p.name) : <UserRound size={16} />}
+                        {p.photo && (
+                          <img src={p.photo} alt="" style={{ position: "absolute", inset: 0 }}
+                            onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                        )}
                       </span>
                       <div>
                         <Link href={`/superadmin/users/${p.id}/edit`} className="ad-link">{p.name || "Unnamed"}</Link>
@@ -293,9 +380,9 @@ export default function ProfilesPage() {
                       </div>
                     </div>
                   </td>
+                  <td><RelChip rel={p.relationship} /></td>
                   <td style={{ fontSize: 12 }}>
                     {[p.gender === "female" ? "Bride" : p.gender === "male" ? "Groom" : null, p.age, p.city, p.profession].filter(Boolean).join(" · ") || "—"}
-                    {p.relationship && p.relationship !== "self" && <div className="ad-muted">for {p.relationship}</div>}
                   </td>
                   <td>
                     <ProfileStatusChip status={p.status} />
@@ -306,19 +393,29 @@ export default function ProfilesPage() {
                     )}
                   </td>
                   <td style={{ whiteSpace: "nowrap" }}>
-                    {p.userId ? <Link href={`/superadmin/accounts/${p.userId}`} className="ad-link" style={{ fontWeight: 500 }}>{p.accountCode || "Account"}</Link> : "—"}
+                    {p.userId ? (
+                      <Link href={`/superadmin/accounts/${p.userId}`} className="ad-acct" title="Open account 360°">
+                        <span className="nm">{p.accountName || "Unnamed account"}</span>
+                        <span className="sub">{[p.accountCode, p.accountPhone ? phoneFmt(p.accountPhone) : null].filter(Boolean).join(" · ") || "—"}</span>
+                      </Link>
+                    ) : "—"}
                   </td>
                   <td style={{ whiteSpace: "nowrap", fontSize: 12 }}>{p.views} views<div className="ad-muted">{p.contactedBy} contacted</div></td>
-                  <td style={{ whiteSpace: "nowrap" }}>{fmtDate(p.createdAt)}</td>
+                  <td style={{ whiteSpace: "nowrap" }}>{fmtDate(dateOn === "approved" ? p.approvedAt : p.createdAt)}</td>
                   <td><RowMenu row={p} onAction={(a) => runAction([p.id], a)} onTransfer={() => setTransferId(p.id)} /></td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {!loading && rows.length === 0 && <div className="ad-empty">No profiles match these filters.</div>}
+          {!loading && rows.length === 0 && (
+            <div className="ad-empty">
+              No profiles match these filters.{" "}
+              {filtersOn && <button type="button" className="ad-link" style={{ border: 0, background: "none", cursor: "pointer" }} onClick={resetFilters}>Reset filters</button>}
+            </div>
+          )}
         </div>
       </div>
-      <Pager total={total} limit={LIMIT} offset={offset} onChange={setOffset} />
+      <Pager total={total} limit={limit} offset={offset} onChange={setOffset} onLimitChange={changeLimit} />
 
       {transferId && (
         <ProfileTransferModal

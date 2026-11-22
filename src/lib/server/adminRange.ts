@@ -25,3 +25,17 @@ export function parseAdminRange(
   if (to.getTime() - from.getTime() > 3 * 366 * DAY) return { ok: false, error: "Custom range can be at most 3 years" };
   return { ok: true, range, from, to };
 }
+
+/**
+ * Optional list date filter: ?from=YYYY-MM-DD&to=YYYY-MM-DD (IST days, "to" inclusive).
+ * Either side may be empty. Returns ISO timestamps (or null) for the SQL functions.
+ */
+export function parseListDates(sp: URLSearchParams): { from: string | null; to: string | null } {
+  const day = (v: string | null) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(`${v}T00:00:00+05:30`) : null);
+  const f = day(sp.get("from"));
+  const t = day(sp.get("to"));
+  return {
+    from: f && !Number.isNaN(f.getTime()) ? f.toISOString() : null,
+    to: t && !Number.isNaN(t.getTime()) ? new Date(t.getTime() + DAY).toISOString() : null,
+  };
+}
