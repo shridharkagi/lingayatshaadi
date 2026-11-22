@@ -33,6 +33,21 @@ type Overview = {
   series: { day: string; signups: number; approvals: number }[];
   mix: { gender: Record<string, number>; state: Record<string, number>; age: Record<string, number> };
   recent: { action: string; entityType: string; entityId: string; at: string }[];
+  plans?: {
+    byPlan: { planId: string | null; name: string; code: string | null; active: number; paid: boolean }[];
+    activePaid: number;
+    activeFree: number;
+    expiring7: number;
+    expiring30: number;
+    lapsedPaid30: number;
+    liveNoPlan: number;
+    revenue: number;
+    revenuePrev: number;
+    revenueAllTime: number;
+    refunds: number;
+    newPaidPlans: number;
+    newPaidPlansPrev: number;
+  };
 };
 
 const RANGES = [
@@ -145,6 +160,62 @@ function Skeleton() {
         <div className="sa-skel" style={{ height: 280 }} />
       </div>
     </div>
+  );
+}
+
+function PlansCard({ p, periodText }: { p: NonNullable<Overview["plans"]>; periodText: string }) {
+  const total = p.byPlan.reduce((s, x) => s + x.active, 0) || 1;
+  const colors = ["#e67300", "#5b3aa8", "#0e6b73", "#c2367a", "#3f46b8", "#9a9cae"];
+  const tiles: { label: string; value: string; hint: string; href?: string }[] = [
+    { label: "Paid plans (active)", value: num(p.activePaid), hint: `${num(p.activeFree)} on Free` },
+    { label: `New paid plans`, value: num(p.newPaidPlans), hint: `${p.newPaidPlansPrev ? `${num(p.newPaidPlansPrev)} the period before` : "in this period"}` },
+    { label: "Renewals due", value: num(p.expiring30), hint: `${num(p.expiring7)} within 7 days`, href: "/superadmin/subscriptions?status=expiring" },
+    { label: "Paid plans lapsed", value: num(p.lapsedPaid30), hint: "ended in last 30 days, not renewed", href: "/superadmin/subscriptions?status=expired" },
+    { label: "Live but no plan", value: num(p.liveNoPlan), hint: "can't see contacts — upgrade leads", href: "/superadmin/subscriptions?status=none" },
+    { label: "Refunds", value: inr(p.refunds), hint: `${inr(p.revenueAllTime)} net all time` },
+  ];
+  return (
+    <section className="sa-card">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+        <h2 className="sa-h2">Plans &amp; revenue</h2>
+        <span className="sa-muted" style={{ fontSize: 12 }}>
+          Plan counts are right now · money covers {periodText} · <Link href="/superadmin/subscriptions">Open Plans</Link>
+        </span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
+        {tiles.map((t) => {
+          const body = (
+            <>
+              <div className="sa-muted" style={{ fontSize: 12 }}>{t.label}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, margin: "2px 0" }}>{t.value}</div>
+              <div className="sa-muted" style={{ fontSize: 11 }}>{t.hint}</div>
+            </>
+          );
+          return t.href ? (
+            <Link key={t.label} href={t.href} className="sa-card" style={{ padding: 12, boxShadow: "none", display: "block" }}>{body}</Link>
+          ) : (
+            <div key={t.label} className="sa-card" style={{ padding: 12, boxShadow: "none" }}>{body}</div>
+          );
+        })}
+      </div>
+      <div style={{ marginTop: 16 }}>
+        <div className="sa-muted" style={{ fontSize: 12, marginBottom: 6 }}>Active members by plan</div>
+        <div style={{ display: "flex", height: 12, borderRadius: 8, overflow: "hidden", background: "#f0f1f6" }}>
+          {p.byPlan.map((x, i) => (
+            <span key={x.name + i} title={`${x.name}: ${x.active}`} style={{ width: `${(x.active / total) * 100}%`, background: colors[i % colors.length] }} />
+          ))}
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginTop: 8, fontSize: 12 }}>
+          {p.byPlan.length === 0 && <span className="sa-muted">No active plans.</span>}
+          {p.byPlan.map((x, i) => (
+            <span key={x.name + i}>
+              <span className="sa-dot" style={{ background: colors[i % colors.length] }} />
+              {x.name} <strong>{num(x.active)}</strong>
+            </span>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -311,7 +382,7 @@ export default function AdminOverviewPage() {
               delay={0.1}
             />
             <InboxCard
-              href="/superadmin/subscriptions"
+              href="/superadmin/pipeline"
               icon={BadgeIndianRupee}
               tone="t-green"
               n={n("upgradeOpen")}
@@ -321,7 +392,7 @@ export default function AdminOverviewPage() {
               delay={0.14}
             />
             <InboxCard
-              href="/superadmin/subscriptions"
+              href="/superadmin/subscriptions?status=expiring"
               icon={CalendarClock}
               tone="t-teal"
               n={n("plansExpiring7d")}
@@ -363,7 +434,7 @@ export default function AdminOverviewPage() {
               </span>
             </div>
             <div className="sa-card sa-kpi">
-              <div className="sa-muted" style={{ fontSize: 13 }}>Revenue collected</div>
+              <div className="sa-muted" style={{ fontSize: 13 }}>Revenue (net of refunds)</div>
               <div className="v">{inr(k.revenue)}</div>
               <Delta cur={k.revenue} prev={k.revenuePrev} />
             </div>
@@ -378,6 +449,8 @@ export default function AdminOverviewPage() {
               <Delta cur={k.profileViews} prev={k.profileViewsPrev} />
             </div>
           </section>
+
+          {data.plans && <PlansCard p={data.plans} periodText={periodText} />}
 
           <section className="sa-grid-2">
             <div className="sa-card">

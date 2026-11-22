@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   Trash2,
   UserRound,
+  UserRoundPlus,
   UserRoundX,
   UsersRound,
   ArrowLeft,
@@ -59,6 +60,7 @@ const NAV: NavGroup[] = [
     items: [
       { href: "/superadmin/users", label: "Accounts", icon: UsersRound },
       { href: "/superadmin/review-center", label: "Profiles", icon: UserRound },
+      { href: "/superadmin/admin-profiles", label: "Created by admin", icon: UserRoundPlus },
     ],
   },
   {

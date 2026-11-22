@@ -5,6 +5,12 @@ import { createSupabaseAdmin } from "@/lib/supabase";
 /** Last 10 digits (India) or full digits used with `endsWith` on normalized `user.phone`. */
 const SUPER_ADMIN_PHONE = (process.env.SUPER_ADMIN_PHONE || "9844497002").replace(/\D/g, "");
 
+/** True when a login's phone belongs to the super-admin (same rule as the gate). */
+export function isSuperAdminPhone(phone: string | null | undefined): boolean {
+  const d = String(phone || "").replace(/\D/g, "");
+  return !!d && d.endsWith(SUPER_ADMIN_PHONE);
+}
+
 /** Comma-separated extra emails that always pass the superadmin gate (e.g. shridhar.kagi@gmail.com). */
 function superAdminEmailAllowlist(): string[] {
   const raw = process.env.SUPER_ADMIN_EMAILS || process.env.SUPER_ADMIN_EMAIL || "";

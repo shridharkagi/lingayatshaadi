@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Plus, RefreshCw, Search } from "lucide-react";
 import { adminFetch } from "@/lib/api/adminClient";
 import { CsvButton, PageHeader, Pager, ResetButton, downloadCsv, fmtDateTime, phoneFmt, useDebounced } from "@/components/superadmin/ui";
@@ -77,6 +77,14 @@ const BULK: { kind: ChangeKind | "assign" | "renew_free"; label: string }[] = [
 ];
 
 export default function PlansPage() {
+  return (
+    <Suspense fallback={<div className="sa-skel" style={{ height: 240 }} />}>
+      <PlansPageInner />
+    </Suspense>
+  );
+}
+
+function PlansPageInner() {
   const [tab, setTab] = useState<"members" | "templates" | "log">("members");
   const [notice, setNotice] = useState<string | null>(null);
   const flash = (msg: string) => {
@@ -113,7 +121,8 @@ function MembersTab({ flash }: { flash: (m: string) => void }) {
   const { plans } = usePlanTemplates();
   const [q, setQ] = useState("");
   const dq = useDebounced(q, 250);
-  const [status, setStatus] = useState("all");
+  const urlStatus = useSearchParams().get("status");
+  const [status, setStatus] = useState(urlStatus && STATUS_TABS.some((t) => t.id === urlStatus) ? urlStatus : "all");
   const [planF, setPlanF] = useState("");
   const [endFrom, setEndFrom] = useState("");
   const [endTo, setEndTo] = useState("");
@@ -198,6 +207,7 @@ function MembersTab({ flash }: { flash: (m: string) => void }) {
   const selIds = [...selected];
   return (
     <>
+      <SummaryStrip reload={reload} onPick={(st) => setStatus(st)} />
       <div className="sa-tabs" role="tablist" aria-label="Plan status">
         {STATUS_TABS.map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={status === t.id} className={`sa-tab ${status === t.id ? "on" : ""}`} onClick={() => setStatus(t.id)}>
@@ -213,6 +223,8 @@ function MembersTab({ flash }: { flash: (m: string) => void }) {
         </label>
         <select className={`sa-select ${planF ? "is-set" : ""}`} value={planF} onChange={(e) => setPlanF(e.target.value)} aria-label="Plan">
           <option value="">All plans</option>
+          <option value="paid">Any paid plan</option>
+          <option value="free_any">Free / ₹0 plans</option>
           {plans.map((p) => <option key={p.id} value={p.id}>{p.name}{p.archived_at ? " (archived)" : ""}</option>)}
           <option value="none">No plan</option>
         </select>
@@ -236,13 +248,13 @@ function MembersTab({ flash }: { flash: (m: string) => void }) {
         <div className="sa-bulk">
           <strong>{selected.size} selected</strong>
           {selected.size < total && (
-            <button type="button" className="sa-btn ghost" onClick={() => setSelected(new Set(allIds))}>Select all {total} matching</button>
+            <button type="button" className="sa-btn ghost m3-sm" onClick={() => setSelected(new Set(allIds))}>Select all {total} matching</button>
           )}
           <span style={{ flex: 1 }} />
           {BULK.map((b) => (
-            <button key={b.kind} type="button" className="sa-btn ghost" onClick={() => setDialog({ kind: b.kind, ids: selIds })}>{b.label}</button>
+            <button key={b.kind} type="button" className="sa-btn ghost m3-sm" onClick={() => setDialog({ kind: b.kind, ids: selIds })}>{b.label}</button>
           ))}
-          <button type="button" className="sa-btn ghost" onClick={() => setSelected(new Set())}>Clear</button>
+          <button type="button" className="sa-btn ghost m3-sm" onClick={() => setSelected(new Set())}>Clear</button>
         </div>
       )}
 
@@ -283,7 +295,7 @@ function MembersTab({ flash }: { flash: (m: string) => void }) {
                   <td>
                     <strong>{r.name || "Unnamed"}</strong>
                     <div className="sa-muted" style={{ fontSize: 12 }}>
-                      {[r.accountCode, phoneFmt(r.phone), r.profiles.map((p) => p.publicId).filter(Boolean).join(", ") || "no profile"].filter(Boolean).join(" · ")}
+                      {[r.accountCode, phoneFmt(r.phone), profilesText(r.profiles)].filter(Boolean).join(" · ")}
                     </div>
                   </td>
                   <td>
@@ -312,8 +324,7 @@ function MembersTab({ flash }: { flash: (m: string) => void }) {
                     {r.totalPaid > 0 && <div className="sa-muted">all time {inr(r.totalPaid)}</div>}
                   </td>
                   <td onClick={(e) => e.stopPropagation()} style={{ whiteSpace: "nowrap" }}>
-                    <button type="button" className="sa-btn ghost m3-sm" onClick={() => setDialog({ kind: "assign", ids: [r.accountId] })}>Assign</button>{" "}
-                    <Link className="sa-btn ghost m3-sm" href={`/superadmin/accounts/${r.accountId}`}>Open</Link>
+                    <button type="button" className="sa-btn ghost m3-sm" onClick={() => setDialog({ kind: "assign", ids: [r.accountId] })}>Assign</button>
                   </td>
                 </tr>
               ))}
@@ -345,6 +356,61 @@ function MembersTab({ flash }: { flash: (m: string) => void }) {
         <ChangePlanDialog kind={dialog.kind} accountIds={dialog.ids} label={`${dialog.ids.length} account${dialog.ids.length === 1 ? "" : "s"}`} onClose={() => setDialog(null)} onDone={done} />
       )}
     </>
+  );
+}
+
+function profilesText(list: Member["profiles"]) {
+  const ids = list.map((p) => p.publicId).filter(Boolean) as string[];
+  if (ids.length === 0) return "no profile";
+  return ids.length <= 2 ? ids.join(", ") : `${ids.slice(0, 2).join(", ")} +${ids.length - 2} more`;
+}
+
+type Summary = {
+  activePaid: number;
+  activeFree: number;
+  expiring7: number;
+  lapsedPaid30: number;
+  liveNoPlan: number;
+  revenue: number;
+  refunds: number;
+  newPaidPlans: number;
+};
+
+/** Headline numbers; tiles that map to a list filter the table when clicked. */
+function SummaryStrip({ reload, onPick }: { reload: number; onPick: (status: string) => void }) {
+  const [s, setS] = useState<Summary | null>(null);
+  useEffect(() => {
+    let off = false;
+    adminFetch("/api/superadmin/plans/summary")
+      .then((r) => r.json())
+      .then((j) => !off && !j.error && setS(j))
+      .catch(() => {});
+    return () => {
+      off = true;
+    };
+  }, [reload]);
+  const month = new Date().toLocaleDateString("en-IN", { month: "long", timeZone: "Asia/Kolkata" });
+  const tiles: { label: string; value: string; hint: string; status?: string }[] = s
+    ? [
+        { label: "Paid plans active", value: String(s.activePaid), hint: `${s.activeFree} on Free`, status: "active" },
+        { label: "Expiring in 7 days", value: String(s.expiring7), hint: "renew or remind", status: "expiring" },
+        { label: "Lapsed paid (30 days)", value: String(s.lapsedPaid30), hint: "win-back list", status: "expired" },
+        { label: "Live, no plan", value: String(s.liveNoPlan), hint: "can't see contacts", status: "none" },
+        { label: `Revenue · ${month}`, value: inr(s.revenue), hint: `${s.newPaidPlans} new paid · refunds ${inr(s.refunds)}` },
+      ]
+    : [];
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10 }}>
+      {!s && [0, 1, 2, 3, 4].map((i) => <div key={i} className="sa-skel" style={{ height: 76 }} />)}
+      {tiles.map((t) => (
+        <button key={t.label} type="button" className="sa-card" disabled={!t.status} onClick={() => t.status && onPick(t.status)}
+          style={{ padding: 12, textAlign: "left", font: "inherit", cursor: t.status ? "pointer" : "default", boxShadow: "none" }}>
+          <div className="sa-muted" style={{ fontSize: 12 }}>{t.label}</div>
+          <div style={{ fontSize: 22, fontWeight: 800, margin: "2px 0", color: "var(--ad-text)" }}>{t.value}</div>
+          <div className="sa-muted" style={{ fontSize: 11 }}>{t.hint}</div>
+        </button>
+      ))}
+    </div>
   );
 }
 

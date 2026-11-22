@@ -140,6 +140,8 @@ export async function GET(req: NextRequest) {
   else if (status !== "all") rows = rows.filter((r) => r.plan?.status === status);
   const plan = sp.get("plan");
   if (plan === "none") rows = rows.filter((r) => !r.plan);
+  else if (plan === "paid") rows = rows.filter((r) => r.plan && r.plan.price > 0);
+  else if (plan === "free_any") rows = rows.filter((r) => r.plan && r.plan.price <= 0);
   else if (plan) rows = rows.filter((r) => r.plan?.planId === plan);
   const endFrom = sp.get("endFrom");
   const endTo = sp.get("endTo");
