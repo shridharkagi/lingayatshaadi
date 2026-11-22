@@ -53,6 +53,46 @@ type Item = {
 };
 
 type Filter = "all" | "new" | "edit" | "photo" | "kyc";
+type SortDir = "oldest" | "newest";
+type DateWindow = "any" | "today" | "7d" | "30d" | "older30" | "custom";
+
+const DATE_WINDOWS: Array<{ id: DateWindow; label: string }> = [
+  { id: "any", label: "Any time" },
+  { id: "today", label: "Today" },
+  { id: "7d", label: "Last 7 days" },
+  { id: "30d", label: "Last 30 days" },
+  { id: "older30", label: "Older than 30 days" },
+  { id: "custom", label: "Custom range" },
+];
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Does a submission time fall inside the chosen window? Items without a date only show under "Any time". */
+function inDateWindow(iso: string | null, win: DateWindow, from: string, to: string): boolean {
+  if (win === "any") return true;
+  if (!iso) return false;
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return false;
+  const now = Date.now();
+  if (win === "today") {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    return t >= start.getTime();
+  }
+  if (win === "7d") return t >= now - 7 * DAY_MS;
+  if (win === "30d") return t >= now - 30 * DAY_MS;
+  if (win === "older30") return t < now - 30 * DAY_MS;
+  // custom: inclusive local-day bounds; an empty bound is open-ended
+  if (from) {
+    const f = new Date(`${from}T00:00:00`).getTime();
+    if (Number.isFinite(f) && t < f) return false;
+  }
+  if (to) {
+    const e = new Date(`${to}T23:59:59.999`).getTime();
+    if (Number.isFinite(e) && t > e) return false;
+  }
+  return true;
+}
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "all", label: "All" },
   { id: "new", label: "New" },
@@ -205,6 +245,10 @@ export default function ReviewWorkspacePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
+  const [sortDir, setSortDir] = useState<SortDir>("oldest");
+  const [dateWin, setDateWin] = useState<DateWindow>("any");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   const [selKey, setSelKey] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState<string | null>(null);
@@ -233,19 +277,34 @@ export default function ReviewWorkspacePage() {
     load();
   }, [load]);
 
-  const visible = useMemo(
-    () => items.filter((i) => i.key !== pending?.item.key && (filter === "all" || i.type === filter)),
-    [items, filter, pending]
+  const datedItems = useMemo(
+    () => items.filter((i) => inDateWindow(i.submittedAt, dateWin, customFrom, customTo)),
+    [items, dateWin, customFrom, customTo]
   );
+  const visible = useMemo(() => {
+    const list = datedItems.filter((i) => i.key !== pending?.item.key && (filter === "all" || i.type === filter));
+    const ts = (i: Item) => {
+      const t = i.submittedAt ? new Date(i.submittedAt).getTime() : NaN;
+      return Number.isFinite(t) ? t : null;
+    };
+    return [...list].sort((a, b) => {
+      const ta = ts(a);
+      const tb = ts(b);
+      if (ta === null && tb === null) return 0;
+      if (ta === null) return 1; // undated items always last
+      if (tb === null) return -1;
+      return sortDir === "oldest" ? ta - tb : tb - ta;
+    });
+  }, [datedItems, filter, pending, sortDir]);
   const counts = useMemo(() => {
     const c: Record<Filter, number> = { all: 0, new: 0, edit: 0, photo: 0, kyc: 0 };
-    for (const i of items) {
+    for (const i of datedItems) {
       if (i.key === pending?.item.key) continue;
       c.all += 1;
       c[i.type] += 1;
     }
     return c;
-  }, [items, pending]);
+  }, [datedItems, pending]);
 
   const sel = visible.find((i) => i.key === selKey) || visible[0] || null;
   useEffect(() => {
@@ -505,16 +564,88 @@ export default function ReviewWorkspacePage() {
 
       <div className="rv-ws">
         <section className="ad-card rv-queue" aria-label="Review queue" style={{ padding: 0 }}>
-          <div className="rv-qhead">
+          <div className="rv-qhead" style={{ flexWrap: "wrap", gap: 8 }}>
             <strong>Queue</strong>
-            <span className="ad-muted" style={{ fontSize: 12 }}>Oldest first</span>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+              <select
+                className={`ad-select ad-select-sm ${dateWin !== "any" ? "is-set" : ""}`}
+                value={dateWin}
+                onChange={(e) => setDateWin(e.target.value as DateWindow)}
+                aria-label="Filter queue by submitted date"
+              >
+                {DATE_WINDOWS.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                className={`ad-select ad-select-sm ${sortDir !== "oldest" ? "is-set" : ""}`}
+                value={sortDir}
+                onChange={(e) => setSortDir(e.target.value as SortDir)}
+                aria-label="Sort queue"
+              >
+                <option value="oldest">Oldest first</option>
+                <option value="newest">Newest first</option>
+              </select>
+            </div>
+            {dateWin === "custom" && (
+              <div style={{ display: "flex", gap: 6, alignItems: "center", width: "100%", fontSize: 12 }}>
+                <label className="ad-muted" style={{ display: "flex", alignItems: "center", gap: 4, flex: 1 }}>
+                  From
+                  <input
+                    type="date"
+                    className="ad-input"
+                    style={{ height: 32, fontSize: 12, padding: "0 8px", flex: 1, minWidth: 0 }}
+                    value={customFrom}
+                    max={customTo || undefined}
+                    onChange={(e) => setCustomFrom(e.target.value)}
+                  />
+                </label>
+                <label className="ad-muted" style={{ display: "flex", alignItems: "center", gap: 4, flex: 1 }}>
+                  To
+                  <input
+                    type="date"
+                    className="ad-input"
+                    style={{ height: 32, fontSize: 12, padding: "0 8px", flex: 1, minWidth: 0 }}
+                    value={customTo}
+                    min={customFrom || undefined}
+                    onChange={(e) => setCustomTo(e.target.value)}
+                  />
+                </label>
+              </div>
+            )}
+            {(dateWin !== "any" || sortDir !== "oldest") && (
+              <div style={{ display: "flex", justifyContent: "space-between", width: "100%", fontSize: 12 }} className="ad-muted">
+                <span>
+                  {visible.length} of {items.length} shown
+                </span>
+                <button
+                  type="button"
+                  className="ad-link"
+                  style={{ fontSize: 12, background: "none", border: 0, padding: 0, cursor: "pointer", color: "var(--ad-saffron)", fontWeight: 600 }}
+                  onClick={() => {
+                    setDateWin("any");
+                    setSortDir("oldest");
+                    setCustomFrom("");
+                    setCustomTo("");
+                  }}
+                >
+                  Reset
+                </button>
+              </div>
+            )}
           </div>
           {loading && items.length === 0 &&
             Array.from({ length: 5 }).map((_, i) => <div key={i} className="ad-skel" style={{ height: 64, margin: 12 }} />)}
           {!loading && visible.length === 0 && (
             <div style={{ padding: 32, textAlign: "center" }} className="ad-muted">
               <Check size={28} style={{ color: "#11734b", marginBottom: 8 }} />
-              <div>All caught up — nothing waiting here.</div>
+              <div>
+                {dateWin !== "any" && items.length > 0
+                  ? "Nothing in this date range — try a wider range."
+                  : "All caught up — nothing waiting here."}
+              </div>
             </div>
           )}
           {visible.map((it) => (
