@@ -4,8 +4,9 @@ import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
 import { parseListDates } from "@/lib/server/adminRange";
 
 /**
- * Accounts list (logins). GET ?q=&filter=all|paid|no_plan|expiring|no_profile|pending|suspended
- *   &sort=newest|oldest|name_asc|name_desc|views_desc|views_asc|login_desc|login_asc
+ * Accounts list (logins). GET ?q=&filter=all|paid|no_plan|expiring|inactive|no_profile|pending|suspended
+ *   &plan=|paid|none|<plan name>
+ *   &sort=newest|oldest|name_asc|name_desc|views_desc|views_asc|login_desc|login_asc|quota_left
  *   &from=YYYY-MM-DD&to=YYYY-MM-DD&dateOn=joined|last_login&limit=25&offset=0
  */
 export async function GET(req: NextRequest) {
@@ -23,6 +24,7 @@ export async function GET(req: NextRequest) {
     p_from: from,
     p_to: to,
     p_date_on: sp.get("dateOn") === "last_login" ? "last_login" : "joined",
+    p_plan: (sp.get("plan") || "").slice(0, 40),
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);

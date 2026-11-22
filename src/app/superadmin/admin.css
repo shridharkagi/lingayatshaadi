@@ -26,20 +26,20 @@
 .ad-side {
   position: fixed; inset: 0 auto 0 0; width: 256px; z-index: 40;
   background: linear-gradient(180deg, var(--ad-ink) 0%, var(--ad-ink-2) 100%);
-  color: #e9e6f5; padding: 18px 12px; display: flex; flex-direction: column; gap: 2px;
+  color: #e9e6f5; padding: 14px 10px 10px; display: flex; flex-direction: column; gap: 1px;
   overflow-y: auto; transition: transform .25s cubic-bezier(.2,.8,.2,1);
 }
-.ad-brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 16px; text-decoration: none; color: #fff; }
+.ad-brand { display: flex; align-items: center; gap: 10px; padding: 2px 8px 10px; text-decoration: none; color: #fff; }
 .ad-mark {
   width: 36px; height: 36px; border-radius: 10px; flex: none;
   background: linear-gradient(135deg, #f7a541 0%, #e67300 45%, #e0457b 100%);
   display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff;
   box-shadow: 0 6px 18px rgba(224, 69, 123, .35);
 }
-.ad-grp { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #a39dc0; padding: 14px 10px 6px; }
+.ad-grp { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: #a39dc0; padding: 10px 10px 3px; }
 .ad-nav {
-  display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px;
-  color: #d9d5ea; text-decoration: none; font-size: 14px; transition: background .18s, transform .18s, color .18s;
+  display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 9px;
+  color: #d9d5ea; text-decoration: none; font-size: 13.5px; line-height: 1.35; transition: background .18s, transform .18s, color .18s;
 }
 .ad-nav:hover { background: rgba(255,255,255,.07); color: #fff; transform: translateX(2px); }
 .ad-nav.on {
@@ -274,8 +274,9 @@
 .ad-table tr.clickable { cursor: pointer; }
 .ad-link { color: var(--ad-text); font-weight: 600; text-decoration: none; }
 .ad-link:hover { color: #b4480b; }
-.ad-tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--ad-line); }
-.ad-tab { border: 0; background: transparent; font: inherit; font-size: 14px; padding: 10px 14px; color: var(--ad-muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.ad-tabs { display: flex; gap: 2px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--ad-line); }
+.ad-tabs::-webkit-scrollbar { display: none; }
+.ad-tab { white-space: nowrap; flex: none; border: 0; background: transparent; font: inherit; font-size: 13.5px; padding: 10px 12px; color: var(--ad-muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .ad-tab.on { color: var(--ad-text); font-weight: 600; border-bottom-color: var(--ad-saffron); }
 .ad-tab .cnt { font-size: 11px; background: #f0f1f6; border-radius: 999px; padding: 1px 7px; margin-left: 6px; }
 .ad-menu { position: relative; display: inline-block; }
@@ -334,3 +335,41 @@
 .ad-root .ad-acct .nm { font-weight: 600; color: var(--ad-text); }
 .ad-root .ad-acct .sub { font-size: 11px; color: var(--ad-muted, #6b6f85); }
 @keyframes ad-fade { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; transform: none; } }
+
+/* Sidebar: tighten further on short laptop screens so every item fits without scrolling */
+.ad-nav svg { width: 17px; height: 17px; flex: none; }
+@media (max-height: 760px) {
+  .ad-side { padding-top: 10px; }
+  .ad-brand { padding-bottom: 6px; }
+  .ad-mark { width: 30px; height: 30px; border-radius: 9px; font-size: 13px; }
+  .ad-grp { padding: 7px 10px 2px; font-size: 10px; }
+  .ad-nav { padding: 4.5px 10px; font-size: 13px; }
+  .ad-nav svg { width: 16px; height: 16px; }
+}
+@media (max-height: 640px) {
+  .ad-grp { padding: 5px 10px 1px; }
+  .ad-nav { padding: 3px 10px; }
+}
+
+/* ---------- bulk WhatsApp panel ---------- */
+.ad-root .wa-scrim { position: fixed; inset: 0; background: rgba(20, 16, 40, .45); z-index: 80; display: flex; align-items: center; justify-content: center; padding: 16px; animation: ad-fade .15s ease-out; }
+.ad-root .wa-panel { width: min(920px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; padding: 18px; overflow: hidden; }
+.ad-root .wa-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+.ad-root .wa-head h2 { display: flex; align-items: center; gap: 8px; }
+.ad-root .wa-body { display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px; min-height: 0; overflow: hidden; }
+.ad-root .wa-compose { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
+.ad-root .wa-preview { background: linear-gradient(180deg, #e7fbe9, #dcf8c6); border-radius: 12px 12px 12px 3px; padding: 10px 12px; font-size: 13px; white-space: pre-wrap; display: flex; flex-direction: column; gap: 4px; color: #1f2d1f; }
+.ad-root .wa-list { display: flex; flex-direction: column; min-height: 0; }
+.ad-root .wa-rows { overflow-y: auto; border: 1px solid var(--ad-line-2); border-radius: 12px; }
+.ad-root .wa-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--ad-line-2); transition: background .2s; }
+.ad-root .wa-row:last-child { border-bottom: 0; }
+.ad-root .wa-row.done { background: #f1fbf4; }
+.ad-root .wa-progress { flex: 1; height: 6px; background: #eef0f6; border-radius: 99px; overflow: hidden; }
+.ad-root .wa-progress span { display: block; height: 100%; background: linear-gradient(90deg, #25d366, #128c7e); transition: width .3s; }
+@media (max-width: 760px) { .ad-root .wa-body { grid-template-columns: 1fr; overflow-y: auto; } }
+
+/* ---------- quota meter ---------- */
+.ad-root .ad-quota { display: flex; flex-direction: column; gap: 3px; min-width: 110px; font-size: 12px; }
+.ad-root .ad-quota .bar { height: 5px; background: #eef0f6; border-radius: 99px; overflow: hidden; }
+.ad-root .ad-quota .bar span { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #22b07d, #e6a100); }
+.ad-root .ad-quota .bar span.hot { background: linear-gradient(90deg, #f28c28, #e0457b); }

@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { Search } from "lucide-react";
+import { MessageCircle, Search } from "lucide-react";
+import WhatsAppBulk from "@/components/superadmin/WhatsAppBulk";
 import { adminFetch } from "@/lib/api/adminClient";
 import {
   CsvButton,
@@ -33,8 +34,9 @@ type Account = {
   profiles: number;
   liveProfiles: number;
   pendingProfiles: number;
-  plan: { name: string; price: number; expiresAt: string } | null;
+  plan: { name: string; price: number; expiresAt: string; startsAt?: string; totalLimit: number | null; dailyLimit: number | null } | null;
   contactViews: number;
+  contactViewsToday: number;
 };
 type Deleted = { id: string; entity_id: string; created_at: string; meta: Record<string, unknown> | null };
 
@@ -43,6 +45,7 @@ const TABS = [
   { id: "paid", label: "Paid plan" },
   { id: "no_plan", label: "No plan" },
   { id: "expiring", label: "Plan ending soon" },
+  { id: "inactive", label: "Inactive 30d+" },
   { id: "no_profile", label: "No profile" },
   { id: "pending", label: "Pending review" },
   { id: "suspended", label: "Suspended" },
@@ -57,7 +60,11 @@ const SORTS = [
   { id: "views_asc", label: "Contact views: fewest first" },
   { id: "login_desc", label: "Last login: most recent" },
   { id: "login_asc", label: "Last login: longest ago" },
+  { id: "quota_left", label: "Contacts left: fewest first" },
 ];
+const PLAN_OPTIONS = ["Gold", "Platinum", "Diamond"];
+/** Which WhatsApp template fits the tab you're on. */
+const TAB_TEMPLATE: Record<string, string> = { no_profile: "no_profile", pending: "pending", inactive: "inactive", expiring: "expiring" };
 /** Sortable columns: [first click, second click]. */
 const COL_SORT: Record<string, [string, string]> = {
   name: ["name_asc", "name_desc"],
@@ -89,6 +96,11 @@ export default function AccountsPage() {
   const [dateOn, setDateOn] = useState("joined");
   const [limit, setLimit] = useState(25);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [plan, setPlan] = useState("");
+  const [planCounts, setPlanCounts] = useState<Record<string, number>>({});
+  const [selected, setSelected] = useState<Map<string, Account>>(new Map());
+  const [waOpen, setWaOpen] = useState(false);
+  const [selectingAll, setSelectingAll] = useState(false);
   const [offset, setOffset] = useState(0);
   const [rows, setRows] = useState<Account[]>([]);
   const [deleted, setDeleted] = useState<Deleted[]>([]);
@@ -115,19 +127,23 @@ export default function AccountsPage() {
 
   const fetchPage = useCallback(
     async (lim: number, off: number) => {
-      const qs = new URLSearchParams({ q: dq, filter: tab, sort, from: fromQ, to: toQ, dateOn, limit: String(lim), offset: String(off) });
+      const qs = new URLSearchParams({ q: dq, filter: tab, sort, from: fromQ, to: toQ, dateOn, plan, limit: String(lim), offset: String(off) });
       const res = await adminFetch(`/api/superadmin/accounts?${qs}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to load accounts");
-      return json as { total: number; rows: Account[]; counts?: Record<string, number> };
+      return json as { total: number; rows: Account[]; counts?: Record<string, number>; plans?: Record<string, number> };
     },
-    [dq, tab, sort, fromQ, toQ, dateOn]
+    [dq, tab, sort, fromQ, toQ, dateOn, plan]
   );
 
-  useEffect(() => setOffset(0), [dq, tab, sort, fromQ, toQ, dateOn]);
+  useEffect(() => {
+    setOffset(0);
+    setSelected(new Map());
+  }, [dq, tab, sort, fromQ, toQ, dateOn, plan]);
 
-  const filtersOn = q !== "" || sort !== "newest" || dates.preset !== "any" || dateOn !== "joined" || tab !== "all";
+  const filtersOn = q !== "" || sort !== "newest" || dates.preset !== "any" || dateOn !== "joined" || tab !== "all" || plan !== "";
   const resetFilters = () => {
+    setPlan("");
     setQ("");
     setSort("newest");
     setDates(NO_DATES);
@@ -170,6 +186,7 @@ export default function AccountsPage() {
             setRows(json.rows);
             setTotal(json.total);
             setCounts(json.counts || {});
+            setPlanCounts(json.plans || {});
           }
         }
       } catch (e) {
@@ -190,10 +207,10 @@ export default function AccountsPage() {
       for (let off = 0; off < Math.max(total, 1); off += 500) all.push(...(await fetchPage(500, off)).rows);
       downloadCsv(
         `accounts-${tab}-${new Date().toISOString().slice(0, 10)}.csv`,
-        ["Account code", "Name", "Phone", "Joined", "Last login", "Active profiles", "Live", "Pending", "Plan", "Plan price", "Plan ends", "Contact views", "Suspended"],
+        ["Account code", "Name", "Phone", "Joined", "Last login", "Active profiles", "Live", "Pending", "Plan", "Plan price", "Plan ends", "Contact views", "Contact limit", "Today", "Daily limit", "Suspended"],
         all.map((a) => [
           a.accountCode, a.name, phoneFmt(a.phone), fmtDate(a.createdAt), fmtDateTime(a.lastSignInAt), a.profiles, a.liveProfiles,
-          a.pendingProfiles, a.plan?.name || "", a.plan?.price ?? "", a.plan ? fmtDate(a.plan.expiresAt) : "", a.contactViews, a.suspended ? "yes" : "no",
+          a.pendingProfiles, a.plan?.name || "", a.plan?.price ?? "", a.plan ? fmtDate(a.plan.expiresAt) : "", a.contactViews, a.plan ? a.plan.totalLimit ?? "unlimited" : "", a.contactViewsToday, a.plan ? a.plan.dailyLimit ?? "unlimited" : "", a.suspended ? "yes" : "no",
         ])
       );
     } catch (e) {
@@ -202,6 +219,33 @@ export default function AccountsPage() {
       setExporting(false);
     }
   };
+
+  const toggle = (a: Account) =>
+    setSelected((m) => {
+      const n = new Map(m);
+      if (n.has(a.id)) n.delete(a.id);
+      else n.set(a.id, a);
+      return n;
+    });
+  const pageChecked = rows.length > 0 && rows.every((r) => selected.has(r.id));
+  const togglePage = () =>
+    setSelected((m) => {
+      const n = new Map(m);
+      rows.forEach((r) => (pageChecked ? n.delete(r.id) : n.set(r.id, r)));
+      return n;
+    });
+  async function selectAllMatching() {
+    setSelectingAll(true);
+    try {
+      const n = new Map<string, Account>();
+      for (let off = 0; off < Math.min(total, 2000); off += 500) (await fetchPage(500, off)).rows.forEach((r) => n.set(r.id, r));
+      setSelected(n);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't select all");
+    } finally {
+      setSelectingAll(false);
+    }
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -225,6 +269,14 @@ export default function AccountsPage() {
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, phone or U-code" aria-label="Search accounts" />
           </label>
           <DateFilter value={dates} onChange={setDates} fields={DATE_FIELDS} field={dateOn} onFieldChange={setDateOn} />
+          <select className={`ad-select ${plan ? "is-set" : ""}`} value={plan} onChange={(e) => setPlan(e.target.value)} aria-label="Plan">
+            <option value="">Any plan</option>
+            <option value="paid">Any paid plan ({Object.entries(planCounts).filter(([k]) => k !== "none").reduce((n, [, v]) => n + v, 0)})</option>
+            {[...new Set([...PLAN_OPTIONS, ...Object.keys(planCounts).filter((k) => k !== "none")])].map((p) => (
+              <option key={p} value={p}>{p} ({planCounts[p] || 0})</option>
+            ))}
+            <option value="none">No plan ({planCounts.none || 0})</option>
+          </select>
           <select className="ad-select" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
             {SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
           </select>
@@ -232,6 +284,21 @@ export default function AccountsPage() {
         </div>
       )}
 
+      {selected.size > 0 && tab !== "deleted" && (
+        <div className="ad-bulk">
+          <strong>{selected.size} selected</strong>
+          {selected.size < total && rows.every((r) => selected.has(r.id)) && (
+            <button type="button" className="ad-link" style={{ border: 0, background: "none", cursor: "pointer", fontSize: 13 }} disabled={selectingAll} onClick={selectAllMatching}>
+              {selectingAll ? "Selecting…" : `Select all ${total} matching`}
+            </button>
+          )}
+          <span style={{ flex: 1 }} />
+          <button type="button" className="ad-btn pri" onClick={() => setWaOpen(true)}>
+            <MessageCircle size={16} /> WhatsApp {selected.size}
+          </button>
+          <button type="button" className="ad-btn ghost" onClick={() => setSelected(new Map())}>Clear</button>
+        </div>
+      )}
       {error && <div className="ad-card" style={{ color: "#b42358" }}>{error}</div>}
 
       <div className="ad-card" style={{ padding: 0, overflow: "hidden" }}>
@@ -253,15 +320,22 @@ export default function AccountsPage() {
           ) : (
             <table className="ad-table">
               <thead>
-                <tr>{sortTh("name", "Account")}<th>Phone</th><th>Profiles</th><th>Plan</th>{sortTh("views", "Contact views")}{sortTh("joined", "Joined")}{sortTh("login", "Last login")}<th /></tr>
+                <tr>
+                  <th style={{ width: 36 }} onClick={(e) => e.stopPropagation()}>
+                    <input type="checkbox" aria-label="Select all on this page" checked={pageChecked} onChange={togglePage} />
+                  </th>
+                  {sortTh("name", "Account")}<th>Phone</th><th>Profiles</th><th>Plan</th>{sortTh("views", "Contacts used")}{sortTh("joined", "Joined")}{sortTh("login", "Last login")}<th /></tr>
               </thead>
               <tbody>
                 {loading && rows.length === 0 &&
                   Array.from({ length: 6 }).map((_, i) => (
-                    <tr key={i}><td colSpan={8}><div className="ad-skel" style={{ height: 28 }} /></td></tr>
+                    <tr key={i}><td colSpan={9}><div className="ad-skel" style={{ height: 28 }} /></td></tr>
                   ))}
                 {rows.map((a) => (
                   <tr key={a.id} className="clickable" onClick={() => router.push(`/superadmin/accounts/${a.id}`)}>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <input type="checkbox" aria-label={`Select ${a.name || "account"}`} checked={selected.has(a.id)} onChange={() => toggle(a)} />
+                    </td>
                     <td>
                       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                         <span className="ad-av" style={{ background: "#3f46b8" }}>{initials(a.name)}</span>
@@ -297,7 +371,19 @@ export default function AccountsPage() {
                         <span className="ad-muted">No plan</span>
                       )}
                     </td>
-                    <td>{a.contactViews}</td>
+                    <td>
+                      {a.plan ? (
+                        <div className="ad-quota" title={`Today: ${a.contactViewsToday}${a.plan.dailyLimit ? ` of ${a.plan.dailyLimit}` : ""}`}>
+                          <span><strong>{a.contactViews}</strong>{a.plan.totalLimit ? <span className="ad-muted"> / {a.plan.totalLimit}</span> : <span className="ad-muted"> · unlimited</span>}</span>
+                          {a.plan.totalLimit ? (
+                            <span className="bar"><span className={a.contactViews / a.plan.totalLimit >= 0.8 ? "hot" : ""} style={{ width: `${Math.min(100, (a.contactViews / a.plan.totalLimit) * 100)}%` }} /></span>
+                          ) : null}
+                          <span className="ad-muted" style={{ fontSize: 11 }}>today {a.contactViewsToday}{a.plan.dailyLimit ? ` / ${a.plan.dailyLimit}` : ""}</span>
+                        </div>
+                      ) : (
+                        a.contactViews
+                      )}
+                    </td>
                     <td style={{ whiteSpace: "nowrap" }}>{fmtDate(a.createdAt)}</td>
                     <td style={{ whiteSpace: "nowrap" }} className="ad-muted">{a.lastSignInAt ? fmtDateTime(a.lastSignInAt) : "Never"}</td>
                     <td>
@@ -318,6 +404,13 @@ export default function AccountsPage() {
           )}
         </div>
       </div>
+      {waOpen && (
+        <WhatsAppBulk
+          recipients={[...selected.values()].map((a) => ({ id: a.id, name: a.name, phone: a.phone, planEnds: a.plan?.expiresAt }))}
+          suggested={TAB_TEMPLATE[tab]}
+          onClose={() => setWaOpen(false)}
+        />
+      )}
       {tab !== "deleted" && <Pager total={total} limit={limit} offset={offset} onChange={setOffset} onLimitChange={changeLimit} />}
     </div>
   );
