@@ -453,3 +453,10 @@ html:has(.ad-root) { overflow-x: clip; }
 .pf-compact input[placeholder="YYYY"] { width: 4.4rem !important; padding-left: 4px !important; padding-right: 4px !important; text-align: center; }
 .pf-compact .flex-wrap:has(> input[placeholder="DD"]) { flex-wrap: nowrap; gap: 4px; }
 .ad-root .pc-nav .opt { margin-left: auto; font-size: 10px; color: var(--ad-muted); }
+.ad-root .pc-summary { display: flex; gap: 10px; align-items: center; }
+.ad-root .pc-links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.ad-root .pc-links a { font-size: 12px; font-weight: 600; color: #c25a00; background: #fff4ea; border: 1px solid #fbe0c8; border-radius: 999px; padding: 3px 10px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+.ad-root .pc-links a:hover { background: #ffead6; }
+.ad-root .pc-trust { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+.ad-root .pc-trust input { width: 70px; height: 32px; border: 1px solid var(--ad-line-2); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 13px; }
+.ad-root .pc-dirty { color: #c25a00; font-weight: 600; }

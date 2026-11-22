@@ -2,6 +2,7 @@ import { createSupabaseAdmin } from "@/lib/supabase";
 
 export type AdminAuditAction =
   | "profile.create"
+  | "profile.admin_edit"
   | "profile.approve"
   | "profile.reject"
   | "photo.approve"

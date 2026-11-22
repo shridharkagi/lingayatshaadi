@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Profile } from "@/types";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
+import { logAdminAudit } from "@/lib/server/adminAudit";
 import { toProfileRow, fromProfileRow, type ProfileRow } from "@/lib/profileMapper";
 
 /**
@@ -48,9 +49,27 @@ export async function PATCH(
   delete row.id;
   delete (row as { user_id?: unknown }).user_id;
 
+  const { data: beforeRow } = await admin.from("profiles").select("*").eq("id", id).maybeSingle();
   const { data, error } = await admin.from("profiles").update(row).eq("id", id).select("*").single();
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Audit only the fields that actually changed.
+  const before = (beforeRow || {}) as Record<string, unknown>;
+  const after = data as Record<string, unknown>;
+  const changed = Object.keys(row).filter(
+    (k) => k !== "updated_at" && JSON.stringify(before[k] ?? null) !== JSON.stringify(after[k] ?? null)
+  );
+  if (changed.length) {
+    await logAdminAudit({
+      actorUserId: auth.userId,
+      action: "profile.admin_edit",
+      entityType: "profile",
+      entityId: id,
+      beforeJson: Object.fromEntries(changed.map((k) => [k, before[k] ?? null])),
+      afterJson: Object.fromEntries(changed.map((k) => [k, after[k] ?? null])),
+    });
   }
   return NextResponse.json({ profile: fromProfileRow(data as ProfileRow) });
 }
