@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -15,6 +16,8 @@ function isStandaloneMode() {
 }
 
 export function InstallPWAButton() {
+  const pathname = usePathname() ?? "";
+  const isAdminRoute = pathname === "/superadmin" || pathname.startsWith("/superadmin/");
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
 
@@ -52,7 +55,8 @@ export function InstallPWAButton() {
     setDeferredPrompt(null);
   };
 
-  if (isInstalled || !deferredPrompt) return null;
+  // Not offered inside the admin console (and its styles are Midnight-only).
+  if (isAdminRoute || isInstalled || !deferredPrompt) return null;
 
   return (
     <button
