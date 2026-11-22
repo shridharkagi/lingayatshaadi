@@ -985,7 +985,7 @@ function ProfileCompleteInner() {
           </div>
         </div>
       )}
-      <header className="sticky top-0 bg-white/95 backdrop-blur border-b border-[var(--border)] px-4 py-3 flex items-center justify-between z-20">
+      <header className="lb-appbar sticky top-0 px-4 py-3 flex items-center justify-between z-20">
         <button
           onClick={prev}
           className="flex items-center gap-2 text-gray-700 hover:text-[var(--primary)] transition-colors"

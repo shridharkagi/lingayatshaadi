@@ -63,7 +63,7 @@ export default function LegacyMessagesPage() {
 
   return (
     <div className="max-w-lg mx-auto pb-6">
-      <header className="bg-white border-b border-[var(--border)] px-4 py-4">
+      <header className="lb-appbar lb-appbar-app sticky top-0 z-20 px-4 py-4">
         <h1 className="text-xl font-bold text-[var(--foreground)]">Messages</h1>
       </header>
 

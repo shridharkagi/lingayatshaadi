@@ -9,7 +9,7 @@ export default function TermsPage() {
   const year = new Date().getFullYear();
   return (
     <div className="min-h-screen bg-[var(--color-bg)] flex flex-col">
-      <header className="sticky top-0 z-50 bg-white border-b border-[var(--color-border)] shadow-[var(--shadow-soft)]">
+      <header className="lb-appbar sticky top-0 z-50">
         <div className="flex items-center justify-between px-4 h-14 max-w-4xl mx-auto">
           <Link href="/" className="flex items-center gap-2 text-[var(--color-text-muted)] hover:text-[var(--primary)] transition">
             <ChevronLeft size={24} />

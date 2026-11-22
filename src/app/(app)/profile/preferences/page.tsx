@@ -153,10 +153,10 @@ export default function MatchPreferencesPage() {
     // BottomNav (h-16 = 64px) plus iOS safe area; on lg+ the BottomNav is
     // hidden so we only need clearance for the save bar itself.
     <div className="max-w-3xl mx-auto pb-44 lg:pb-32">
-      <header className="bg-white border-b border-[var(--border)] px-4 py-3 flex items-center gap-3 sticky top-0 z-20">
+      <header className="lb-appbar lb-appbar-app sticky top-0 z-20 px-4 py-3 flex items-center gap-3">
         <button
           onClick={() => router.back()}
-          className="p-2 -ml-2 rounded-lg hover:bg-gray-100"
+          className="lb-btn-glass flex h-10 w-10 shrink-0 items-center justify-center rounded-full active:scale-95"
           aria-label="Back"
         >
           <ChevronLeft size={22} />

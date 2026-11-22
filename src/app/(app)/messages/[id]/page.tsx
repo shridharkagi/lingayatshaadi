@@ -116,10 +116,10 @@ function ChatPageImpl() {
 
   return (
     <div className="w-full max-w-2xl mx-auto flex flex-col h-[100dvh] lg:h-[calc(100vh-4rem)]">
-      <header className="bg-white border-b border-[var(--border)] px-3 sm:px-4 py-3 flex items-center gap-2 sm:gap-3 sticky top-0 z-10 flex-shrink-0">
+      <header className="lb-appbar lb-appbar-app px-3 sm:px-4 py-3 flex items-center gap-2 sm:gap-3 sticky top-0 z-10 flex-shrink-0">
         <button 
           onClick={() => router.back()} 
-          className="p-2 -ml-2 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-colors touch-manipulation"
+          className="lb-btn-glass flex h-10 w-10 shrink-0 items-center justify-center rounded-full active:scale-95"
           aria-label="Go back"
         >
           ←

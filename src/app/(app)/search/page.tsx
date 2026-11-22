@@ -165,7 +165,7 @@ export default function SearchPage() {
 
   return (
     <div className={`max-w-6xl mx-auto w-full ${isLoggedIn ? "pb-20" : "pb-6"}`}>
-      <header className="bg-white border-b border-[var(--border)] px-4 py-4 sticky top-0 z-10">
+      <header className="lb-appbar lb-appbar-app px-4 py-4 sticky top-0 z-10">
         <h1 className="text-lg sm:text-xl font-bold text-[var(--foreground)] mb-4">Search</h1>
         <div className="flex gap-2">
           <div className="flex-1 relative">

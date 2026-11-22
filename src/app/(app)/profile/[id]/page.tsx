@@ -132,7 +132,7 @@ function ShareProfileButton({ profile }: { profile: Profile }) {
   return (
     <button
       onClick={handleShare}
-      className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
+      className="lb-btn-glass flex h-10 w-10 items-center justify-center rounded-full active:scale-95"
       aria-label="Share profile"
     >
       <Share2 size={20} />
@@ -1446,13 +1446,13 @@ export default function OtherProfilePage() {
           </div>
         </div>
       )}
-      <header className="sticky top-0 z-20 -mx-3 sm:-mx-2 lg:-mx-2 xl:-mx-3 bg-[#0B0B12]/85 backdrop-blur-xl border-b border-[var(--lb-line)] px-3 sm:px-4 py-2.5 flex items-center justify-between rounded-none sm:rounded-b-2xl">
+      <header className="lb-appbar lb-appbar-app sticky top-0 z-20 px-4 py-2.5 flex items-center justify-between">
         <button
           onClick={() => router.back()}
-          className="lb-btn-glass flex h-11 items-center gap-1.5 rounded-xl pl-2.5 pr-3 -ml-1 font-medium text-[var(--lb-text)]" aria-label="Go back"
+          className="lb-btn-glass flex h-10 w-10 items-center justify-center rounded-full text-[var(--lb-text)] active:scale-95"
+          aria-label="Go back"
         >
-          <ChevronLeft size={22} strokeWidth={2.5} />
-          <span className="hidden sm:inline">Back</span>
+          <ChevronLeft size={22} strokeWidth={2.4} />
         </button>
         
         <Link href="/home" className="min-w-0 flex-1 px-2 text-center leading-none hover:opacity-90 transition-opacity">

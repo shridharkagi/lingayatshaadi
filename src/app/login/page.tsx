@@ -257,7 +257,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)] flex flex-col">
-      <header className="sticky top-0 z-50 bg-white border-b border-[var(--color-border)] shadow-[var(--shadow-soft)]">
+      <header className="lb-appbar sticky top-0 z-50">
         <div className="flex items-center justify-between px-3 sm:px-4 h-14 gap-2 min-w-0">
           <Link href="/" className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 pr-1">
             <Heart className="w-6 h-6 sm:w-7 sm:h-7 shrink-0 text-[var(--primary)] fill-[var(--primary)]" />

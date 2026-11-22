@@ -244,7 +244,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen" style={{ background: "var(--gradient-bg-warm)" }}>
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-[var(--color-border)] shadow-[var(--shadow-soft)]">
+      <header className="lb-appbar fixed top-0 left-0 right-0 z-50">
         <div className="max-w-6xl mx-auto px-2.5 sm:px-4 flex items-center justify-between h-14 sm:h-16 gap-2 min-w-0">
           <Link href="/" className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 pr-1">
             <Heart className="w-6 h-6 sm:w-8 sm:h-8 shrink-0 text-[var(--primary)] fill-[var(--primary)]" />

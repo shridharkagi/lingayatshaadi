@@ -9,8 +9,8 @@ export default function NotificationSettingsPage() {
 
   return (
     <div className="max-w-lg mx-auto">
-      <header className="bg-white border-b border-[var(--border)] px-4 py-3 flex items-center gap-3">
-        <button onClick={() => router.back()} className="p-2 -ml-2 rounded-lg">
+      <header className="lb-appbar lb-appbar-app sticky top-0 z-20 px-4 py-3 flex items-center gap-3">
+        <button onClick={() => router.back()} className="lb-btn-glass flex h-10 w-10 shrink-0 items-center justify-center rounded-full active:scale-95">
           <ChevronLeft size={24} />
         </button>
         <h1 className="text-lg font-semibold">Notification Settings</h1>
