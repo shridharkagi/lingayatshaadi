@@ -1,128 +1,53 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireAuthUser } from "@/lib/server/requireAuthUser";
-import {
-  listOwnedProfileIdsIncludingDeleted,
-  userSubscriptionsOrFilter,
-} from "@/lib/server/subscriptionLookup";
+import { accountProfileIds, effectiveStatus, type SubscriptionRow } from "@/lib/server/plans";
 
+/** The logged-in account's plans (with contacts used in each period) and payments. */
 export async function GET(req: NextRequest) {
   const auth = await requireAuthUser(req);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const admin = createSupabaseAdmin();
-  const ownedProfileIds = await listOwnedProfileIdsIncludingDeleted(admin, auth.userId);
-  const contactViewerOrFilter = ownedProfileIds.map((id) => `viewer_id.eq.${id}`).join(",");
-  const orFilter = userSubscriptionsOrFilter(auth.userId, ownedProfileIds);
-
-  const subsWithNotesRes = await admin
-    .from("user_subscriptions")
-    .select(
-      "id, user_id, plan_id, status, starts_at, expires_at, created_at, plan_name_snapshot, price_snapshot, currency_snapshot, total_contact_views_snapshot, daily_contact_view_limit_snapshot, notes"
-    )
-    .or(orFilter)
-    .order("created_at", { ascending: false })
-    .limit(100);
-  const subsRes =
-    !subsWithNotesRes.error
-      ? subsWithNotesRes
-      : await admin
-          .from("user_subscriptions")
-          .select(
-            "id, user_id, plan_id, status, starts_at, expires_at, created_at, plan_name_snapshot, price_snapshot, currency_snapshot, total_contact_views_snapshot, daily_contact_view_limit_snapshot"
-          )
-          .or(orFilter)
-          .order("created_at", { ascending: false })
-          .limit(100);
-
-  const subs = (subsRes.data || []) as Array<{
-    id: string;
-    user_id?: string;
-    starts_at?: string;
-    expires_at?: string;
-  }>;
-  const starts = subs
-    .map((s) => new Date(String(s.starts_at || "")).getTime())
-    .filter((n) => Number.isFinite(n));
-  const expires = subs
-    .map((s) => new Date(String(s.expires_at || "")).getTime())
-    .filter((n) => Number.isFinite(n));
-  const minStartIso = starts.length > 0 ? new Date(Math.min(...starts)).toISOString() : null;
-  const maxExpiryIso = expires.length > 0 ? new Date(Math.max(...expires)).toISOString() : null;
-
-  const [{ data: txns, error: txnErr }, { data: contactViews, error: viewsErr }] = await Promise.all([
+  const [ids, subsRes, txnRes] = await Promise.all([
+    accountProfileIds(admin, auth.userId),
+    admin.from("user_subscriptions").select("*").eq("user_id", auth.userId).order("starts_at", { ascending: false }).limit(100),
     admin
       .from("payment_transactions")
-      .select("id, subscription_id, amount, currency, status, external_txn_id, paid_at, created_at, payment_mode, payer_source")
-      .or(orFilter)
+      .select("id, subscription_id, amount, refunded_amount, currency, status, external_txn_id, paid_at, created_at, payment_mode, payer_source")
+      .eq("user_id", auth.userId)
+      .neq("status", "void")
       .order("created_at", { ascending: false })
       .limit(200),
-    minStartIso && maxExpiryIso && contactViewerOrFilter
-      ? admin
-          .from("contact_views")
-          .select("viewer_id, viewed_at")
-          .or(contactViewerOrFilter)
-          .gte("viewed_at", minStartIso)
-          .lte("viewed_at", maxExpiryIso)
-          .limit(10000)
-      : Promise.resolve({ data: [], error: null }),
   ]);
-  if (subsRes.error || txnErr || viewsErr) {
-    return NextResponse.json(
-      { error: subsRes.error?.message || txnErr?.message || viewsErr?.message || "Failed to load history" },
-      { status: 500 }
-    );
+  if (subsRes.error || txnRes.error) {
+    return NextResponse.json({ error: subsRes.error?.message || txnRes.error?.message || "Failed to load history" }, { status: 500 });
+  }
+  const subs = (subsRes.data || []) as SubscriptionRow[];
+
+  // Contacts revealed in each plan period (one query over the whole range).
+  let views: { viewed_at: string }[] = [];
+  if (subs.length && ids.length) {
+    const from = subs.reduce((m, s) => (s.starts_at < m ? s.starts_at : m), subs[0].starts_at);
+    const to = subs.reduce((m, s) => (s.expires_at > m ? s.expires_at : m), subs[0].expires_at);
+    const { data } = await admin.from("contact_views").select("viewed_at").in("viewer_id", ids).gte("viewed_at", from).lte("viewed_at", to).limit(10000);
+    views = (data || []) as { viewed_at: string }[];
   }
 
-  const maskedTxns = (txns || []).map((t) => {
-    const payerSource = typeof t.payer_source === "string" ? t.payer_source : "";
-    const maskedPayer =
-      payerSource.length > 4 ? `${"*".repeat(Math.max(0, payerSource.length - 4))}${payerSource.slice(-4)}` : payerSource;
-    return { ...t, payer_source: maskedPayer };
-  });
-
-  const views = (contactViews || []) as Array<{ viewer_id?: string; viewed_at?: string }>;
-
-  const rawSubs = (subsRes.data || []) as Array<{ plan_id?: string | null; plan_name_snapshot?: string | null }>;
-  const planIds = Array.from(
-    new Set(
-      rawSubs
-        .map((s) => String(s.plan_id || "").trim())
-        .filter((pid) => pid.length > 0)
-    )
-  );
-  let planNameById = new Map<string, string>();
-  if (planIds.length > 0) {
-    const { data: planRows } = await admin.from("subscription_plans").select("id, name").in("id", planIds);
-    planNameById = new Map(
-      (planRows || []).map((r) => [String((r as { id?: string }).id || ""), String((r as { name?: string }).name || "")])
-    );
-  }
-
-  const accountViewerIds = ownedProfileIds.length > 0 ? ownedProfileIds : [auth.userId];
-  const subscriptionsWithUsage = (subsRes.data || []).map((s) => {
-    const sub = s as {
-      user_id?: string;
-      starts_at?: string;
-      expires_at?: string;
+  const subscriptions = subs.map((s) => {
+    const end = s.ended_at && s.ended_at < s.expires_at ? s.ended_at : s.expires_at;
+    return {
+      ...s,
+      status: effectiveStatus(s) === "expiring" || effectiveStatus(s) === "upcoming" ? "active" : effectiveStatus(s),
+      contacts_used_count: views.filter((v) => v.viewed_at >= s.starts_at && v.viewed_at <= end).length,
+      plan_name_resolved: s.plan_name_snapshot || "Membership plan",
     };
-    const startTs = new Date(String(sub.starts_at || "")).getTime();
-    const endTs = new Date(String(sub.expires_at || "")).getTime();
-    const contacts_used_count =
-      Number.isFinite(startTs) && Number.isFinite(endTs)
-        ? views.filter((v) => {
-            const viewerId = String(v.viewer_id || "");
-            if (!accountViewerIds.includes(viewerId)) return false;
-            const viewedTs = new Date(String(v.viewed_at || "")).getTime();
-            return Number.isFinite(viewedTs) && viewedTs >= startTs && viewedTs <= endTs;
-          }).length
-        : 0;
-    const pid = String((s as { plan_id?: string | null }).plan_id || "").trim();
-    const fromPlanTable = pid ? planNameById.get(pid) : undefined;
-    const snap = String((s as { plan_name_snapshot?: string | null }).plan_name_snapshot || "").trim();
-    const plan_name_resolved = snap || (fromPlanTable?.trim() ?? "") || "Membership plan";
-    return { ...s, contacts_used_count, plan_name_resolved };
   });
 
-  return NextResponse.json({ subscriptions: subscriptionsWithUsage, transactions: maskedTxns });
+  const transactions = (txnRes.data || []).map((t) => {
+    const payer = typeof t.payer_source === "string" ? t.payer_source : "";
+    return { ...t, payer_source: payer.length > 4 ? `${"*".repeat(payer.length - 4)}${payer.slice(-4)}` : payer };
+  });
+
+  return NextResponse.json({ subscriptions, transactions });
 }

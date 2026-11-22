@@ -21,6 +21,8 @@ export type AdminAuditAction =
   | "subscription.refund_manual"
   | "subscription.upgrade_request_status"
   | "subscription.plan_update"
+  | "subscription.plan_change"
+  | "subscription.payment_change"
   | "account.suspend"
   | "account.unsuspend"
   | "account.delete";

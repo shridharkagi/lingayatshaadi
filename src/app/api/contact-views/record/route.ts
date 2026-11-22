@@ -1,29 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireAuthUser } from "@/lib/server/requireAuthUser";
-import {
-  listOwnedProfileIdsIncludingDeleted,
-  userSubscriptionsOrFilter,
-} from "@/lib/server/subscriptionLookup";
+import { accountProfileIds, getAccountAccess } from "@/lib/server/plans";
 
 const DAILY_LIMIT_MESSAGE =
   "You have reached today's contact view limit. Please try again tomorrow.";
 const TOTAL_LIMIT_MESSAGE =
   "Your plan's total contact view limit is exhausted. Please upgrade or contact support for assistance.";
-
-function getIstDayBoundsUtc(now = new Date()) {
-  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-  const ist = new Date(now.getTime() + IST_OFFSET_MS);
-  const y = ist.getUTCFullYear();
-  const m = ist.getUTCMonth();
-  const d = ist.getUTCDate();
-  const startIst = Date.UTC(y, m, d, 0, 0, 0, 0);
-  const endIst = Date.UTC(y, m, d + 1, 0, 0, 0, 0) - 1;
-  return {
-    startUtc: new Date(startIst - IST_OFFSET_MS).toISOString(),
-    endUtc: new Date(endIst - IST_OFFSET_MS).toISOString(),
-  };
-}
+const EXPIRED_OR_NONE_MESSAGE =
+  "You need an active plan to view contact details. Please upgrade or contact support.";
 
 export async function POST(req: NextRequest) {
   const auth = await requireAuthUser(req);
@@ -38,58 +23,28 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = createSupabaseAdmin();
-  const { data: viewerProfile } = await admin
-    .from("profiles")
-    .select("id, user_id")
-    .eq("id", body.viewerProfileId)
-    .single();
-  if (!viewerProfile || viewerProfile.user_id !== auth.userId) {
+  // Quota is per ACCOUNT (all its profiles, including deleted ones).
+  const ownIds = await accountProfileIds(admin, auth.userId);
+  if (!ownIds.includes(body.viewerProfileId)) {
     return NextResponse.json({ error: "Unauthorized profile access" }, { status: 403 });
   }
 
-  const nowIso = new Date().toISOString();
+  // Already revealed by any profile on this account → no charge, no re-count.
   const { data: existing } = await admin
     .from("contact_views")
-    .select("viewer_id")
-    .eq("viewer_id", body.viewerProfileId)
+    .select("id")
+    .in("viewer_id", ownIds)
     .eq("viewed_id", body.viewedProfileId)
-    .maybeSingle();
+    .limit(1);
 
-  if (!existing) {
-    const subscriptionLookupProfileIds = await listOwnedProfileIdsIncludingDeleted(admin, auth.userId);
-    const orFilter = userSubscriptionsOrFilter(auth.userId, subscriptionLookupProfileIds);
-    const { data: subRows } = await admin
-      .from("user_subscriptions")
-      .select("id, total_contact_views_snapshot, daily_contact_view_limit_snapshot")
-      .or(orFilter)
-      .eq("status", "active")
-      .lte("starts_at", nowIso)
-      .gte("expires_at", nowIso)
-      .order("expires_at", { ascending: false })
-      .limit(1);
-    const activeSubscription = subRows?.[0];
-    if (!activeSubscription) {
-      return NextResponse.json({ error: TOTAL_LIMIT_MESSAGE, code: "SUBSCRIPTION_REQUIRED" }, { status: 403 });
+  if (!existing || existing.length === 0) {
+    const access = await getAccountAccess(admin, auth.userId, ownIds);
+    if (!access.usable) {
+      return NextResponse.json({ error: EXPIRED_OR_NONE_MESSAGE, code: "SUBSCRIPTION_REQUIRED" }, { status: 403 });
     }
+    const { totalLimit, dailyLimit, usage } = access;
 
-    const totalLimit = Number(activeSubscription.total_contact_views_snapshot || 0);
-    const dailyLimit = Number(activeSubscription.daily_contact_view_limit_snapshot || 0);
-    const { startUtc, endUtc } = getIstDayBoundsUtc();
-
-    const [{ count: totalUsed }, { count: todayUsed }] = await Promise.all([
-      admin
-        .from("contact_views")
-        .select("viewer_id", { count: "exact", head: true })
-        .eq("viewer_id", body.viewerProfileId),
-      admin
-        .from("contact_views")
-        .select("viewer_id", { count: "exact", head: true })
-        .eq("viewer_id", body.viewerProfileId)
-        .gte("viewed_at", startUtc)
-        .lte("viewed_at", endUtc),
-    ]);
-
-    if (dailyLimit > 0 && Number(todayUsed || 0) >= dailyLimit) {
+    if (dailyLimit !== null && usage.todayUsed >= dailyLimit) {
       await admin.from("notifications").insert({
         user_id: auth.userId,
         type: "general",
@@ -100,7 +55,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: DAILY_LIMIT_MESSAGE, code: "DAILY_LIMIT_REACHED" }, { status: 403 });
     }
 
-    if (totalLimit > 0 && Number(totalUsed || 0) >= totalLimit) {
+    if (totalLimit !== null && usage.totalUsed >= totalLimit) {
       await admin.from("notifications").insert({
         user_id: auth.userId,
         type: "general",
@@ -110,17 +65,15 @@ export async function POST(req: NextRequest) {
       });
       return NextResponse.json({ error: TOTAL_LIMIT_MESSAGE, code: "TOTAL_LIMIT_REACHED" }, { status: 403 });
     }
-  }
 
-  const { error } = await admin.from("contact_views").upsert(
-    {
+    const { error } = await admin.from("contact_views").insert({
       viewer_id: body.viewerProfileId,
       viewed_id: body.viewedProfileId,
-      viewed_at: nowIso,
-    },
-    { onConflict: "viewer_id,viewed_id" }
-  );
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      viewed_at: new Date().toISOString(),
+    });
+    // 23505 = a parallel request recorded it first; treat as already revealed.
+    if (error && error.code !== "23505") return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
   // Contacts are only released here, after the plan/quota checks above.
   // Only numbers the owner marked "show on profile" are returned.

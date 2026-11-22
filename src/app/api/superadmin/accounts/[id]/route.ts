@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
+import { effectiveStatus, getUsage, isUsable, type SubscriptionRow } from "@/lib/server/plans";
 
 type Row = Record<string, unknown>;
-
-function istMidnightUtc(now = new Date()) {
-  const off = 5.5 * 3600 * 1000;
-  const ist = new Date(now.getTime() + off);
-  return new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate()) - off).toISOString();
-}
 
 /**
  * Member 360°: everything about one account (auth user) — its profiles,
@@ -43,10 +38,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   const ownerIds = [id, ...profileIds];
   const nameById = new Map(profiles.map((p) => [String(p.id), String(p.full_name || "Profile")]));
 
-  const nowIso = new Date().toISOString();
-  const [subsRes, payRes, upgRes, notesRes, auditRes, cvRes, intRes] = await Promise.all([
-    admin.from("user_subscriptions").select("*").in("user_id", ownerIds).order("created_at", { ascending: false }),
-    admin.from("payment_transactions").select("*").in("user_id", ownerIds).order("created_at", { ascending: false }),
+  const [subsRes, payRes, upgRes, notesRes, auditRes, cvRes, intRes, evRes] = await Promise.all([
+    admin.from("user_subscriptions").select("*").eq("user_id", id).order("starts_at", { ascending: false }),
+    admin.from("payment_transactions").select("*").eq("user_id", id).order("created_at", { ascending: false }),
     admin.from("subscription_upgrade_requests").select("*").eq("user_id", id).order("created_at", { ascending: false }),
     admin.from("admin_notes").select("*").eq("user_id", id).order("created_at", { ascending: false }).limit(50),
     admin
@@ -61,39 +55,49 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     profileIds.length
       ? admin.from("interests").select("from_id, to_id, status, created_at").in("from_id", profileIds).order("created_at", { ascending: false }).limit(30)
       : Promise.resolve({ data: [] as Row[] }),
+    admin.from("subscription_events").select("*").eq("user_id", id).order("created_at", { ascending: false }).limit(100),
   ]);
 
-  // Older rows have no plan_name_snapshot and may point at the legacy
-  // membership_plans table: resolve a display name from either table.
-  const rawSubs = (subsRes.data || []) as Row[];
-  const planIds = Array.from(new Set(rawSubs.map((x) => String(x.plan_id || "")).filter(Boolean)));
-  const planNames = new Map<string, string>();
-  if (planIds.length) {
-    const [sp, mp] = await Promise.all([
-      admin.from("subscription_plans").select("id, name").in("id", planIds),
-      admin.from("membership_plans").select("id, name").in("id", planIds),
-    ]);
-    for (const r of [...((mp.data || []) as Row[]), ...((sp.data || []) as Row[])]) planNames.set(String(r.id), String(r.name));
-  }
-  const subs: Row[] = rawSubs.map((x) => ({
-    ...x,
-    plan_name_snapshot: x.plan_name_snapshot || planNames.get(String(x.plan_id || "")) || null,
-  }));
-  const active = subs.find(
-    (s) => s.status === "active" && String(s.starts_at || "") <= nowIso && String(s.expires_at || "") >= nowIso
-  );
+  const subs = ((subsRes.data || []) as SubscriptionRow[]).map((x) => ({ ...x, effective_status: effectiveStatus(x) }));
   const contactViews = (cvRes.data || []) as Row[];
-  const quota = active
+  const activeRow = subs.find((s) => s.status === "active") || null;
+  const usage = activeRow && isUsable(activeRow) ? await getUsage(admin, activeRow, profileIds) : null;
+  const quota = activeRow && usage
     ? {
-        planName: active.plan_name_snapshot || "Plan",
-        startsAt: active.starts_at,
-        expiresAt: active.expires_at,
-        totalLimit: Number(active.total_contact_views_snapshot || 0),
-        dailyLimit: Number(active.daily_contact_view_limit_snapshot || 0),
-        totalUsed: contactViews.filter((c) => String(c.viewed_at) >= String(active.starts_at)).length,
-        todayUsed: contactViews.filter((c) => String(c.viewed_at) >= istMidnightUtc()).length,
+        subscriptionId: activeRow.id,
+        planName: activeRow.plan_name_snapshot || "Plan",
+        startsAt: activeRow.starts_at,
+        expiresAt: activeRow.expires_at,
+        totalLimit: activeRow.total_contact_views_snapshot,
+        dailyLimit: activeRow.daily_contact_view_limit_snapshot,
+        totalUsed: usage.totalUsed,
+        todayUsed: usage.todayUsed,
       }
     : null;
+
+  // Admin names for the plan history.
+  const planEvents = (evRes.data || []) as Row[];
+  const actorIds = [...new Set(planEvents.map((e) => String(e.actor_user_id || "")).filter(Boolean))];
+  const actorNames = new Map(
+    await Promise.all(
+      actorIds.map(async (aid) => {
+        const { data: au } = await admin.auth.admin.getUserById(aid);
+        return [aid, String((au?.user?.user_metadata as Row | undefined)?.full_name || "Admin")] as const;
+      })
+    )
+  );
+  const planHistory = planEvents.map((e) => ({
+    id: e.id,
+    at: e.created_at,
+    action: e.action,
+    reason: e.reason,
+    before: e.before_json,
+    after: e.after_json,
+    subscriptionId: e.subscription_id,
+    paymentId: e.payment_id,
+    batchId: e.batch_id,
+    actor: e.actor_user_id ? actorNames.get(String(e.actor_user_id)) || "Admin" : "System",
+  }));
 
   // Per-profile engagement received.
   const engagement = await Promise.all(
@@ -143,7 +147,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     events.push({
       at: String(pmt.paid_at || pmt.created_at),
       kind: "payment",
-      text: `Payment ₹${Number(pmt.amount || 0).toLocaleString("en-IN")} · ${pmt.payment_mode || pmt.provider || ""} · ${pmt.status}`,
+      text: `Payment ₹${Number(pmt.amount || 0).toLocaleString("en-IN")} · ${String(pmt.payment_mode || pmt.provider || "").replace(/_/g, " ")} · ${pmt.status === "void" ? "removed" : pmt.status}`,
       tone: "green",
     });
   for (const r of (upgRes.data || []) as Row[])
@@ -168,6 +172,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     profiles: profiles.map((p) => ({ ...p, engagement: engagementById[String(p.id)] || null })),
     quota,
     subscriptions: subs,
+    planHistory,
     payments: payRes.data || [],
     upgradeRequests: upgRes.data || [],
     notes: notesRes.data || [],

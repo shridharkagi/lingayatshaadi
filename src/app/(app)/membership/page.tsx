@@ -16,8 +16,8 @@ type Plan = {
   price: number;
   currency: string;
   features: string[];
-  total_contact_views: number;
-  daily_contact_view_limit: number;
+  total_contact_views: number | null;
+  daily_contact_view_limit: number | null;
   is_active: boolean;
 };
 
@@ -172,7 +172,7 @@ export default function MembershipPage() {
                   {Math.round(Number(plan.duration_days || 30) / 30)} month(s)
                 </p>
                 <p className="text-[11px] text-gray-500 mt-1">
-                  {Number(plan.total_contact_views || 0)} total, {Number(plan.daily_contact_view_limit || 0)}/day
+                  {plan.total_contact_views === null ? "Unlimited" : plan.total_contact_views} total, {plan.daily_contact_view_limit === null ? "unlimited" : plan.daily_contact_view_limit}/day
                 </p>
                 <ul className="mt-2 space-y-1">
                   {(plan.features || []).slice(0, 2).map((f, i) => (

@@ -970,13 +970,13 @@ export default function AccountPage() {
                         ₹{Number(txn?.amount || s.price_snapshot || 0).toLocaleString("en-IN")}
                       </span>
                       <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 font-medium text-blue-700">
-                        Allowed: {Number((s as { total_contact_views_snapshot?: number }).total_contact_views_snapshot || 0)}
+                        Allowed: {(s as { total_contact_views_snapshot?: number | null }).total_contact_views_snapshot === null ? "Unlimited" : Number((s as { total_contact_views_snapshot?: number | null }).total_contact_views_snapshot || 0)}
                       </span>
                       <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">
                         Contacted: {Number((s as { contacts_used_count?: number }).contacts_used_count || 0)}
                       </span>
                       <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-700">
-                        Daily: {Number((s as { daily_contact_view_limit_snapshot?: number }).daily_contact_view_limit_snapshot || 0)}/day
+                        Daily: {(s as { daily_contact_view_limit_snapshot?: number | null }).daily_contact_view_limit_snapshot === null ? "Unlimited" : Number((s as { daily_contact_view_limit_snapshot?: number | null }).daily_contact_view_limit_snapshot || 0)}/day
                       </span>
                       {txn &&
                         String((txn as { payment_mode?: string }).payment_mode || "").trim() &&

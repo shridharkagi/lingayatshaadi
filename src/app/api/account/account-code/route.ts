@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
   const admin = createSupabaseAdmin();
 
-  let persisted = await getPersistedAccountCodeMap(admin, [auth.userId]);
+  const persisted = await getPersistedAccountCodeMap(admin, [auth.userId]);
   let accountCode = persisted.get(auth.userId) || null;
 
   if (!accountCode) {

@@ -16,8 +16,8 @@ type SubscriptionRow = {
   plan_name_snapshot?: string;
   price_snapshot?: number;
   currency_snapshot?: string;
-  total_contact_views_snapshot?: number;
-  daily_contact_view_limit_snapshot?: number;
+  total_contact_views_snapshot?: number | null;
+  daily_contact_view_limit_snapshot?: number | null;
   contacts_used_count?: number;
   notes?: string | null;
 };
@@ -101,7 +101,7 @@ export default function AccountSubscriptionsTimelinePage() {
             ? "refunded"
             : s.status === "refunded"
               ? "refunded"
-              : new Date(s.expires_at).getTime() < now
+              : s.status === "cancelled" || s.status === "expired" || new Date(s.expires_at).getTime() < now
                 ? "expired"
                 : "active";
         return { ...s, effectiveStatus, txn };
@@ -207,13 +207,13 @@ export default function AccountSubscriptionsTimelinePage() {
               <p>
                 Contact usage:{" "}
                 <span className="font-medium text-[var(--foreground)]">
-                  {Number(r.contacts_used_count || 0)} / {Number(r.total_contact_views_snapshot || 0)}
+                  {Number(r.contacts_used_count || 0)} / {r.total_contact_views_snapshot === null ? "Unlimited" : Number(r.total_contact_views_snapshot || 0)}
                 </span>
               </p>
               <p>
                 Daily cap:{" "}
                 <span className="font-medium text-[var(--foreground)]">
-                  {Number(r.daily_contact_view_limit_snapshot || 0)}/day
+                  {r.daily_contact_view_limit_snapshot === null ? "Unlimited" : Number(r.daily_contact_view_limit_snapshot || 0)}/day
                 </span>
               </p>
               <p className="sm:col-span-2">

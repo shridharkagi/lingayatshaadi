@@ -118,23 +118,26 @@ export async function GET(req: NextRequest) {
     q = q.eq("profile_status", "suspended");
   } else if (tab === "plan_over") {
     const nowIso = new Date().toISOString();
-    const { data: expiredSubs, error: subsErr } = await admin
+    // Plans are per account: profiles whose account's latest plan has ended.
+    const { data: subRows, error: subsErr } = await admin
       .from("user_subscriptions")
-      .select("profile_id")
-      .or(`status.eq.expired,expires_at.lt.${nowIso}`)
-      .not("profile_id", "is", null)
+      .select("user_id, status, expires_at")
       .order("expires_at", { ascending: false })
-      .limit(500);
+      .limit(5000);
     if (subsErr && !isMissingRelation(subsErr.message)) {
       return NextResponse.json({ error: subsErr.message }, { status: 500 });
     }
-    const expiredIds = (expiredSubs || [])
-      .map((s) => (s as { profile_id?: string | null }).profile_id || "")
-      .filter(Boolean);
-    if (expiredIds.length === 0) {
+    const latestByAccount = new Map<string, { status: string; expires_at: string }>();
+    for (const s of (subRows || []) as { user_id: string; status: string; expires_at: string }[]) {
+      if (!latestByAccount.has(s.user_id)) latestByAccount.set(s.user_id, s);
+    }
+    const overAccounts = [...latestByAccount.entries()]
+      .filter(([, s]) => s.status !== "active" || s.expires_at < nowIso)
+      .map(([uid]) => uid);
+    if (overAccounts.length === 0) {
       return NextResponse.json({ items: [] });
     }
-    q = q.in("id", expiredIds);
+    q = q.in("user_id", overAccounts);
   }
 
   if (genderFilter !== "all") {
@@ -209,11 +212,11 @@ export async function GET(req: NextRequest) {
           .limit(1000)
       : Promise.resolve({ data: null });
   const subsLookup =
-    profileIds.length > 0
+    ownerUserIds.length > 0
       ? admin
           .from("user_subscriptions")
-          .select("profile_id, status, starts_at, expires_at, created_at, subscription_plans(name, code)")
-          .in("profile_id", profileIds)
+          .select("user_id, status, starts_at, expires_at, created_at, plan_name_snapshot, plan_code")
+          .in("user_id", ownerUserIds)
           .order("created_at", { ascending: false })
       : Promise.resolve({ data: null, error: null });
   const [authResult, ownerProfilesResult, subsResult] = await Promise.all([
@@ -257,22 +260,22 @@ export async function GET(req: NextRequest) {
       error: { message?: string } | null;
     };
     if (!subsErr || isMissingRelation(subsErr?.message)) {
-      for (const row of subs || []) {
-        const r = row as {
-          profile_id?: string | null;
-          status?: string;
-          starts_at?: string | null;
-          expires_at?: string | null;
-          subscription_plans?: { name?: string; code?: string } | null;
-        };
-        const pid = r.profile_id || "";
-        if (!pid || planByProfileId[pid]) continue;
+      // Latest plan per account, shown on each of the account's profiles.
+      const latestByOwner = new Map<string, Record<string, unknown>>();
+      for (const row of (subs || []) as Record<string, unknown>[]) {
+        const uid = String(row.user_id || "");
+        if (uid && !latestByOwner.has(uid)) latestByOwner.set(uid, row);
+      }
+      for (const item of items) {
+        const pid = String(item.id || "");
+        const r = latestByOwner.get(String(item.user_id || ""));
+        if (!pid || !r) continue;
         planByProfileId[pid] = {
-          name: r.subscription_plans?.name || "Free",
-          code: r.subscription_plans?.code || "free",
-          starts_at: r.starts_at || null,
-          expires_at: r.expires_at || null,
-          status: r.status || "active",
+          name: String(r.plan_name_snapshot || "Plan"),
+          code: String(r.plan_code || ""),
+          starts_at: (r.starts_at as string) || null,
+          expires_at: (r.expires_at as string) || null,
+          status: String(r.status || "active"),
         };
       }
     }

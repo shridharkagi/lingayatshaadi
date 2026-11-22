@@ -8,7 +8,6 @@ import { createSupabaseAdmin } from "@/lib/supabase";
 import { ensureAccountCodeForUser } from "@/lib/server/accountCodes";
 import { findAuthUserByPhone } from "@/lib/server/authUsers";
 import { issueMagicLinkSession } from "@/lib/server/issueMagicLinkSession";
-import { ensureFreePlanForUser } from "@/lib/server/freePlanProvisioning";
 import { ACCOUNT_SUSPENDED_LOGIN_MESSAGE, isAccountAuthSuspended } from "@/lib/auth/accountStatus";
 import { invalidateAuthUsersCache } from "@/lib/server/authUsers";
 
@@ -430,21 +429,12 @@ async function handleSignup({
 
   if (createdUserId) {
     const provisionStart = nowMs();
-    const [codeResult, planResult] = await Promise.allSettled([
-      ensureAccountCodeForUser(admin, createdUserId),
-      ensureFreePlanForUser(admin, createdUserId),
-    ]);
-    logTiming(reqId, "signup_post_provision_parallel", provisionStart, {
-      account_code: codeResult.status,
-      free_plan: planResult.status,
-    });
+    // No plan at signup: the Free plan is given when the account's first
+    // profile is approved (lib/server/plans.ts → grantFreeOnApproval).
+    const [codeResult] = await Promise.allSettled([ensureAccountCodeForUser(admin, createdUserId)]);
+    logTiming(reqId, "signup_post_provision_parallel", provisionStart, { account_code: codeResult.status });
     if (codeResult.status === "rejected") {
       console.warn("[phone/verify] ensureAccountCodeForUser failed:", codeResult.reason);
-    }
-    if (planResult.status === "fulfilled" && planResult.value.error) {
-      console.warn("[phone/verify] auto free-plan provision warning:", planResult.value.error);
-    } else if (planResult.status === "rejected") {
-      console.warn("[phone/verify] auto free-plan provision failed:", planResult.reason);
     }
   }
 

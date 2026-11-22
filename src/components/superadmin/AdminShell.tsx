@@ -65,7 +65,7 @@ const NAV: NavGroup[] = [
     title: "Revenue",
     items: [
       { href: "/superadmin/pipeline", label: "Upgrade pipeline", icon: Handshake, badge: (i) => i.upgradeOpen || 0 },
-      { href: "/superadmin/subscriptions", label: "Subscriptions & plans", icon: CreditCard },
+      { href: "/superadmin/subscriptions", label: "Plans & subscriptions", icon: CreditCard },
     ],
   },
   {

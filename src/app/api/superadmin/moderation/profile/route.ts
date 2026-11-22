@@ -3,6 +3,7 @@ import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
 import { logAdminAudit } from "@/lib/server/adminAudit";
 import { generatePublicIdFromExistingIds } from "@/lib/memberId";
+import { grantFreeOnApproval } from "@/lib/server/plans";
 
 export async function POST(req: NextRequest) {
   const auth = await requireSuperAdmin(req);
@@ -71,7 +72,10 @@ export async function POST(req: NextRequest) {
         beforeJson: row as Record<string, unknown>,
         afterJson: { moderation_status: "approved" },
       });
-      return NextResponse.json({ ok: true });
+      // First approved profile on the account → Free plan (once per account).
+      const accountId = (row as { user_id?: string | null }).user_id;
+      const free = accountId ? await grantFreeOnApproval(admin, accountId, auth.userId) : { granted: false };
+      return NextResponse.json({ ok: true, freePlanGranted: free.granted });
     }
 
     const reason = (body.reason || "").trim();

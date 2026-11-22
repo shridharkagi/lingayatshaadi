@@ -1,1105 +1,654 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { CheckCircle2, Plus, RefreshCw, Search } from "lucide-react";
 import { adminFetch } from "@/lib/api/adminClient";
+import { CsvButton, PageHeader, Pager, ResetButton, downloadCsv, fmtDateTime, phoneFmt, useDebounced } from "@/components/superadmin/ui";
+import {
+  AssignPlanDialog,
+  ChangePlanDialog,
+  Dialog,
+  PlanStatusChip,
+  fmtDay,
+  inr,
+  limitText,
+  usePlanTemplates,
+  ACTION_LABEL,
+  describeChange,
+  type ChangeKind,
+  type PlanTemplate,
+} from "@/components/superadmin/plans/PlanDialogs";
 
-type Plan = {
-  id: string;
-  code: string;
+type Member = {
+  accountId: string;
+  accountCode: string | null;
   name: string;
-  duration_days: number;
-  price: number;
-  currency: string;
-  total_contact_views: number;
-  daily_contact_view_limit: number;
-  is_active: boolean;
-  activeSubscribers?: number;
-};
-type SubscriptionsByPlanRow = {
-  planId: string;
-  planName: string;
-  activeCount: number;
-  catalogPlanId: string | null;
-};
-type RecentSubscriptionRow = {
-  id: string;
-  planName: string;
-  status: string;
-  startsAt: string | null;
-  expiresAt: string | null;
-  createdAt: string | null;
-  totalContactViews?: number;
-  dailyContactViewLimit?: number;
-  notes?: string | null;
-  memberLabel: string;
-  userLinkId: string;
-  subscriptionUserId?: string;
-};
-type MemberSummaryRow = {
-  ownerAuthUserId: string;
-  ownerAccountCode?: string | null;
-  accountName: string;
-  ownerLabel: string;
-  activeProfiles: Array<{
-    profileId: string;
-    profilePublicId: string | null;
-    profileName: string;
-  }>;
-  activePlanName: string;
-  activePlanEndsAt: string | null;
-  activeSubscriptionId?: string | null;
-  activeTotalContactViews?: number;
-  activeDailyContactViewLimit?: number;
-  activeNotes?: string | null;
-  previousPlansCount: number;
-  totalPlansCount: number;
-  totalPaidAmount: number;
-  history: Array<{
-    subscriptionId: string;
-    planName: string;
+  phone: string | null;
+  joinedAt: string | null;
+  profiles: { id: string; publicId: string | null; name: string | null; status: string }[];
+  plansCount: number;
+  totalPaid: number;
+  plan: {
+    id: string;
+    planId: string | null;
+    code: string | null;
+    name: string;
     status: string;
-    startsAt: string | null;
-    expiresAt: string | null;
-    contactsAllowed: number;
-    contactsTaken: number;
-    amountPaid: number;
-  }>;
-};
-type UserLookup = {
-  userId: string | null;
-  profileId: string | null;
-  publicId: string | null;
-  fullName: string;
-  contact: string | null;
-  accountCode?: string | null;
+    startsAt: string;
+    expiresAt: string;
+    totalLimit: number | null;
+    dailyLimit: number | null;
+    price: number;
+    paid: number;
+    source: string;
+    notes: string | null;
+    endReason: string | null;
+    used: number;
+    usedToday: number;
+  } | null;
 };
 
-function addDays(yyyyMmDd: string, days: number): string {
-  const base = new Date(`${yyyyMmDd}T00:00:00Z`);
-  if (Number.isNaN(base.getTime())) return "";
-  base.setUTCDate(base.getUTCDate() + days);
-  return base.toISOString().slice(0, 10);
+const STATUS_TABS: { id: string; label: string; countKeys: string[] }[] = [
+  { id: "all", label: "All accounts", countKeys: ["all"] },
+  { id: "active", label: "Active", countKeys: ["active", "expiring"] },
+  { id: "expiring", label: "Expiring in 7 days", countKeys: ["expiring"] },
+  { id: "expired", label: "Expired", countKeys: ["expired"] },
+  { id: "cancelled", label: "Cancelled", countKeys: ["cancelled"] },
+  { id: "refunded", label: "Refunded", countKeys: ["refunded"] },
+  { id: "none", label: "No plan yet", countKeys: ["none"] },
+];
+const SORTS = [
+  { id: "end_asc", label: "Ending soonest" },
+  { id: "end_desc", label: "Ending latest" },
+  { id: "newest", label: "Newest accounts" },
+  { id: "name", label: "Name A–Z" },
+  { id: "paid_desc", label: "Paid most" },
+];
+const BULK: { kind: ChangeKind | "assign" | "renew_free"; label: string }[] = [
+  { kind: "assign", label: "Assign plan" },
+  { kind: "renew_free", label: "Renew Free" },
+  { kind: "extend", label: "Extend" },
+  { kind: "set_end", label: "Set end date" },
+  { kind: "set_contacts", label: "Set contacts" },
+  { kind: "add_contacts", label: "Add contacts" },
+  { kind: "cancel", label: "Cancel plan" },
+];
+
+export default function PlansPage() {
+  const [tab, setTab] = useState<"members" | "templates" | "log">("members");
+  const [notice, setNotice] = useState<string | null>(null);
+  const flash = (msg: string) => {
+    setNotice(msg);
+    window.setTimeout(() => setNotice(null), 6000);
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <PageHeader
+        title="Plans & subscriptions"
+        subtitle="Plans belong to the login account (U-code) and are shared by all its profiles. Every change is logged with a reason."
+      />
+      <div className="sa-tabs" role="tablist">
+        {([["members", "Members"], ["templates", "Plan templates"], ["log", "Change log"]] as const).map(([id, label]) => (
+          <button key={id} type="button" role="tab" aria-selected={tab === id} className={`sa-tab ${tab === id ? "on" : ""}`} onClick={() => setTab(id)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {notice && <div className="m3-ok" role="status"><CheckCircle2 size={18} /> {notice}</div>}
+      {tab === "members" && <MembersTab flash={flash} />}
+      {tab === "templates" && <TemplatesTab flash={flash} />}
+      {tab === "log" && <LogTab />}
+    </div>
+  );
 }
 
-export default function SuperAdminSubscriptionsPage() {
-  const [overview, setOverview] = useState<Record<string, unknown> | null>(null);
-  const [plans, setPlans] = useState<Plan[]>([]);
+// ---------------------------------------------------------------------------
+// Members
+// ---------------------------------------------------------------------------
+
+function MembersTab({ flash }: { flash: (m: string) => void }) {
+  const router = useRouter();
+  const { plans } = usePlanTemplates();
+  const [q, setQ] = useState("");
+  const dq = useDebounced(q, 250);
+  const [status, setStatus] = useState("all");
+  const [planF, setPlanF] = useState("");
+  const [endFrom, setEndFrom] = useState("");
+  const [endTo, setEndTo] = useState("");
+  const [sort, setSort] = useState("end_asc");
+  const [limit, setLimit] = useState(50);
+  const [offset, setOffset] = useState(0);
+  const [rows, setRows] = useState<Member[]>([]);
+  const [allIds, setAllIds] = useState<string[]>([]);
+  const [total, setTotal] = useState(0);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [busyPlanCode, setBusyPlanCode] = useState<string | null>(null);
-  const [resolvingUser, setResolvingUser] = useState(false);
-  const [resolvedUser, setResolvedUser] = useState<UserLookup | null>(null);
-  const [userCandidates, setUserCandidates] = useState<UserLookup[]>([]);
-  const [expiresEdited, setExpiresEdited] = useState(false);
-  const [assigning, setAssigning] = useState(false);
-  const [editingSub, setEditingSub] = useState<RecentSubscriptionRow | null>(null);
-  const [savingSubEdit, setSavingSubEdit] = useState(false);
-  const [autoOpenCurrentEdit, setAutoOpenCurrentEdit] = useState(false);
-  const [memberSearch, setMemberSearch] = useState("");
-  const [memberPlanFilter, setMemberPlanFilter] = useState("all");
-  const [memberExpiryFilter, setMemberExpiryFilter] = useState<
-    "all" | "expiring_7" | "expiring_30" | "expired" | "no_active"
-  >("all");
-  const [subEditForm, setSubEditForm] = useState({
-    expiresAt: "",
-    totalContactViews: "",
-    dailyContactViewLimit: "",
-    reason: "",
-  });
-  const [historyMember, setHistoryMember] = useState<MemberSummaryRow | null>(null);
-  const [memberExpiryFrom, setMemberExpiryFrom] = useState("");
-  const [memberExpiryTo, setMemberExpiryTo] = useState("");
-  const [form, setForm] = useState({
-    userQuery: "",
-    userId: "",
-    profileId: "",
-    planId: "",
-    paymentMode: "other",
-    paymentModeDetails: "",
-    payerSource: "",
-    paymentMadeAt: new Date().toISOString().slice(0, 10),
-    startImmediately: true,
-    startsAt: new Date().toISOString().slice(0, 10),
-    expiresAt: "",
-    amount: "",
-    transactionId: "",
-    receiptRef: "",
-    note: "",
-    overrideTotalContactViews: "",
-    overrideDailyContactViewLimit: "",
-  });
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [dialog, setDialog] = useState<null | { kind: ChangeKind | "assign" | "renew_free"; ids: string[]; member?: Member }>(null);
+  const [quickAssign, setQuickAssign] = useState(false);
+  const [reload, setReload] = useState(0);
 
-  const load = async () => {
+  const qs = useMemo(() => {
+    const p = new URLSearchParams({ status, sort, limit: String(limit), offset: String(offset) });
+    if (dq.trim()) p.set("q", dq.trim());
+    if (planF) p.set("plan", planF);
+    if (endFrom) p.set("endFrom", endFrom);
+    if (endTo) p.set("endTo", endTo);
+    return p.toString();
+  }, [dq, status, planF, endFrom, endTo, sort, limit, offset]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
     setError(null);
-    const [ovRes, planRes] = await Promise.all([
-      adminFetch("/api/superadmin/subscriptions/overview"),
-      adminFetch("/api/superadmin/subscriptions/plans"),
-    ]);
-    const safeJson = async <T,>(res: Response, fallback: T): Promise<T> => {
-      try {
-        return (await res.json()) as T;
-      } catch {
-        return fallback;
-      }
-    };
-    const ovJson = await safeJson<Record<string, unknown>>(ovRes, {});
-    const planJson = await safeJson<{ plans?: Plan[]; error?: string }>(planRes, {});
-    if (!ovRes.ok) setError(String(ovJson.error || `Failed to load overview (${ovRes.status})`));
-    if (!planRes.ok) setError(planJson.error || `Failed to load plans (${planRes.status})`);
-    setOverview(ovRes.ok ? ovJson : null);
-    const basePlans = planJson.plans || [];
-    if (ovRes.ok && Array.isArray(ovJson.plans)) {
-      const countById = new Map(
-        (ovJson.plans as Array<{ id?: string; activeSubscribers?: number }>).map((p) => [
-          String(p.id || ""),
-          Number(p.activeSubscribers || 0),
-        ])
-      );
-      setPlans(basePlans.map((p) => ({ ...p, activeSubscribers: countById.get(p.id) ?? 0 })));
-    } else {
-      setPlans(basePlans);
-    }
-  };
-
-  useEffect(() => {
-    void load();
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const userQuery = (params.get("user") || "").trim();
-    const openEdit = (params.get("openEditCurrent") || "").trim() === "1";
-    if (openEdit) setAutoOpenCurrentEdit(true);
-    if (!userQuery) return;
-    setForm((prev) => ({ ...prev, userQuery }));
-    void resolveUser(userQuery);
-  }, []);
-
-  const selectedPlan = useMemo(
-    () => plans.find((p) => p.id === form.planId),
-    [plans, form.planId]
-  );
-
-  useEffect(() => {
-    if (!selectedPlan) return;
-    const startDate = form.startImmediately ? new Date().toISOString().slice(0, 10) : form.startsAt;
-    const amount = Number(selectedPlan.price || 0);
-    const isFree = amount <= 0;
-    setForm((prev) => ({
-      ...prev,
-      amount: String(amount),
-      startsAt: prev.startsAt || startDate,
-      expiresAt: expiresEdited ? prev.expiresAt : addDays(prev.startsAt || startDate, Number(selectedPlan.duration_days || 0)),
-      paymentMode: isFree ? "free_auto" : prev.paymentMode === "free_auto" ? "other" : prev.paymentMode,
-      transactionId:
-        isFree && !prev.transactionId
-          ? `FREE-${prev.userId || "user"}-${Date.now().toString(36).toUpperCase()}`
-          : prev.transactionId,
-      overrideTotalContactViews: prev.overrideTotalContactViews || String(selectedPlan.total_contact_views || 0),
-      overrideDailyContactViewLimit:
-        prev.overrideDailyContactViewLimit || String(selectedPlan.daily_contact_view_limit || 0),
-    }));
-  }, [selectedPlan, form.startImmediately, expiresEdited]);
-
-  useEffect(() => {
-    if (!selectedPlan) return;
-    if (expiresEdited) return;
-    setForm((prev) => ({
-      ...prev,
-      expiresAt: addDays(prev.startsAt, Number(selectedPlan.duration_days || 0)),
-    }));
-  }, [form.startsAt, selectedPlan, expiresEdited]);
-
-  /** Returns the chosen profile row, or null. Updates UI state like before. */
-  const resolveUser = async (queryRaw: string): Promise<UserLookup | null> => {
-    const query = queryRaw.trim();
-    if (!query) {
-      setResolvedUser(null);
-      setUserCandidates([]);
-      return null;
-    }
-    setResolvingUser(true);
     try {
-      const res = await adminFetch(`/api/superadmin/subscriptions/user-lookup?q=${encodeURIComponent(query)}`);
-      let json: { users?: UserLookup[]; error?: string };
-      try {
-        json = (await res.json()) as { users?: UserLookup[]; error?: string };
-      } catch {
-        setError("Invalid response from user lookup.");
-        setResolvedUser(null);
-        setUserCandidates([]);
-        return null;
-      }
-      if (!res.ok) {
-        setError(json.error || "Failed to resolve user");
-        setResolvedUser(null);
-        setUserCandidates([]);
-        return null;
-      }
-      const users = json.users || [];
-      setUserCandidates(users);
-      const exact = users.find(
-        (u) =>
-          (u.accountCode || "").toLowerCase() === query.toLowerCase() ||
-          (u.publicId || "").toLowerCase() === query.toLowerCase() ||
-          (u.userId || "").toLowerCase() === query.toLowerCase()
-      );
-      const chosen = exact || users[0] || null;
-      setResolvedUser(chosen);
-      setForm((prev) => ({
-        ...prev,
-        userId: chosen?.userId || "",
-        profileId: chosen?.profileId || prev.profileId,
-        payerSource: prev.payerSource || chosen?.contact || "",
-      }));
-      return chosen;
-    } finally {
-      setResolvingUser(false);
-    }
-  };
-
-  const assignManual = async () => {
-    setError(null);
-    setAssigning(true);
-    try {
-      let userId = form.userId.trim();
-      let profileId = form.profileId.trim();
-      if (!userId && form.userQuery.trim()) {
-        const chosen = await resolveUser(form.userQuery);
-        userId = (chosen?.userId || "").trim();
-        profileId = (chosen?.profileId || profileId).trim();
-      }
-      if (!userId) {
-        setError("Please enter a valid Member/User ID. Tab out of the field or wait for the name to appear, then try again.");
-        return;
-      }
-      if (!form.planId) {
-        setError("Please select a plan.");
-        return;
-      }
-      const res = await adminFetch("/api/superadmin/subscriptions/assign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId,
-          profileId: profileId || undefined,
-          planId: form.planId,
-          paymentMode: form.paymentMode || undefined,
-          paymentModeDetails: form.paymentModeDetails || undefined,
-          payerSource: form.payerSource || undefined,
-          paymentMadeAt: form.paymentMadeAt ? `${form.paymentMadeAt}T00:00:00.000Z` : undefined,
-          startsAt: form.startsAt ? `${form.startsAt}T00:00:00.000Z` : undefined,
-          expiresAt: form.expiresAt ? `${form.expiresAt}T00:00:00.000Z` : undefined,
-          startImmediately: form.startImmediately,
-          amount: Number(form.amount || 0),
-          transactionId: form.transactionId || undefined,
-          receiptRef: form.receiptRef || undefined,
-          note: form.note || undefined,
-          overrideTotalContactViews: Number(form.overrideTotalContactViews || 0),
-          overrideDailyContactViewLimit: Number(form.overrideDailyContactViewLimit || 0),
-        }),
-      });
-      let json: { error?: string };
-      try {
-        json = (await res.json()) as { error?: string };
-      } catch {
-        setError(`Assignment failed (${res.status}). The server did not return JSON.`);
-        return;
-      }
-      if (!res.ok) {
-        setError(json.error || "Failed to assign subscription");
-        return;
-      }
-      setForm({
-        userQuery: "",
-        userId: "",
-        profileId: "",
-        planId: "",
-        paymentMode: "other",
-        paymentModeDetails: "",
-        payerSource: "",
-        paymentMadeAt: new Date().toISOString().slice(0, 10),
-        startImmediately: true,
-        startsAt: new Date().toISOString().slice(0, 10),
-        expiresAt: "",
-        amount: "",
-        transactionId: "",
-        receiptRef: "",
-        note: "",
-        overrideTotalContactViews: "",
-        overrideDailyContactViewLimit: "",
-      });
-      setResolvedUser(null);
-      setUserCandidates([]);
-      setExpiresEdited(false);
-      await load();
+      const res = await adminFetch(`/api/superadmin/plans/members?${qs}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to load");
+      setRows(json.rows || []);
+      setAllIds(json.allIds || []);
+      setTotal(json.total || 0);
+      setCounts(json.counts || {});
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Assignment request failed");
+      setError(e instanceof Error ? e.message : "Failed to load");
     } finally {
-      setAssigning(false);
+      setLoading(false);
     }
-  };
-
-  const savePlan = async (plan: Plan) => {
-    setBusyPlanCode(plan.code);
-    const res = await adminFetch("/api/superadmin/subscriptions/plans", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        id: plan.id,
-        code: plan.code,
-        name: plan.name,
-        durationDays: Number(plan.duration_days || 0),
-        price: Number(plan.price || 0),
-        currency: plan.currency || "INR",
-        totalContactViews: Number(plan.total_contact_views || 0),
-        dailyContactViewLimit: Number(plan.daily_contact_view_limit || 0),
-        isActive: plan.is_active,
-        features: [],
-      }),
-    });
-    const json = (await res.json()) as { error?: string };
-    if (!res.ok) setError(json.error || `Failed to update ${plan.name}`);
-    await load();
-    setBusyPlanCode(null);
-  };
-
-  const totals = useMemo(
-    () =>
-      (overview?.totals as { activeSubscriptions?: number; expiringIn7Days?: number; totalCollected?: number } | undefined) ||
-      {},
-    [overview]
-  );
-  const subscriptionsByPlan = useMemo(
-    () => (overview?.subscriptionsByPlan as SubscriptionsByPlanRow[] | undefined) || [],
-    [overview]
-  );
-  const recentSubscriptions = useMemo(
-    () => (overview?.recentSubscriptions as RecentSubscriptionRow[] | undefined) || [],
-    [overview]
-  );
-  const memberSummaries = useMemo(
-    () => (overview?.memberSummaries as MemberSummaryRow[] | undefined) || [],
-    [overview]
-  );
+  }, [qs]);
   useEffect(() => {
-    if (!autoOpenCurrentEdit || memberSummaries.length === 0) return;
-    const query = form.userQuery.trim().toUpperCase();
-    if (!query) return;
-    const match = memberSummaries.find((m) => {
-      const code = String(m.ownerAccountCode || "").toUpperCase();
-      const uid = String(m.ownerAuthUserId || "").toUpperCase();
-      return code === query || uid === query;
-    });
-    if (!match || !match.activeSubscriptionId) return;
-    openEditFromSummary(match);
-    setAutoOpenCurrentEdit(false);
-  }, [autoOpenCurrentEdit, memberSummaries, form.userQuery]);
-  const memberPlanOptions = useMemo(() => {
-    const set = new Set<string>();
-    memberSummaries.forEach((m) => {
-      const name = String(m.activePlanName || "—").trim();
-      if (!name || name === "—") return;
-      set.add(name);
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [memberSummaries]);
-  const filteredMemberSummaries = useMemo(() => {
-    const now = Date.now();
-    const dayMs = 86400000;
-    const q = memberSearch.trim().toLowerCase();
-    return memberSummaries.filter((m) => {
-      if (q) {
-        const hay = `${m.ownerAccountCode || ""} ${m.ownerLabel || ""}`.toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      if (memberPlanFilter !== "all" && m.activePlanName !== memberPlanFilter) return false;
-      const endsAtMs = m.activePlanEndsAt ? new Date(m.activePlanEndsAt).getTime() : NaN;
-      const hasActive = !!m.activeSubscriptionId && !!m.activePlanEndsAt && Number.isFinite(endsAtMs) && endsAtMs >= now;
-      if (memberExpiryFilter === "no_active") return !hasActive;
-      if (memberExpiryFilter === "expired") return !!m.activePlanEndsAt && Number.isFinite(endsAtMs) && endsAtMs < now;
-      if (memberExpiryFilter === "expiring_7")
-        return hasActive && endsAtMs <= now + 7 * dayMs;
-      if (memberExpiryFilter === "expiring_30")
-        return hasActive && endsAtMs <= now + 30 * dayMs;
-      if (memberExpiryFrom && Number.isFinite(endsAtMs)) {
-        const fromTs = new Date(`${memberExpiryFrom}T00:00:00`).getTime();
-        if (endsAtMs < fromTs) return false;
-      }
-      if (memberExpiryTo && Number.isFinite(endsAtMs)) {
-        const toTs = new Date(`${memberExpiryTo}T23:59:59`).getTime();
-        if (endsAtMs > toTs) return false;
-      }
-      return true;
-    });
-  }, [memberSummaries, memberSearch, memberPlanFilter, memberExpiryFilter, memberExpiryFrom, memberExpiryTo]);
-  const fmtIn = (iso?: string | null) =>
-    iso ? new Date(iso).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "—";
-  const toDateInput = (iso?: string | null) => (iso ? new Date(iso).toISOString().slice(0, 10) : "");
+    load();
+  }, [load, reload]);
+  useEffect(() => setOffset(0), [dq, status, planF, endFrom, endTo, sort, limit]);
 
-  const openEditSubscription = (sub: RecentSubscriptionRow) => {
-    setEditingSub(sub);
-    setSubEditForm({
-      expiresAt: toDateInput(sub.expiresAt),
-      totalContactViews: String(sub.totalContactViews || 0),
-      dailyContactViewLimit: String(sub.dailyContactViewLimit || 0),
-      reason: "",
+  const filtersOn = !!(q || planF || endFrom || endTo || status !== "all" || sort !== "end_asc");
+  const pageAll = rows.length > 0 && rows.every((r) => selected.has(r.accountId));
+  const toggle = (id: string) =>
+    setSelected((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
     });
+  const done = (msg: string) => {
+    setDialog(null);
+    setQuickAssign(false);
+    setSelected(new Set());
+    flash(msg);
+    setReload((n) => n + 1);
   };
-  const openEditFromSummary = (m: MemberSummaryRow) => {
-    if (!m.activeSubscriptionId) {
-      setError("No active subscription found to edit for this member.");
-      return;
-    }
-    openEditSubscription({
-      id: m.activeSubscriptionId,
-      planName: m.activePlanName || "Plan",
-      status: "active",
-      startsAt: null,
-      expiresAt: m.activePlanEndsAt || null,
-      createdAt: null,
-      totalContactViews: Number(m.activeTotalContactViews || 0),
-      dailyContactViewLimit: Number(m.activeDailyContactViewLimit || 0),
-      notes: m.activeNotes || null,
-      memberLabel: m.ownerLabel || m.ownerAccountCode || "Member",
-      userLinkId: m.ownerAuthUserId,
-      subscriptionUserId: m.ownerAuthUserId,
-    });
+  const exportCsv = async () => {
+    const p = new URLSearchParams(qs);
+    p.set("limit", "500");
+    p.set("offset", "0");
+    const json = await (await adminFetch(`/api/superadmin/plans/members?${p}`)).json();
+    const list = (json.rows || []) as Member[];
+    downloadCsv(
+      `plans-${status}-${new Date().toISOString().slice(0, 10)}.csv`,
+      ["Account", "Name", "Phone", "Profiles", "Plan", "Status", "Starts", "Ends", "Contacts used", "Total contacts", "Per day", "Price", "Paid (this plan)", "Paid (all time)"],
+      list.map((r) => [
+        r.accountCode, r.name, phoneFmt(r.phone), r.profiles.map((p) => p.publicId).join(" "), r.plan?.name, r.plan?.status,
+        fmtDay(r.plan?.startsAt), fmtDay(r.plan?.expiresAt), r.plan?.used, limitText(r.plan?.totalLimit), limitText(r.plan?.dailyLimit),
+        r.plan?.price, r.plan?.paid, r.totalPaid,
+      ])
+    );
   };
 
-  const saveSubscriptionEdit = async () => {
-    if (!editingSub) return;
-    if (!subEditForm.reason.trim()) {
-      setError("Reason is required to edit a user subscription.");
-      return;
-    }
-    setSavingSubEdit(true);
-    setError(null);
-    const res = await adminFetch("/api/superadmin/subscriptions/adjust", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        subscriptionId: editingSub.id,
-        expiresAt: subEditForm.expiresAt ? `${subEditForm.expiresAt}T00:00:00.000Z` : undefined,
-        totalContactViews: Number(subEditForm.totalContactViews || 0),
-        dailyContactViewLimit: Number(subEditForm.dailyContactViewLimit || 0),
-        reason: subEditForm.reason.trim(),
-      }),
-    });
-    const json = (await res.json()) as { error?: string };
-    setSavingSubEdit(false);
-    if (!res.ok) {
-      setError(json.error || "Failed to update subscription");
-      return;
-    }
-    setEditingSub(null);
-    setSubEditForm({ expiresAt: "", totalContactViews: "", dailyContactViewLimit: "", reason: "" });
-    await load();
-  };
-
+  const selIds = [...selected];
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900">Subscriptions</h1>
-      <p className="text-gray-500 mt-1">Manual subscription assignment and plan controls</p>
-      <p className="text-sm text-gray-600 mt-2">
-        To see which accounts have a plan and how much they have paid in total, open{" "}
-        <Link href="/superadmin/users" className="text-[var(--primary)] font-medium underline">
-          Users (Account Owners)
-        </Link>
-        — columns <span className="font-medium">Current plan</span> and <span className="font-medium">Total paid</span>.
-      </p>
-      {error && <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
-      <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="rounded-xl border bg-white p-4">
-          <p className="text-xs text-gray-500">Active subscriptions</p>
-          <p className="text-2xl font-bold">{totals.activeSubscriptions || 0}</p>
-        </div>
-        <div className="rounded-xl border bg-white p-4">
-          <p className="text-xs text-gray-500">Expiring in 7 days</p>
-          <p className="text-2xl font-bold">{totals.expiringIn7Days || 0}</p>
-        </div>
-        <div className="rounded-xl border bg-white p-4">
-          <p className="text-xs text-gray-500">Collected payments</p>
-          <p className="text-2xl font-bold">Rs {Number(totals.totalCollected || 0).toLocaleString()}</p>
-        </div>
-      </div>
-
-      <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="rounded-xl border bg-white p-5">
-          <h2 className="text-lg font-semibold text-gray-900">Active members by plan</h2>
-          <p className="text-xs text-gray-500 mt-1">
-            Counts from <code className="text-[11px]">user_subscriptions</code> (raw plan ids). Legacy membership plan ids are
-            shown separately when they differ from catalog UUIDs.
-          </p>
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b text-left text-gray-500">
-                  <th className="py-2 pr-2">Plan</th>
-                  <th className="py-2 pr-2">Active</th>
-                  <th className="py-2">Catalog link</th>
-                </tr>
-              </thead>
-              <tbody>
-                {subscriptionsByPlan.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="py-4 text-gray-500">
-                      No active subscriptions.
-                    </td>
-                  </tr>
-                ) : (
-                  subscriptionsByPlan.map((row) => (
-                    <tr key={row.planId} className="border-b border-gray-100">
-                      <td className="py-2 pr-2 font-medium text-gray-900">{row.planName}</td>
-                      <td className="py-2 pr-2">{row.activeCount}</td>
-                      <td className="py-2 text-gray-500">
-                        {row.catalogPlanId ? (
-                          <span className="text-emerald-700">Maps to catalog</span>
-                        ) : (
-                          <span>Legacy / other id</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div className="rounded-xl border bg-white p-5">
-          <h2 className="text-lg font-semibold text-gray-900">Recent subscriptions</h2>
-          <p className="text-xs text-gray-500 mt-1">Latest rows by created time (up to 25).</p>
-          <div className="mt-3 overflow-x-auto max-h-[320px] overflow-y-auto">
-            <table className="w-full text-xs">
-              <thead className="sticky top-0 bg-white border-b text-left text-gray-500">
-                <tr>
-                  <th className="py-2 pr-2">Member</th>
-                  <th className="py-2 pr-2">Plan</th>
-                  <th className="py-2 pr-2">Status</th>
-                  <th className="py-2 pr-2">Ends</th>
-                  <th className="py-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentSubscriptions.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="py-4 text-gray-500">
-                      No subscription rows yet.
-                    </td>
-                  </tr>
-                ) : (
-                  recentSubscriptions.map((r) => (
-                    <tr key={r.id} className="border-b border-gray-100 align-top">
-                      <td className="py-2 pr-2">
-                        <span className="text-gray-900">{r.memberLabel}</span>
-                      </td>
-                      <td className="py-2 pr-2">
-                        <div className="text-gray-900">{r.planName}</div>
-                        {r.notes && (
-                          <p className="mt-0.5 max-w-[240px] truncate text-[11px] text-gray-500" title={r.notes}>
-                            {r.notes}
-                          </p>
-                        )}
-                      </td>
-                      <td className="py-2 pr-2 capitalize">{r.status}</td>
-                      <td className="py-2 pr-2 whitespace-nowrap">{fmtIn(r.expiresAt)}</td>
-                      <td className="py-2">
-                        <button
-                          type="button"
-                          onClick={() => openEditSubscription(r)}
-                          className="rounded-md border border-gray-200 px-2.5 py-1 text-xs font-medium hover:bg-gray-50"
-                        >
-                          Edit
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-6 rounded-xl border bg-white p-5">
-        <h2 className="text-lg font-semibold text-gray-900">Subscribed members dashboard</h2>
-        <p className="text-xs text-gray-500 mt-1">
-          Account-level details of active subscribers, previous plans and total paid amount.
-        </p>
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-4 gap-2">
-          <input
-            value={memberSearch}
-            onChange={(e) => setMemberSearch(e.target.value)}
-            placeholder="Search by Account ID or name"
-            className="rounded-lg border border-gray-200 px-3 py-2 text-xs"
-          />
-          <select
-            value={memberPlanFilter}
-            onChange={(e) => setMemberPlanFilter(e.target.value)}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-xs"
-          >
-            <option value="all">All plans</option>
-            {memberPlanOptions.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-          <select
-            value={memberExpiryFilter}
-            onChange={(e) => setMemberExpiryFilter(e.target.value as typeof memberExpiryFilter)}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-xs"
-          >
-            <option value="all">All expiry states</option>
-            <option value="expiring_7">Expiring in 7 days</option>
-            <option value="expiring_30">Expiring in 30 days</option>
-            <option value="expired">Expired</option>
-            <option value="no_active">No active plan</option>
-          </select>
-          <button
-            type="button"
-            onClick={() => {
-              setMemberSearch("");
-              setMemberPlanFilter("all");
-              setMemberExpiryFilter("all");
-              setMemberExpiryFrom("");
-              setMemberExpiryTo("");
-            }}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium hover:bg-gray-50"
-          >
-            Reset filters
+    <>
+      <div className="sa-tabs" role="tablist" aria-label="Plan status">
+        {STATUS_TABS.map((t) => (
+          <button key={t.id} type="button" role="tab" aria-selected={status === t.id} className={`sa-tab ${status === t.id ? "on" : ""}`} onClick={() => setStatus(t.id)}>
+            {t.label}<span className="cnt">{t.countKeys.reduce((s, k) => s + (counts[k] || 0), 0)}</span>
           </button>
+        ))}
+      </div>
+
+      <div className="sa-toolbar">
+        <label className="sa-search-box" style={{ flex: "1 1 260px", maxWidth: 380, height: 40 }}>
+          <Search size={16} aria-hidden="true" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search U-code, name, phone or member ID" aria-label="Search accounts" />
+        </label>
+        <select className={`sa-select ${planF ? "is-set" : ""}`} value={planF} onChange={(e) => setPlanF(e.target.value)} aria-label="Plan">
+          <option value="">All plans</option>
+          {plans.map((p) => <option key={p.id} value={p.id}>{p.name}{p.archived_at ? " (archived)" : ""}</option>)}
+          <option value="none">No plan</option>
+        </select>
+        <label className="sa-muted" style={{ fontSize: 12, display: "inline-flex", gap: 6, alignItems: "center" }}>
+          Ends
+          <input type="date" className={`sa-input ${endFrom ? "is-set" : ""}`} style={{ height: 36 }} value={endFrom} onChange={(e) => setEndFrom(e.target.value)} aria-label="Ends from" />
+          –
+          <input type="date" className={`sa-input ${endTo ? "is-set" : ""}`} style={{ height: 36 }} value={endTo} onChange={(e) => setEndTo(e.target.value)} aria-label="Ends to" />
+        </label>
+        <select className={`sa-select ${sort !== "end_asc" ? "is-set" : ""}`} value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
+          {SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+        </select>
+        <ResetButton show={filtersOn} onClick={() => { setQ(""); setPlanF(""); setEndFrom(""); setEndTo(""); setStatus("all"); setSort("end_asc"); }} />
+        <span style={{ flex: 1 }} />
+        <CsvButton onClick={exportCsv} />
+        <button type="button" className="sa-btn ghost" onClick={() => setReload((n) => n + 1)} aria-label="Refresh"><RefreshCw size={16} /></button>
+        <button type="button" className="sa-btn pri" onClick={() => setQuickAssign(true)}><Plus size={16} /> Assign plan</button>
+      </div>
+
+      {selected.size > 0 && (
+        <div className="sa-bulk">
+          <strong>{selected.size} selected</strong>
+          {selected.size < total && (
+            <button type="button" className="sa-btn ghost" onClick={() => setSelected(new Set(allIds))}>Select all {total} matching</button>
+          )}
+          <span style={{ flex: 1 }} />
+          {BULK.map((b) => (
+            <button key={b.kind} type="button" className="sa-btn ghost" onClick={() => setDialog({ kind: b.kind, ids: selIds })}>{b.label}</button>
+          ))}
+          <button type="button" className="sa-btn ghost" onClick={() => setSelected(new Set())}>Clear</button>
         </div>
-        <div className="mt-2 grid grid-cols-1 md:grid-cols-4 gap-2">
-          <input
-            type="date"
-            value={memberExpiryFrom}
-            onChange={(e) => setMemberExpiryFrom(e.target.value)}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-xs"
-            placeholder="Expiry from"
-          />
-          <input
-            type="date"
-            value={memberExpiryTo}
-            onChange={(e) => setMemberExpiryTo(e.target.value)}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-xs"
-            placeholder="Expiry to"
-          />
-        </div>
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-xs">
+      )}
+
+      {error && <div className="m3-error">{error}</div>}
+      <div className="sa-card" style={{ padding: 0 }}>
+        <div className="sa-table-wrap">
+          <table className="sa-table">
             <thead>
-              <tr className="border-b text-left text-gray-500">
-                <th className="py-2 pr-3">Account ID</th>
-                <th className="py-2 pr-3">Account Name</th>
-                <th className="py-2 pr-3">Profile ID</th>
-                <th className="py-2 pr-3">Profile Name</th>
-                <th className="py-2 pr-3">Current plan</th>
-                <th className="py-2 pr-3">Expires</th>
-                <th className="py-2 pr-3">Total paid</th>
-                <th className="py-2">Actions</th>
+              <tr>
+                <th style={{ width: 36 }}>
+                  <input type="checkbox" aria-label="Select page" checked={pageAll}
+                    onChange={() => setSelected((s) => {
+                      const n = new Set(s);
+                      rows.forEach((r) => (pageAll ? n.delete(r.accountId) : n.add(r.accountId)));
+                      return n;
+                    })} />
+                </th>
+                <th>Account</th>
+                <th>Plan</th>
+                <th>Validity</th>
+                <th>Contacts used</th>
+                <th>Price · paid</th>
+                <th aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
-              {filteredMemberSummaries.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="py-4 text-gray-500">
-                    No subscribed member summary available yet.
+              {loading && rows.length === 0 && (
+                <tr><td colSpan={7}><div className="sa-skel" style={{ height: 120 }} /></td></tr>
+              )}
+              {!loading && rows.length === 0 && (
+                <tr><td colSpan={7} className="sa-muted" style={{ padding: 24, textAlign: "center" }}>No accounts match these filters.</td></tr>
+              )}
+              {rows.map((r) => (
+                <tr key={r.accountId} className="clickable" onClick={() => router.push(`/superadmin/accounts/${r.accountId}`)}>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <input type="checkbox" aria-label={`Select ${r.name || r.accountCode}`} checked={selected.has(r.accountId)} onChange={() => toggle(r.accountId)} />
+                  </td>
+                  <td>
+                    <strong>{r.name || "Unnamed"}</strong>
+                    <div className="sa-muted" style={{ fontSize: 12 }}>
+                      {[r.accountCode, phoneFmt(r.phone), r.profiles.map((p) => p.publicId).filter(Boolean).join(", ") || "no profile"].filter(Boolean).join(" · ")}
+                    </div>
+                  </td>
+                  <td>
+                    {r.plan ? (
+                      <>
+                        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                          <strong>{r.plan.name}</strong> <PlanStatusChip status={r.plan.status} />
+                        </div>
+                        {r.plan.endReason && r.plan.status !== "active" && <div className="sa-muted" style={{ fontSize: 11 }}>{r.plan.endReason}</div>}
+                      </>
+                    ) : (
+                      <PlanStatusChip status="none" />
+                    )}
+                  </td>
+                  <td style={{ whiteSpace: "nowrap", fontSize: 12 }}>{r.plan ? `${fmtDay(r.plan.startsAt)} → ${fmtDay(r.plan.expiresAt)}` : "—"}</td>
+                  <td style={{ fontSize: 12 }}>
+                    {r.plan ? (
+                      <>
+                        {r.plan.used} / {limitText(r.plan.totalLimit)}
+                        <div className="sa-muted">today {r.plan.usedToday} / {limitText(r.plan.dailyLimit)}</div>
+                      </>
+                    ) : "—"}
+                  </td>
+                  <td style={{ fontSize: 12 }}>
+                    {r.plan ? `${inr(r.plan.price)} · ${inr(r.plan.paid)}` : "—"}
+                    {r.totalPaid > 0 && <div className="sa-muted">all time {inr(r.totalPaid)}</div>}
+                  </td>
+                  <td onClick={(e) => e.stopPropagation()} style={{ whiteSpace: "nowrap" }}>
+                    <button type="button" className="sa-btn ghost m3-sm" onClick={() => setDialog({ kind: "assign", ids: [r.accountId] })}>Assign</button>{" "}
+                    <Link className="sa-btn ghost m3-sm" href={`/superadmin/accounts/${r.accountId}`}>Open</Link>
                   </td>
                 </tr>
-              ) : (
-                filteredMemberSummaries.map((m) => (
-                  <tr key={m.ownerAuthUserId} className="border-b border-gray-100">
-                    <td className="py-2 pr-3">
-                      <div className="font-medium text-gray-900">{m.ownerAccountCode || "—"}</div>
-                    </td>
-                    <td className="py-2 pr-3">{m.accountName || "—"}</td>
-                    <td className="py-2 pr-3">
-                      {m.activeProfiles.length === 0 ? (
-                        <span className="text-gray-400">No profile exists</span>
-                      ) : (
-                        <div className="space-y-0.5">
-                          {m.activeProfiles.map((p) => (
-                            <div key={p.profileId}>{p.profilePublicId || p.profileId.slice(0, 8)}</div>
-                          ))}
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-2 pr-3">
-                      {m.activeProfiles.length === 0 ? (
-                        <span className="text-gray-400">No profile exists</span>
-                      ) : (
-                        <div className="space-y-0.5">
-                          {m.activeProfiles.map((p) => (
-                            <div key={`${p.profileId}-name`}>{p.profileName}</div>
-                          ))}
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-2 pr-3">{m.activePlanName}</td>
-                    <td className="py-2 pr-3 whitespace-nowrap">{fmtIn(m.activePlanEndsAt)}</td>
-                    <td className="py-2 pr-3">₹{Number(m.totalPaidAmount || 0).toLocaleString("en-IN")}</td>
-                    <td className="py-2 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openEditFromSummary(m)}
-                        disabled={!m.activeSubscriptionId}
-                        className="rounded-md border border-gray-200 px-2.5 py-1 text-xs font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title={m.activeSubscriptionId ? "Edit active subscription" : "No active subscription"}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setHistoryMember(m)}
-                        className="rounded-md border border-gray-200 px-2.5 py-1 text-xs font-medium hover:bg-gray-50"
-                      >
-                        History
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
+              ))}
             </tbody>
           </table>
         </div>
+        <div style={{ padding: 12 }}>
+          <Pager total={total} limit={limit} offset={offset} onChange={setOffset} onLimitChange={setLimit} />
+        </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {plans.map((plan) => {
-          return (
-            <div key={String(plan.id)} className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-              <input
-                value={plan.name}
-                onChange={(e) =>
-                  setPlans((prev) =>
-                    prev.map((p) => (p.id === plan.id ? { ...p, name: e.target.value } : p))
-                  )
-                }
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 font-semibold text-gray-900"
-              />
-              <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                <label className="text-gray-600">
-                  Price
-                  <input
-                    type="number"
-                    value={plan.price}
-                    onChange={(e) =>
-                      setPlans((prev) =>
-                        prev.map((p) => (p.id === plan.id ? { ...p, price: Number(e.target.value || 0) } : p))
-                      )
-                    }
-                    className="mt-1 w-full rounded-lg border border-gray-200 px-2 py-1.5"
-                  />
-                </label>
-                <label className="text-gray-600">
-                  Days
-                  <input
-                    type="number"
-                    value={plan.duration_days}
-                    onChange={(e) =>
-                      setPlans((prev) =>
-                        prev.map((p) =>
-                          p.id === plan.id ? { ...p, duration_days: Number(e.target.value || 0) } : p
-                        )
-                      )
-                    }
-                    className="mt-1 w-full rounded-lg border border-gray-200 px-2 py-1.5"
-                  />
-                </label>
-                <label className="text-gray-600">
-                  Total views
-                  <input
-                    type="number"
-                    value={plan.total_contact_views}
-                    onChange={(e) =>
-                      setPlans((prev) =>
-                        prev.map((p) =>
-                          p.id === plan.id ? { ...p, total_contact_views: Number(e.target.value || 0) } : p
-                        )
-                      )
-                    }
-                    className="mt-1 w-full rounded-lg border border-gray-200 px-2 py-1.5"
-                  />
-                </label>
-                <label className="text-gray-600">
-                  Daily limit
-                  <input
-                    type="number"
-                    value={plan.daily_contact_view_limit}
-                    onChange={(e) =>
-                      setPlans((prev) =>
-                        prev.map((p) =>
-                          p.id === plan.id
-                            ? { ...p, daily_contact_view_limit: Number(e.target.value || 0) }
-                            : p
-                        )
-                      )
-                    }
-                    className="mt-1 w-full rounded-lg border border-gray-200 px-2 py-1.5"
-                  />
-                </label>
+      {quickAssign && <QuickAssign onPick={(m) => { setQuickAssign(false); setDialog({ kind: "assign", ids: [m.accountId], member: m }); }} onClose={() => setQuickAssign(false)} />}
+
+      {dialog && (dialog.kind === "assign" || dialog.kind === "renew_free") && (() => {
+        const one = dialog.ids.length === 1 ? dialog.member || rows.find((r) => r.accountId === dialog.ids[0]) || null : null;
+        return (
+          <AssignPlanDialog
+            accountIds={dialog.ids}
+            freeOnly={dialog.kind === "renew_free"}
+            label={one ? `${one.name || "Unnamed"} · ${one.accountCode || ""}` : `${dialog.ids.length} accounts`}
+            current={one?.plan && one.plan.status !== "cancelled" && one.plan.status !== "refunded" && one.plan.status !== "expired" ? { name: one.plan.name, endsAt: one.plan.expiresAt } : null}
+            defaultPayer={one?.phone ? phoneFmt(one.phone).replace(/\s/g, "") : null}
+            onClose={() => setDialog(null)}
+            onDone={done}
+          />
+        );
+      })()}
+      {dialog && dialog.kind !== "assign" && dialog.kind !== "renew_free" && (
+        <ChangePlanDialog kind={dialog.kind} accountIds={dialog.ids} label={`${dialog.ids.length} account${dialog.ids.length === 1 ? "" : "s"}`} onClose={() => setDialog(null)} onDone={done} />
+      )}
+    </>
+  );
+}
+
+function QuickAssign({ onPick, onClose }: { onPick: (member: Member) => void; onClose: () => void }) {
+  const [q, setQ] = useState("");
+  const dq = useDebounced(q, 250);
+  const [rows, setRows] = useState<Member[]>([]);
+  useEffect(() => {
+    if (dq.trim().length < 2) {
+      setRows([]);
+      return;
+    }
+    let off = false;
+    adminFetch(`/api/superadmin/plans/members?q=${encodeURIComponent(dq.trim())}&limit=8&sort=name`)
+      .then((r) => r.json())
+      .then((j) => !off && setRows(j.rows || []))
+      .catch(() => {});
+    return () => {
+      off = true;
+    };
+  }, [dq]);
+  return (
+    <Dialog title="Assign a plan" subtitle="Find the member's account (U-code, name, phone or member ID)." onClose={onClose}>
+      <label className="sa-search-box" style={{ height: 42 }}>
+        <Search size={16} aria-hidden="true" />
+        <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. U2611102, Shridhar, 98444…, LG2610…" aria-label="Find account" />
+      </label>
+      <div style={{ display: "grid", gap: 6, marginTop: 10 }}>
+        {rows.map((r) => (
+          <button key={r.accountId} type="button" className="m3-plan" onClick={() => onPick(r)}>
+            <strong>{r.name || "Unnamed"}</strong> <span className="sa-muted">{r.accountCode}</span>
+            <span className="sa-muted" style={{ display: "block", fontSize: 12 }}>
+              {phoneFmt(r.phone)} · {r.plan ? `${r.plan.name} (${r.plan.status}) until ${fmtDay(r.plan.expiresAt)}` : "no plan"}
+            </span>
+          </button>
+        ))}
+        {dq.trim().length >= 2 && rows.length === 0 && <p className="sa-muted" style={{ fontSize: 13 }}>No account found.</p>}
+      </div>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Plan templates
+// ---------------------------------------------------------------------------
+
+type Draft = { name: string; price: string; days: string; total: number | null; daily: number | null; isActive: boolean; sortOrder: string };
+const toDraft = (p: PlanTemplate): Draft => ({
+  name: p.name, price: String(p.price), days: String(p.duration_days), total: p.total_contact_views, daily: p.daily_contact_view_limit,
+  isActive: p.is_active, sortOrder: String(p.sort_order ?? 0),
+});
+
+function TemplatesTab({ flash }: { flash: (m: string) => void }) {
+  const { plans, error, reload } = usePlanTemplates();
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  useEffect(() => setDrafts(Object.fromEntries(plans.map((p) => [p.id, toDraft(p)]))), [plans]);
+
+  const send = async (body: Record<string, unknown>, okMsg: string, key: string) => {
+    const reason = window.prompt(`${okMsg} — reason for the change log:`);
+    if (!reason || !reason.trim()) return;
+    setBusy(key);
+    setErr(null);
+    try {
+      const res = await adminFetch("/api/superadmin/plans/templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...body, reason: reason.trim() }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((json as { error?: string }).error || "Couldn't save");
+      flash(okMsg);
+      setCreating(false);
+      reload();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't save");
+    } finally {
+      setBusy(null);
+    }
+  };
+  const payload = (d: Draft) => ({
+    name: d.name, price: Number(d.price || 0), durationDays: Number(d.days || 0), totalContacts: d.total, dailyLimit: d.daily,
+    isActive: d.isActive, sortOrder: Number(d.sortOrder || 0),
+  });
+  const shown = plans.filter((p) => showArchived || !p.archived_at);
+  const archivedCount = plans.filter((p) => p.archived_at).length;
+
+  return (
+    <>
+      <div className="sa-card" style={{ fontSize: 13 }}>
+        Templates set the <strong>default</strong> price, validity and contacts when you assign a plan. Editing a template never changes plans members
+        already have — change those per member from Members or the account page. “Visible to members” controls the Membership page; hidden plans
+        can still be assigned by you. Archived plans can’t be assigned.
+      </div>
+      {(error || err) && <div className="m3-error">{error || err}</div>}
+      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+        {archivedCount > 0 && (
+          <button type="button" className="sa-btn ghost" onClick={() => setShowArchived((v) => !v)}>{showArchived ? "Hide" : "Show"} {archivedCount} archived</button>
+        )}
+        <button type="button" className="sa-btn pri" onClick={() => setCreating(true)}><Plus size={16} /> New plan</button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
+        {creating && (
+          <TemplateCard
+            title="New plan"
+            draft={drafts.__new || { name: "", price: "0", days: "30", total: 0, daily: 0, isActive: false, sortOrder: "0" }}
+            onChange={(d) => setDrafts((s) => ({ ...s, __new: d }))}
+            footer={
+              <div style={{ display: "flex", gap: 8 }}>
+                <button type="button" className="sa-btn ghost" onClick={() => setCreating(false)}>Cancel</button>
+                <button type="button" className="sa-btn pri" style={{ flex: 1 }} disabled={busy === "__new"}
+                  onClick={() => send({ action: "create", ...payload(drafts.__new || { name: "", price: "0", days: "30", total: 0, daily: 0, isActive: false, sortOrder: "0" }) }, "Plan created", "__new")}>
+                  Create
+                </button>
               </div>
-              <label className="mt-3 flex items-center gap-2 text-sm text-gray-600">
-                <input
-                  type="checkbox"
-                  checked={plan.is_active}
-                  onChange={(e) =>
-                    setPlans((prev) =>
-                      prev.map((p) => (p.id === plan.id ? { ...p, is_active: e.target.checked } : p))
-                    )
-                  }
-                />
-                Visible for new users
-              </label>
-              <p className="mt-2 text-xs text-gray-600">
-                <span className="font-semibold text-gray-800">Active members (catalog):</span>{" "}
-                {Number(plan.activeSubscribers ?? 0)}
-              </p>
-              <button
-                onClick={() => savePlan(plan)}
-                className="mt-4 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-50"
-              >
-                {busyPlanCode === plan.code ? "Saving..." : "Save Plan"}
-              </button>
-            </div>
+            }
+          />
+        )}
+        {shown.map((p) => {
+          const d = drafts[p.id];
+          if (!d) return null;
+          const dirty = JSON.stringify(d) !== JSON.stringify(toDraft(p));
+          return (
+            <TemplateCard
+              key={p.id}
+              title={p.name}
+              meta={`code ${p.code} · ${p.activeMembers ?? 0} active member${p.activeMembers === 1 ? "" : "s"}`}
+              archived={!!p.archived_at}
+              draft={d}
+              onChange={(nd) => setDrafts((s) => ({ ...s, [p.id]: nd }))}
+              footer={
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {p.archived_at ? (
+                    <button type="button" className="sa-btn ghost" style={{ flex: 1 }} disabled={busy === p.id} onClick={() => send({ action: "restore", planId: p.id }, `${p.name} restored`, p.id)}>Restore</button>
+                  ) : (
+                    <>
+                      <button type="button" className="sa-btn pri" style={{ flex: 1 }} disabled={!dirty || busy === p.id}
+                        onClick={() => send({ action: "update", planId: p.id, ...payload(d) }, `${d.name} saved`, p.id)}>
+                        {busy === p.id ? "Saving…" : "Save changes"}
+                      </button>
+                      {dirty && <button type="button" className="sa-btn ghost" onClick={() => setDrafts((s) => ({ ...s, [p.id]: toDraft(p) }))}>Undo</button>}
+                      {p.code !== "free" && (
+                        <button type="button" className="sa-btn ghost" disabled={busy === p.id} onClick={() => send({ action: "archive", planId: p.id }, `${p.name} archived`, p.id)}>Archive</button>
+                      )}
+                    </>
+                  )}
+                </div>
+              }
+            />
           );
         })}
       </div>
-      <div className="mt-8 rounded-xl border bg-white p-6">
-        <h2 className="text-lg font-semibold">Manual assignment (offline payments)</h2>
-        <p className="text-sm text-gray-500 mt-1">Collect payment offline and activate plan with transaction details.</p>
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3">
-            <input
-              value={form.userQuery}
-              placeholder="Member/User ID (ex: U26045 / LS...)"
-              onChange={(e) => setForm((s) => ({ ...s, userQuery: e.target.value }))}
-              onBlur={() => {
-                void resolveUser(form.userQuery);
-              }}
-              className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
-            />
-            <input
-              value={resolvedUser ? `${resolvedUser.fullName}${resolvedUser.publicId ? ` (${resolvedUser.publicId})` : ""}` : resolvingUser ? "Resolving..." : ""}
-              placeholder="Name auto-populates"
-              readOnly
-              className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
-            />
-            {resolvedUser && (
-              <p className="text-xs text-gray-500 md:col-span-2">
-                Resolved user: {resolvedUser.fullName}
-                {resolvedUser.accountCode ? ` | ${resolvedUser.accountCode}` : ""}
-                {resolvedUser.publicId ? ` | ${resolvedUser.publicId}` : ""}
-              </p>
-            )}
-            {userCandidates.length > 1 && (
-              <select
-                value={resolvedUser?.userId || ""}
-                onChange={(e) => {
-                  const chosen = userCandidates.find((u) => (u.userId || "") === e.target.value) || null;
-                  setResolvedUser(chosen);
-                  setForm((s) => ({
-                    ...s,
-                    userId: chosen?.userId || "",
-                    profileId: chosen?.profileId || "",
-                  }));
-                }}
-                className="rounded-lg border border-gray-200 px-3 py-2 text-sm md:col-span-2"
-              >
-                {userCandidates.map((u) => (
-                  <option key={`${u.userId || "unknown"}-${u.profileId || "no-profile"}`} value={String(u.userId || "")}>
-                    {u.fullName} {u.publicId ? `(${u.publicId})` : ""}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-          <select value={form.planId} onChange={(e) => setForm((s) => ({ ...s, planId: e.target.value }))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm">
-            <option value="">Select plan</option>
-            {plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-          <select value={form.paymentMode} onChange={(e) => setForm((s) => ({ ...s, paymentMode: e.target.value }))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm">
-            <option value="phonepe">PhonePe</option>
-            <option value="gpay">G-Pay</option>
-            <option value="bank_transfer">Bank transfer</option>
-            <option value="check">Check</option>
-            <option value="cash">Cash</option>
-            <option value="other">Other</option>
-            <option value="free_auto">Free Auto</option>
-          </select>
-          <input value={form.paymentModeDetails} placeholder="other payment details" onChange={(e) => setForm((s) => ({ ...s, paymentModeDetails: e.target.value }))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <input value={form.payerSource} placeholder="payment made from number/account" onChange={(e) => setForm((s) => ({ ...s, payerSource: e.target.value }))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <input type="date" value={form.paymentMadeAt} onChange={(e) => setForm((s) => ({ ...s, paymentMadeAt: e.target.value }))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <label className="flex items-center gap-2 text-sm text-gray-600">
-            <input type="checkbox" checked={form.startImmediately} onChange={(e) => setForm((s) => ({ ...s, startImmediately: e.target.checked }))} />
-            Start immediately
-          </label>
-          <input
-            type="date"
-            value={form.startsAt}
-            onChange={(e) => setForm((s) => ({ ...s, startsAt: e.target.value }))}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
-          />
-          <input
-            type="date"
-            value={form.expiresAt}
-            onChange={(e) => {
-              setExpiresEdited(true);
-              setForm((s) => ({ ...s, expiresAt: e.target.value }));
-            }}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
-          />
-          <input value={form.amount} placeholder="amount" onChange={(e) => setForm((s) => ({ ...s, amount: e.target.value }))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <input value={form.transactionId} placeholder="transactionId" onChange={(e) => setForm((s) => ({ ...s, transactionId: e.target.value }))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <input value={form.receiptRef} placeholder="receiptRef" onChange={(e) => setForm((s) => ({ ...s, receiptRef: e.target.value }))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <input value={form.overrideTotalContactViews} placeholder="allowed total contacts" onChange={(e) => setForm((s) => ({ ...s, overrideTotalContactViews: e.target.value }))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <input value={form.overrideDailyContactViewLimit} placeholder="allowed daily contacts" onChange={(e) => setForm((s) => ({ ...s, overrideDailyContactViewLimit: e.target.value }))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <input value={form.note} placeholder="note" onChange={(e) => setForm((s) => ({ ...s, note: e.target.value }))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm md:col-span-2" />
-        </div>
-        <button
-          type="button"
-          onClick={() => void assignManual()}
-          disabled={assigning || resolvingUser}
-          className="mt-4 rounded-lg bg-[var(--primary)] px-4 py-2 text-white text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          {assigning ? "Assigning…" : "Assign subscription"}
-        </button>
+    </>
+  );
+}
+
+function TemplateCard({ title, meta, archived, draft, onChange, footer }: { title: string; meta?: string; archived?: boolean; draft: Draft; onChange: (d: Draft) => void; footer: React.ReactNode }) {
+  const set = (patch: Partial<Draft>) => onChange({ ...draft, ...patch });
+  const disabled = !!archived;
+  return (
+    <section className="sa-card" style={{ opacity: archived ? 0.7 : 1 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
+        <h2 className="sa-h2" style={{ fontSize: 16, margin: 0 }}>{title}</h2>
+        {archived ? <span className="sa-chip t-grey">Archived</span> : draft.isActive ? <span className="sa-chip t-green">Visible</span> : <span className="sa-chip t-grey">Hidden</span>}
       </div>
+      {meta && <div className="sa-muted" style={{ fontSize: 12, marginTop: 4 }}>{meta}</div>}
+      <div className="m3-form">
+        <label className="full">Name<input value={draft.name} disabled={disabled} onChange={(e) => set({ name: e.target.value })} /></label>
+        <label>Price (₹)<input type="number" min={0} value={draft.price} disabled={disabled} onChange={(e) => set({ price: e.target.value })} /></label>
+        <label>Validity (days)<input type="number" min={1} value={draft.days} disabled={disabled} onChange={(e) => set({ days: e.target.value })} /></label>
+        <TemplateLimit label="Total contacts" value={draft.total} disabled={disabled} onChange={(v) => set({ total: v })} />
+        <TemplateLimit label="Per day" value={draft.daily} disabled={disabled} onChange={(v) => set({ daily: v })} />
+        <label>Order on page<input type="number" value={draft.sortOrder} disabled={disabled} onChange={(e) => set({ sortOrder: e.target.value })} /></label>
+        <label style={{ flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "end" }}>
+          <input type="checkbox" style={{ height: 14 }} checked={draft.isActive} disabled={disabled} onChange={(e) => set({ isActive: e.target.checked })} /> Visible to members
+        </label>
+      </div>
+      <div style={{ marginTop: 14 }}>{footer}</div>
+    </section>
+  );
+}
 
-      {editingSub && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="w-full max-w-lg rounded-xl border bg-white p-5 shadow-xl">
-            <h3 className="text-lg font-semibold text-gray-900">Edit user subscription</h3>
-            <p className="text-xs text-gray-500 mt-1">
-              {editingSub.memberLabel} — {editingSub.planName}
-            </p>
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <label className="text-sm text-gray-600">
-                Expiry date
-                <input
-                  type="date"
-                  value={subEditForm.expiresAt}
-                  onChange={(e) => setSubEditForm((s) => ({ ...s, expiresAt: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                />
-              </label>
-              <label className="text-sm text-gray-600">
-                Total contact limit
-                <input
-                  type="number"
-                  value={subEditForm.totalContactViews}
-                  onChange={(e) => setSubEditForm((s) => ({ ...s, totalContactViews: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                />
-              </label>
-              <label className="text-sm text-gray-600">
-                Daily contact limit
-                <input
-                  type="number"
-                  value={subEditForm.dailyContactViewLimit}
-                  onChange={(e) => setSubEditForm((s) => ({ ...s, dailyContactViewLimit: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                />
-              </label>
-              <label className="text-sm text-gray-600 sm:col-span-2">
-                Reason (required)
-                <input
-                  value={subEditForm.reason}
-                  onChange={(e) => setSubEditForm((s) => ({ ...s, reason: e.target.value }))}
-                  placeholder="Reason for this change"
-                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                />
-              </label>
-            </div>
-            <p className="mt-3 text-xs text-gray-500">
-              To switch the member to another plan, use Manual assignment and assign a new plan row.
-            </p>
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setEditingSub(null)}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void saveSubscriptionEdit()}
-                disabled={savingSubEdit}
-                className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-              >
-                {savingSubEdit ? "Saving..." : "Save changes"}
-              </button>
-            </div>
-          </div>
+function TemplateLimit({ label, value, disabled, onChange }: { label: string; value: number | null; disabled?: boolean; onChange: (v: number | null) => void }) {
+  return (
+    <label>
+      <span style={{ display: "flex", justifyContent: "space-between" }}>
+        {label}
+        <span style={{ fontSize: 11, display: "inline-flex", gap: 4, alignItems: "center" }}>
+          <input type="checkbox" style={{ height: 13, width: 13 }} checked={value === null} disabled={disabled} onChange={(e) => onChange(e.target.checked ? null : 0)} /> ∞
+        </span>
+      </span>
+      <input type="number" min={0} value={value === null ? "" : value} placeholder={value === null ? "Unlimited" : ""} disabled={disabled || value === null}
+        onChange={(e) => onChange(Math.max(0, Math.floor(Number(e.target.value || 0))))} />
+    </label>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Change log
+// ---------------------------------------------------------------------------
+
+type LogEvent = {
+  id: string;
+  at: string;
+  action: string;
+  reason: string | null;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  batchId: string | null;
+  planName: string | null;
+  account: { id: string; code: string | null; name: string | null } | null;
+  actor: string;
+};
+
+function LogTab() {
+  const [action, setAction] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [batchId, setBatchId] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [limit, setLimit] = useState(50);
+  const [events, setEvents] = useState<LogEvent[]>([]);
+  const [total, setTotal] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => setOffset(0), [action, from, to, batchId, limit]);
+  useEffect(() => {
+    const p = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    if (action) p.set("action", action);
+    if (from) p.set("from", from);
+    if (to) p.set("to", to);
+    if (batchId) p.set("batchId", batchId);
+    let off = false;
+    setLoading(true);
+    adminFetch(`/api/superadmin/plans/log?${p}`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (off) return;
+        if (j.error) setError(j.error);
+        else {
+          setEvents(j.events || []);
+          setTotal(j.total || 0);
+          setError(null);
+        }
+      })
+      .catch(() => !off && setError("Couldn't load the log"))
+      .finally(() => !off && setLoading(false));
+    return () => {
+      off = true;
+    };
+  }, [action, from, to, batchId, offset, limit]);
+
+  return (
+    <>
+      <div className="sa-toolbar">
+        <select className={`sa-select ${action ? "is-set" : ""}`} value={action} onChange={(e) => setAction(e.target.value)} aria-label="Action">
+          <option value="">All changes</option>
+          <option value="assigned">Plans assigned</option>
+          <option value="updated">Plans edited</option>
+          <option value="cancelled">Plans cancelled</option>
+          <option value="replaced">Plans replaced</option>
+          <option value="payments">Payments & refunds</option>
+          <option value="templates">Template changes</option>
+        </select>
+        <label className="sa-muted" style={{ fontSize: 12, display: "inline-flex", gap: 6, alignItems: "center" }}>
+          From <input type="date" className="sa-input" style={{ height: 36 }} value={from} onChange={(e) => setFrom(e.target.value)} />
+          To <input type="date" className="sa-input" style={{ height: 36 }} value={to} onChange={(e) => setTo(e.target.value)} />
+        </label>
+        {batchId && <button type="button" className="sa-btn ghost" onClick={() => setBatchId("")}>Showing one bulk change ✕</button>}
+        <ResetButton show={!!(action || from || to || batchId)} onClick={() => { setAction(""); setFrom(""); setTo(""); setBatchId(""); }} />
+      </div>
+      {error && <div className="m3-error">{error}</div>}
+      <div className="sa-card" style={{ padding: 0 }}>
+        <div className="sa-table-wrap">
+          <table className="sa-table">
+            <thead><tr><th>When</th><th>Account</th><th>Change</th><th>Details</th><th>Reason</th><th>By</th></tr></thead>
+            <tbody>
+              {loading && events.length === 0 && <tr><td colSpan={6}><div className="sa-skel" style={{ height: 100 }} /></td></tr>}
+              {!loading && events.length === 0 && <tr><td colSpan={6} className="sa-muted" style={{ padding: 24, textAlign: "center" }}>No changes logged yet.</td></tr>}
+              {events.map((e) => (
+                <tr key={e.id}>
+                  <td style={{ whiteSpace: "nowrap", fontSize: 12 }}>{fmtDateTime(e.at)}</td>
+                  <td style={{ fontSize: 12 }}>
+                    {e.account ? <Link href={`/superadmin/accounts/${e.account.id}`}>{e.account.name || "—"} <span className="sa-muted">{e.account.code}</span></Link> : <span className="sa-muted">{e.planName || "—"}</span>}
+                  </td>
+                  <td style={{ fontSize: 12 }}>
+                    <strong>{ACTION_LABEL[e.action] || e.action}</strong>
+                    {e.batchId && (
+                      <button type="button" className="sa-chip t-indigo" style={{ marginLeft: 6, border: 0, cursor: "pointer" }} onClick={() => setBatchId(e.batchId!)}>bulk</button>
+                    )}
+                  </td>
+                  <td style={{ fontSize: 12, maxWidth: 360 }}>{describeChange(e)}</td>
+                  <td style={{ fontSize: 12, maxWidth: 240 }}>{e.reason || "—"}</td>
+                  <td style={{ fontSize: 12 }}>{e.actor}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
-
-      {historyMember && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="w-full max-w-4xl rounded-xl border bg-white p-5 shadow-xl">
-            <h3 className="text-lg font-semibold text-gray-900">Plan History</h3>
-            <p className="text-xs text-gray-500 mt-1">
-              {historyMember.ownerAccountCode || "—"} · {historyMember.accountName || "User"}
-            </p>
-            <div className="mt-4 max-h-[60vh] overflow-auto">
-              <table className="w-full text-xs">
-                <thead className="sticky top-0 bg-white border-b text-left text-gray-500">
-                  <tr>
-                    <th className="py-2 pr-2">Plan</th>
-                    <th className="py-2 pr-2">Status</th>
-                    <th className="py-2 pr-2">Start</th>
-                    <th className="py-2 pr-2">End</th>
-                    <th className="py-2 pr-2">Contacts allowed</th>
-                    <th className="py-2 pr-2">Contacts taken</th>
-                    <th className="py-2">Amount paid</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {historyMember.history.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="py-4 text-gray-500">
-                        No plan history found.
-                      </td>
-                    </tr>
-                  ) : (
-                    historyMember.history.map((h) => (
-                      <tr key={h.subscriptionId} className="border-b border-gray-100">
-                        <td className="py-2 pr-2">{h.planName}</td>
-                        <td className="py-2 pr-2 capitalize">{h.status}</td>
-                        <td className="py-2 pr-2 whitespace-nowrap">{fmtIn(h.startsAt)}</td>
-                        <td className="py-2 pr-2 whitespace-nowrap">{fmtIn(h.expiresAt)}</td>
-                        <td className="py-2 pr-2">{h.contactsAllowed}</td>
-                        <td className="py-2 pr-2">{h.contactsTaken}</td>
-                        <td className="py-2">₹{Number(h.amountPaid || 0).toLocaleString("en-IN")}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setHistoryMember(null)}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <p className="mt-8 text-sm text-gray-500">
-        Upgrade requests from members are handled in{" "}
-        <Link href="/superadmin/pipeline" className="text-[var(--primary)] font-medium underline">
-          Upgrade pipeline
-        </Link>
-        .
-      </p>
-    </div>
+        <div style={{ padding: 12 }}><Pager total={total} limit={limit} offset={offset} onChange={setOffset} onLimitChange={setLimit} /></div>
+      </div>
+    </>
   );
 }

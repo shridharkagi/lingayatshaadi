@@ -52,6 +52,7 @@ export async function GET(req: NextRequest) {
         userId: uid,
         accountCode: codeBy.get(uid) || null,
         name: names.get(uid) || "",
+        planId: r.plan_id || null,
         planCode: r.plan_code,
         planName: r.plan_name,
         planPrice: r.plan_price,

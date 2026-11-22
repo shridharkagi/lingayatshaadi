@@ -11,6 +11,7 @@ type Req = {
   userId: string;
   accountCode: string | null;
   name: string;
+  planId: string | null;
   planCode: string | null;
   planName: string | null;
   planPrice: number | null;
@@ -68,7 +69,7 @@ function Card({ r, onPatch }: { r: Req; onPatch: (id: string, patch: Partial<{ s
       <div className="pl-actions">
         {wa && <a className="sa-btn ghost" href={`https://wa.me/${wa}?text=${message}`} target="_blank" rel="noreferrer"><MessageCircle size={14} /> WhatsApp</a>}
         {wa && <a className="sa-btn ghost" href={`tel:+${wa}`}><Phone size={14} /> Call</a>}
-        <Link className="sa-btn pri" href={`/superadmin/accounts/${r.userId}`}>Assign plan</Link>
+        <Link className="sa-btn pri" href={`/superadmin/accounts/${r.userId}?assign=1${r.planId ? `&plan=${r.planId}` : ""}`}>Assign plan</Link>
       </div>
       <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
         <label className="sa-muted" style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>

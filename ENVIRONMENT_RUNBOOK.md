@@ -51,6 +51,11 @@ These were created from `FULL_STACK_IMPLEMENTATION.md` SQL sections and hardenin
 18. `supabase-hardening-unrestricted-tables.sql`
 19. Realtime enable query:
    - `ALTER PUBLICATION supabase_realtime ADD TABLE messages;`
+20. `supabase/migrations/20261122_01_lock_down_profiles.sql` … `20261122_07_admin_accounts_plans.sql` (in order; Test and Prod)
+21. `supabase/migrations/20261123_08_account_plans.sql` — account-level plans, single plan catalogue,
+    `subscription_events` history, offline refunds, one-time Free catch-up. Run on Test, deploy `develop`,
+    verify; then Prod, deploy `main`. Backups: `backup_20261123_user_subscriptions`,
+    `backup_20261123_payment_transactions`. Plan logic lives only in `src/lib/server/plans.ts`.
 
 ### Not to Run on Fresh Environments
 
