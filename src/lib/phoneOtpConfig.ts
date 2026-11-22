@@ -9,7 +9,12 @@ export type OtpChannel = "bypass" | "fast2sms" | "none";
 export type OtpPurpose = "login" | "signup" | "password_reset";
 
 export function resolveOtpChannel(): OtpChannel {
-  if (String(process.env.DEV_OTP_BYPASS || "").toLowerCase() === "true") {
+  // Local dev only: never honoured in production builds (Vercel Test/Prod),
+  // where accepting any OTP would allow logging in as anyone.
+  if (
+    process.env.NODE_ENV !== "production" &&
+    String(process.env.DEV_OTP_BYPASS || "").toLowerCase() === "true"
+  ) {
     return "bypass";
   }
   const apiKey = process.env.FAST2SMS_API_KEY?.trim();

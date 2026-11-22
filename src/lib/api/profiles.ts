@@ -1,9 +1,11 @@
 import { createSupabaseClient, createSupabaseClientSafe } from "@/lib/supabase";
 import { toProfileRow, fromProfileRow, type ProfileRow } from "@/lib/profileMapper";
-import { generatePublicIdFromExistingIds, genderFlag } from "@/lib/memberId";
 import type { Profile } from "@/types";
 import { MAX_ACTIVE_OR_PENDING_PROFILES } from "@/lib/accessPolicy";
 import { profileMatchesProfessionFilter } from "@/lib/professionFilter";
+
+/** Read-only view exposing safe columns of publicly visible profiles. */
+const PUBLIC_PROFILES = "public_profiles";
 
 /**
  * For public-facing surfaces (search, home cards, other-member profile
@@ -124,40 +126,10 @@ export async function createProfile(
       row.last_submitted_at = new Date().toISOString();
     }
 
-    // Generate the next public_id in the "L[BG]YYMMNNNNN" scheme using a
-    // GLOBAL counter — the next number is `max(seq across ALL existing
-    // public_ids) + 1`, irrespective of year/month or gender. We scan
-    // every public_id in the table (cheap: it's a short indexed column).
-    if (!row.public_id) {
-      const now = new Date();
-      const yy = String(now.getFullYear()).slice(-2);
-      const mm = String(now.getMonth() + 1).padStart(2, "0");
-      const flag = genderFlag(data.gender);
-
-      const { data: existing, error: lookupErr } = await withTimeout(
-        // `LIKE 'L%'` matches both legacy (LS…) and new (LB…/LG…) formats.
-        supabase.from("profiles").select("public_id").like("public_id", "L%"),
-        PROFILE_WRITE_TIMEOUT_MS,
-        "createProfile public_id scan"
-      );
-
-      if (lookupErr) {
-        console.warn(
-          "[profiles.createProfile] public_id scan failed, falling back to random suffix:",
-          describeSupabaseError(lookupErr)
-        );
-        // Best-effort fallback: avoid collision via 5 random digits. Still
-        // uses the new format so the parser keeps working. The DB UNIQUE
-        // constraint on public_id is the final safety net.
-        const seq = String(Math.floor(Math.random() * 100000)).padStart(5, "0");
-        row.public_id = `L${flag}${yy}${mm}${seq}`;
-      } else {
-        const ids = (existing || [])
-          .map((r) => (r as { public_id?: string }).public_id || "")
-          .filter(Boolean);
-        row.public_id = generatePublicIdFromExistingIds(ids, data.gender);
-      }
-    }
+    // public_id is assigned by the database (profiles_guard trigger) so the
+    // client never needs to read other profiles' IDs, and concurrent signups
+    // can't collide.
+    delete (row as Record<string, unknown>).public_id;
 
     if (typeof window !== "undefined") {
       console.info("[profiles.createProfile] inserting row", { user_id: userId, keys: Object.keys(row) });
@@ -241,30 +213,8 @@ export async function updateProfileById(
       !options.skipModeration &&
       (explicitOwnerSubmission || (!explicitOwnerDraft && touchesOwnerFields));
 
-    // Draft-created profiles may not have a public_id yet. When they are
-    // first submitted, assign one so all UI links can use canonical lb/lg slugs.
-    if (isSubmission) {
-      const { data: existingRow } = await supabase
-        .from("profiles")
-        .select("public_id, gender")
-        .eq("id", profileId)
-        .maybeSingle();
-      const existingPublicId = (existingRow as { public_id?: string | null } | null)?.public_id;
-      if (!existingPublicId) {
-        const genderForId =
-          (row.gender as Profile["gender"] | undefined) ||
-          ((existingRow as { gender?: Profile["gender"] | null } | null)?.gender as Profile["gender"] | undefined) ||
-          "male";
-        const { data: existingIds } = await supabase
-          .from("profiles")
-          .select("public_id")
-          .like("public_id", "L%");
-        const ids = (existingIds || [])
-          .map((r) => (r as { public_id?: string | null }).public_id || "")
-          .filter(Boolean);
-        row.public_id = generatePublicIdFromExistingIds(ids, genderForId);
-      }
-    }
+    // public_id for first-time submissions is assigned by the database
+    // (profiles_guard trigger) when the row leaves draft.
     if (isSubmission) {
       row.moderation_status = "pending_review";
       row.last_submitted_at = new Date().toISOString();
@@ -354,25 +304,6 @@ export async function listProfilesByUserId(
 
     if (error) return { data: [], error: error.message };
     const rows = (data || []) as ProfileRow[];
-    const missing = rows.filter((r) => !(r.public_id as string | undefined));
-    if (missing.length > 0) {
-      const { data: existingIds } = await supabase
-        .from("profiles")
-        .select("public_id")
-        .like("public_id", "L%");
-      const seed = (existingIds || [])
-        .map((r) => (r as { public_id?: string | null }).public_id || "")
-        .filter(Boolean);
-      for (const m of missing) {
-        const id = String(m.id || "");
-        if (!id) continue;
-        const g = (m.gender as Profile["gender"] | undefined) || "male";
-        const next = generatePublicIdFromExistingIds(seed, g);
-        seed.push(next);
-        await supabase.from("profiles").update({ public_id: next }).eq("id", id);
-        m.public_id = next;
-      }
-    }
     return { data: rows.map((r) => fromProfileRow(r)), error: null };
   } catch (err) {
     return { data: [], error: err instanceof Error ? err.message : "Failed to list profiles" };
@@ -396,14 +327,20 @@ export async function getProfileById(profileId: string): Promise<{ data: Profile
   try {
     const supabase = createSupabaseClientSafe();
     if (!supabase) return { data: null, error: "Supabase not configured" };
+    // Public view first (safe columns, publicly visible profiles). Fall back
+    // to the base table, which RLS only lets the owner or a superadmin read.
+    const pub = await supabase.from(PUBLIC_PROFILES).select("*").eq("id", profileId).maybeSingle();
+    if (pub.error) return { data: null, error: pub.error.message };
+    if (pub.data) return { data: fromProfileRow(pub.data as ProfileRow), error: null };
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", profileId)
-      .single();
+      .maybeSingle();
 
     if (error) return { data: null, error: error.message };
-    return { data: data ? fromProfileRow(data as ProfileRow) : null, error: null };
+    if (!data) return { data: null, error: "Profile not found" };
+    return { data: fromProfileRow(data as ProfileRow), error: null };
   } catch (err) {
     return { data: null, error: err instanceof Error ? err.message : "Failed to fetch profile" };
   }
@@ -414,6 +351,9 @@ export async function getProfileByPublicId(publicId: string): Promise<{ data: Pr
   try {
     const supabase = createSupabaseClientSafe();
     if (!supabase) return { data: null, error: "Supabase not configured" };
+    const pub = await supabase.from(PUBLIC_PROFILES).select("*").eq("public_id", publicId).maybeSingle();
+    if (pub.error) return { data: null, error: pub.error.message };
+    if (pub.data) return { data: fromProfileRow(pub.data as ProfileRow), error: null };
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
@@ -454,7 +394,7 @@ export async function searchProfiles(
   try {
     const supabase = createSupabaseClientSafe();
     if (!supabase) return { data: [], error: "Supabase not configured" };
-    let query = supabase.from("profiles").select("*");
+    let query = supabase.from(PUBLIC_PROFILES).select("*");
     query = query.is("deleted_at", null);
 
     if (filters.gender) query = query.eq("gender", filters.gender);
@@ -521,7 +461,7 @@ export async function searchProfilesCursor(
     const selectedProfessionTypes = filters.professionTypes || [];
 
     while (collected.length < pageSize && !reachedEnd) {
-      let query = supabase.from("profiles").select("*");
+      let query = supabase.from(PUBLIC_PROFILES).select("*");
       query = query.is("deleted_at", null);
       query = query.or("moderation_status.eq.approved,approved_snapshot.not.is.null");
 

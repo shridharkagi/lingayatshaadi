@@ -121,5 +121,27 @@ export async function POST(req: NextRequest) {
     { onConflict: "viewer_id,viewed_id" }
   );
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, recorded: true });
+
+  // Contacts are only released here, after the plan/quota checks above.
+  // Only numbers the owner marked "show on profile" are returned.
+  const { data: viewed } = await admin
+    .from("profiles")
+    .select("contacts, contact, contact_type, deleted_at, is_blocked")
+    .eq("id", body.viewedProfileId)
+    .maybeSingle();
+  if (!viewed || viewed.deleted_at || viewed.is_blocked) {
+    return NextResponse.json({ error: "Profile not available" }, { status: 404 });
+  }
+  type ContactEntry = { number?: string; showOnProfile?: boolean };
+  const contacts = (Array.isArray(viewed.contacts) ? (viewed.contacts as ContactEntry[]) : []).filter(
+    (c) => c && c.number && c.showOnProfile !== false
+  );
+  return NextResponse.json({
+    ok: true,
+    recorded: true,
+    contacts,
+    // Legacy single-number fallback, used only when no structured list exists.
+    contact: contacts.length === 0 ? viewed.contact || null : null,
+    contactType: contacts.length === 0 ? viewed.contact_type || null : null,
+  });
 }

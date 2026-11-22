@@ -5,8 +5,7 @@ import type { ProfileRow } from "@/lib/profileMapper";
 import type { Profile } from "@/types";
 
 /**
- * Server-only fetch for SEO / Open Graph. Prefers service role so RLS does
- * not block public crawlers; falls back to anon when the service key is absent.
+ * Server-only fetch for SEO / Open Graph, from the `public_profiles` view.
  */
 export async function fetchProfileForSeo(routeSlug: string): Promise<Profile | null> {
   const publicId = parseProfileSlug(routeSlug);
@@ -23,8 +22,10 @@ export async function fetchProfileForSeo(routeSlug: string): Promise<Profile | n
   if (!client) return null;
 
   try {
+    // Read the public view so link previews only ever show publicly visible
+    // profiles (approved / with an approved snapshot) and safe fields.
     const { data, error } = await client
-      .from("profiles")
+      .from("public_profiles")
       .select("*")
       .or(
         publicId

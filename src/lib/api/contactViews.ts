@@ -1,11 +1,18 @@
 import { createSupabaseClientSafe } from "@/lib/supabase";
 import { adminFetch } from "@/lib/api/adminClient";
+import type { ProfileContact } from "@/types";
 
 /** Record that viewer viewed contact details of viewedProfile */
+export interface RevealedContacts {
+  contacts: ProfileContact[];
+  contact: string | null;
+  contactType: string | null;
+}
+
 export async function recordContactView(
   viewerProfileId: string,
   viewedProfileId: string
-): Promise<{ error: string | null; code?: string }> {
+): Promise<{ error: string | null; code?: string; revealed?: RevealedContacts }> {
   if (viewerProfileId === viewedProfileId) return { error: null };
 
   try {
@@ -14,9 +21,23 @@ export async function recordContactView(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ viewerProfileId, viewedProfileId }),
     });
-    const json = (await res.json()) as { error?: string; code?: string };
+    const json = (await res.json()) as {
+      error?: string;
+      code?: string;
+      contacts?: ProfileContact[];
+      contact?: string | null;
+      contactType?: string | null;
+    };
     if (!res.ok) return { error: json.error || "Failed to record contact view", code: json.code };
-    return { error: null, code: json.code };
+    return {
+      error: null,
+      code: json.code,
+      revealed: {
+        contacts: json.contacts || [],
+        contact: json.contact ?? null,
+        contactType: json.contactType ?? null,
+      },
+    };
   } catch (err) {
     return {
       error: err instanceof Error ? err.message : "Failed to record contact view",
