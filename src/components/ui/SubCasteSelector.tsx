@@ -56,7 +56,7 @@ export function SubCasteSelector({
         <button
           type="button"
           onClick={() => setOpen(!open)}
-          className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-white text-left flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] hover:border-[var(--color-border)] transition"
+          className="lb-field w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-white text-left flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] hover:border-[var(--color-border)] transition"
         >
           <span className={displayValue ? "text-gray-900" : "text-gray-500"}>
             {displayValue || placeholder}
