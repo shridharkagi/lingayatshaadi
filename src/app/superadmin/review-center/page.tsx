@@ -6,7 +6,9 @@ import { MoreHorizontal, Search, UserRound } from "lucide-react";
 import { adminFetch } from "@/lib/api/adminClient";
 import { ProfileTransferModal } from "@/components/admin/ProfileTransferModal";
 import {
+  CopyButton,
   CsvButton,
+  copyTsv,
   DateFilter,
   NO_DATES,
   PageHeader,
@@ -250,22 +252,26 @@ export default function ProfilesPage() {
     setReload((n) => n + 1);
   };
 
+  const tableData = async (): Promise<[string[], (string | number | null | undefined)[][]]> => {
+    const all: ProfileRow[] = [];
+    for (let off = 0; off < Math.max(total, 1); off += 500) all.push(...(await fetchPage(500, off)).rows);
+    return [
+      ["Member ID", "Name", "Gender", "Age", "City", "State", "Profession", "Created for", "Status", "Account code", "Account name", "Account phone", "Created", "Approved", "Views", "Contacted by"],
+      all.map((p) => [p.publicId, p.name, p.gender, p.age, p.city, p.state, p.profession, p.relationship, p.status, p.accountCode, p.accountName, phoneFmt(p.accountPhone), fmtDate(p.createdAt), fmtDate(p.approvedAt), p.views, p.contactedBy]),
+    ];
+  };
   const exportCsv = async () => {
     setExporting(true);
     try {
-      const all: ProfileRow[] = [];
-      for (let off = 0; off < Math.max(total, 1); off += 500) all.push(...(await fetchPage(500, off)).rows);
-      downloadCsv(
-        `profiles-${tab}-${new Date().toISOString().slice(0, 10)}.csv`,
-        ["Member ID", "Name", "Gender", "Age", "City", "State", "Profession", "Created for", "Status", "Account code", "Account name", "Account phone", "Created", "Approved", "Views", "Contacted by"],
-        all.map((p) => [p.publicId, p.name, p.gender, p.age, p.city, p.state, p.profession, p.relationship, p.status, p.accountCode, p.accountName, phoneFmt(p.accountPhone), fmtDate(p.createdAt), fmtDate(p.approvedAt), p.views, p.contactedBy])
-      );
+      const [h, r] = await tableData();
+      downloadCsv(`profiles-${tab}-${new Date().toISOString().slice(0, 10)}.csv`, h, r);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Export failed");
     } finally {
       setExporting(false);
     }
   };
+
 
   const allActive = Object.entries(counts).filter(([k]) => k !== "deleted").reduce((s, [, n]) => s + n, 0);
   const tabCount = (t: (typeof TABS)[number]) => (t.id === "all" ? allActive : counts[t.key || ""] || 0);
@@ -281,6 +287,7 @@ export default function ProfilesPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <PageHeader title="Profiles" subtitle="Matrimony profiles created by accounts (for self or family members).">
+        <CopyButton onCopy={async () => { const [h, r] = await tableData(); await copyTsv(h, r); return r.length; }} />
         <CsvButton onClick={exportCsv} busy={exporting} />
       </PageHeader>
 

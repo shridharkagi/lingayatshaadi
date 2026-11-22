@@ -5,10 +5,13 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { MessageCircle, Search } from "lucide-react";
 import WhatsAppBulk from "@/components/superadmin/WhatsAppBulk";
+import ContactsTakenModal from "@/components/superadmin/ContactsTakenModal";
 import { adminFetch } from "@/lib/api/adminClient";
 import {
+  CopyButton,
   CsvButton,
   DateFilter,
+  copyTsv,
   NO_DATES,
   PageHeader,
   Pager,
@@ -100,6 +103,7 @@ export default function AccountsPage() {
   const [planCounts, setPlanCounts] = useState<Record<string, number>>({});
   const [selected, setSelected] = useState<Map<string, Account>>(new Map());
   const [waOpen, setWaOpen] = useState(false);
+  const [contactsFor, setContactsFor] = useState<{ id: string; name: string } | null>(null);
   const [selectingAll, setSelectingAll] = useState(false);
   const [offset, setOffset] = useState(0);
   const [rows, setRows] = useState<Account[]>([]);
@@ -200,25 +204,30 @@ export default function AccountsPage() {
     };
   }, [tab, offset, limit, fetchPage]);
 
+  const tableData = async (): Promise<[string[], (string | number | null | undefined)[][]]> => {
+    const all: Account[] = [];
+    for (let off = 0; off < Math.max(total, 1); off += 500) all.push(...(await fetchPage(500, off)).rows);
+    return [
+      ["Account code", "Name", "Phone", "Joined", "Last login", "Active profiles", "Live", "Pending", "Plan", "Plan price", "Plan ends", "Contact views", "Contact limit", "Today", "Daily limit", "Suspended"],
+      all.map((a) => [
+        a.accountCode, a.name, phoneFmt(a.phone), fmtDate(a.createdAt), fmtDateTime(a.lastSignInAt), a.profiles, a.liveProfiles,
+        a.pendingProfiles, a.plan?.name || "", a.plan?.price ?? "", a.plan ? fmtDate(a.plan.expiresAt) : "", a.contactViews,
+        a.plan ? a.plan.totalLimit ?? "unlimited" : "", a.contactViewsToday, a.plan ? a.plan.dailyLimit ?? "unlimited" : "", a.suspended ? "yes" : "no",
+      ]),
+    ];
+  };
   const exportCsv = async () => {
     setExporting(true);
     try {
-      const all: Account[] = [];
-      for (let off = 0; off < Math.max(total, 1); off += 500) all.push(...(await fetchPage(500, off)).rows);
-      downloadCsv(
-        `accounts-${tab}-${new Date().toISOString().slice(0, 10)}.csv`,
-        ["Account code", "Name", "Phone", "Joined", "Last login", "Active profiles", "Live", "Pending", "Plan", "Plan price", "Plan ends", "Contact views", "Contact limit", "Today", "Daily limit", "Suspended"],
-        all.map((a) => [
-          a.accountCode, a.name, phoneFmt(a.phone), fmtDate(a.createdAt), fmtDateTime(a.lastSignInAt), a.profiles, a.liveProfiles,
-          a.pendingProfiles, a.plan?.name || "", a.plan?.price ?? "", a.plan ? fmtDate(a.plan.expiresAt) : "", a.contactViews, a.plan ? a.plan.totalLimit ?? "unlimited" : "", a.contactViewsToday, a.plan ? a.plan.dailyLimit ?? "unlimited" : "", a.suspended ? "yes" : "no",
-        ])
-      );
+      const [h, r] = await tableData();
+      downloadCsv(`accounts-${tab}-${new Date().toISOString().slice(0, 10)}.csv`, h, r);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Export failed");
     } finally {
       setExporting(false);
     }
   };
+
 
   const toggle = (a: Account) =>
     setSelected((m) => {
@@ -250,7 +259,12 @@ export default function AccountsPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <PageHeader title="Accounts" subtitle="People who log in with a mobile number. Each account can manage up to 3 profiles and holds the plan.">
-        {tab !== "deleted" && <CsvButton onClick={exportCsv} busy={exporting} />}
+        {tab !== "deleted" && (
+          <>
+            <CopyButton onCopy={async () => { const [h, r] = await tableData(); await copyTsv(h, r); return r.length; }} />
+            <CsvButton onClick={exportCsv} busy={exporting} />
+          </>
+        )}
       </PageHeader>
 
       <div className="ad-tabs" role="tablist">
@@ -371,7 +385,9 @@ export default function AccountsPage() {
                         <span className="ad-muted">No plan</span>
                       )}
                     </td>
-                    <td>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <button type="button" className="ct-open" disabled={a.contactViews === 0} style={a.contactViews === 0 ? { cursor: "default" } : undefined}
+                        onClick={() => a.contactViews > 0 && setContactsFor({ id: a.id, name: a.name })} title={a.contactViews > 0 ? "See which profiles' contacts were taken" : undefined}>
                       {a.plan ? (
                         <div className="ad-quota" title={`Today: ${a.contactViewsToday}${a.plan.dailyLimit ? ` of ${a.plan.dailyLimit}` : ""}`}>
                           <span><strong>{a.contactViews}</strong>{a.plan.totalLimit ? <span className="ad-muted"> / {a.plan.totalLimit}</span> : <span className="ad-muted"> · unlimited</span>}</span>
@@ -381,8 +397,10 @@ export default function AccountsPage() {
                           <span className="ad-muted" style={{ fontSize: 11 }}>today {a.contactViewsToday}{a.plan.dailyLimit ? ` / ${a.plan.dailyLimit}` : ""}</span>
                         </div>
                       ) : (
-                        a.contactViews
+                        <span>{a.contactViews}</span>
                       )}
+                      {a.contactViews > 0 && <div className="lnk">View list →</div>}
+                      </button>
                     </td>
                     <td style={{ whiteSpace: "nowrap" }}>{fmtDate(a.createdAt)}</td>
                     <td style={{ whiteSpace: "nowrap" }} className="ad-muted">{a.lastSignInAt ? fmtDateTime(a.lastSignInAt) : "Never"}</td>
@@ -404,6 +422,7 @@ export default function AccountsPage() {
           )}
         </div>
       </div>
+      {contactsFor && <ContactsTakenModal accountId={contactsFor.id} accountName={contactsFor.name} onClose={() => setContactsFor(null)} />}
       {waOpen && (
         <WhatsAppBulk
           recipients={[...selected.values()].map((a) => ({ id: a.id, name: a.name, phone: a.phone, planEnds: a.plan?.expiresAt }))}

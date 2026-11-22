@@ -65,7 +65,9 @@ const REASONS: Record<Item["type"], string[]> = {
 
 // Fields shown in the change list / details, in display order.
 const FIELDS: [string, string][] = [
-  ["full_name", "Name"], ["gender", "Gender"], ["date_of_birth", "Date of birth"], ["marital_status", "Marital status"],
+  ["full_name", "Name"], ["contact", "Primary phone"], ["contacts", "Contact numbers"], ["address", "Address"],
+  ["relationship", "Created for"], ["managed_by", "Managed by"], ["nickname", "Nickname"], ["caste", "Caste"],
+  ["gender", "Gender"], ["date_of_birth", "Date of birth"], ["marital_status", "Marital status"],
   ["height", "Height"], ["sub_caste", "Sub-caste"], ["mother_tongue", "Mother tongue"], ["languages_known", "Languages"],
   ["about_me", "About me"], ["hobbies", "Hobbies"], ["qualification", "Education"], ["profession_type", "Profession type"],
   ["profession", "Profession"], ["company_name", "Company"], ["annual_income", "Annual income"],
@@ -78,7 +80,21 @@ const FIELDS: [string, string][] = [
 
 function show(v: unknown): string {
   if (v === null || v === undefined || v === "") return "—";
-  if (Array.isArray(v)) return v.length ? v.join(", ") : "—";
+  if (Array.isArray(v)) {
+    if (!v.length) return "—";
+    return v
+      .map((x) => {
+        if (x && typeof x === "object" && "number" in (x as Record<string, unknown>)) {
+          // Contact entry: { number, methods, belongsTo, showOnProfile }
+          const c = x as { number?: string; methods?: string[]; belongsTo?: string; showOnProfile?: boolean };
+          const num = phoneFmt(c.number || null);
+          return [num === "—" ? c.number || "—" : num, c.belongsTo ? `(${c.belongsTo})` : "", (c.methods || []).join("/"),
+            c.showOnProfile === false ? "· hidden from members" : ""].filter(Boolean).join(" ");
+        }
+        return typeof x === "object" && x !== null ? show(x) : String(x);
+      })
+      .join("\n");
+  }
   if (typeof v === "object") {
     const parts = Object.entries(v as Record<string, unknown>)
       .filter(([, x]) => x !== null && x !== "" && !(Array.isArray(x) && x.length === 0))
@@ -86,6 +102,11 @@ function show(v: unknown): string {
     return parts.length ? parts.join(" · ") : "—";
   }
   return String(v);
+}
+/** Field value for display; phone fields formatted. */
+function val(k: string, v: unknown): string {
+  if (k === "contact" && v) return phoneFmt(String(v)) === "—" ? String(v) : phoneFmt(String(v));
+  return show(v);
 }
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 const initials = (n: string) => n.split(/\s+/).map((x) => x[0]).slice(0, 2).join("").toUpperCase();
@@ -306,13 +327,13 @@ export default function ReviewWorkspacePage() {
     return FIELDS.filter(([k]) => !same(sel.live?.[k], sel.snapshot?.[k])).map(([k, label]) => ({
       key: k,
       label,
-      before: show(sel.snapshot?.[k]),
-      after: show(sel.live?.[k]),
+      before: val(k, sel.snapshot?.[k]),
+      after: val(k, sel.live?.[k]),
     }));
   }, [sel]);
   const details = useMemo(() => {
     if (!sel || sel.type !== "new" || !sel.live) return [];
-    return FIELDS.filter(([k]) => k !== "profile_photo" && show(sel.live?.[k]) !== "—").map(([k, label]) => ({ label, value: show(sel.live?.[k]) }));
+    return FIELDS.filter(([k]) => k !== "profile_photo" && val(k, sel.live?.[k]) !== "—").map(([k, label]) => ({ label, value: val(k, sel.live?.[k]) }));
   }, [sel]);
 
   return (
@@ -475,7 +496,7 @@ export default function ReviewWorkspacePage() {
                     {details.map((d) => (
                       <div key={d.label}>
                         <div className="ad-muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em" }}>{d.label}</div>
-                        <div style={{ fontSize: 14, marginTop: 2, wordBreak: "break-word" }}>{d.value}</div>
+                        <div style={{ fontSize: 14, marginTop: 2, wordBreak: "break-word", whiteSpace: "pre-line" }}>{d.value}</div>
                       </div>
                     ))}
                   </div>

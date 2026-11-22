@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Download, Handshake, RotateCcw, UserRound, Users, UsersRound, type LucideIcon } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, ClipboardCopy, Download, Handshake, RotateCcw, UserRound, Users, UsersRound, type LucideIcon } from "lucide-react";
 
 /** Debounce a changing value (e.g. a search box). */
 export function useDebounced<T>(value: T, ms = 300): T {
@@ -241,4 +241,37 @@ export function phoneDigits(p: string | null | undefined) {
 }
 export function initials(name: string | null | undefined) {
   return (name || "?").trim().split(/\s+/).map((x) => x[0]).slice(0, 2).join("").toUpperCase() || "?";
+}
+
+/** Copy rows as tab-separated text — pastes straight into Google Sheets / Excel as cells. */
+export async function copyTsv(headers: string[], rows: (string | number | null | undefined)[][]) {
+  const cell = (v: string | number | null | undefined) => (v === null || v === undefined ? "" : String(v).replace(/[\t\r\n]+/g, " "));
+  const text = [headers, ...rows].map((r) => r.map(cell).join("\t")).join("\n");
+  await navigator.clipboard.writeText(text);
+}
+
+export function CopyButton({ onCopy, label = "Copy for Sheets" }: { onCopy: () => Promise<number>; label?: string }) {
+  const [state, setState] = useState<"idle" | "busy" | "done" | "fail">("idle");
+  const [n, setN] = useState(0);
+  return (
+    <button
+      type="button"
+      className="ad-btn ghost"
+      disabled={state === "busy"}
+      title="Copies every matching row (all pages). Paste into Google Sheets with Ctrl/⌘+V."
+      onClick={async () => {
+        setState("busy");
+        try {
+          setN(await onCopy());
+          setState("done");
+        } catch {
+          setState("fail");
+        }
+        setTimeout(() => setState("idle"), 2500);
+      }}
+    >
+      {state === "done" ? <Check size={16} /> : <ClipboardCopy size={16} />}
+      {state === "busy" ? "Copying…" : state === "done" ? `Copied ${n} rows` : state === "fail" ? "Copy blocked" : label}
+    </button>
+  );
 }

@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { MessageCircle, Search } from "lucide-react";
 import { adminFetch } from "@/lib/api/adminClient";
-import { CsvButton, PageHeader, Pager, downloadCsv, fmtDate, fmtDateTime, phoneDigits, phoneFmt, useDebounced } from "@/components/superadmin/ui";
+import {
+  CopyButton, CsvButton, DateFilter, NO_DATES, PageHeader, Pager, ResetButton, copyTsv, downloadCsv, fmtDate, fmtDateTime,
+  phoneDigits, phoneFmt, useDebounced, type DateFilterValue,
+} from "@/components/superadmin/ui";
 
 type Lead = {
   id: string;
@@ -17,12 +20,21 @@ type Lead = {
   date_of_joining: string | null;
   created_at: string;
 };
-const LIMIT = 50;
+const SORTS = [
+  { id: "newest", label: "Newest first" },
+  { id: "oldest", label: "Oldest first" },
+  { id: "name", label: "Name A → Z" },
+  { id: "city", label: "City A → Z" },
+];
 
 export default function LeadsPage() {
   const [q, setQ] = useState("");
   const dq = useDebounced(q);
   const [source, setSource] = useState("");
+  const [signed, setSigned] = useState("");
+  const [sort, setSort] = useState("newest");
+  const [dates, setDates] = useState<DateFilterValue>(NO_DATES);
+  const [limit, setLimit] = useState(50);
   const [offset, setOffset] = useState(0);
   const [rows, setRows] = useState<Lead[]>([]);
   const [total, setTotal] = useState(0);
@@ -33,19 +45,30 @@ export default function LeadsPage() {
 
   const fetchPage = useCallback(
     async (lim: number, off: number) => {
-      const qs = new URLSearchParams({ q: dq, source, limit: String(lim), offset: String(off) });
+      const dateOk = dates.preset === "any" || (dates.from && dates.to && dates.from <= dates.to);
+      const qs = new URLSearchParams({
+        q: dq, source, signed, sort, from: dateOk ? dates.from : "", to: dateOk ? dates.to : "", limit: String(lim), offset: String(off),
+      });
       const res = await adminFetch(`/api/superadmin/leads?${qs}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to load leads");
       return json as { total: number; rows: Lead[]; sources: Record<string, number> };
     },
-    [dq, source]
+    [dq, source, signed, sort, dates]
   );
-  useEffect(() => setOffset(0), [dq, source]);
+  useEffect(() => setOffset(0), [dq, source, signed, sort, dates]);
+  const filtersOn = q !== "" || source !== "" || signed !== "" || sort !== "newest" || dates.preset !== "any";
+  const resetFilters = () => {
+    setQ("");
+    setSource("");
+    setSigned("");
+    setSort("newest");
+    setDates(NO_DATES);
+  };
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    fetchPage(LIMIT, offset)
+    fetchPage(limit, offset)
       .then((j) => {
         if (!alive) return;
         setRows(j.rows);
@@ -57,32 +80,40 @@ export default function LeadsPage() {
     return () => {
       alive = false;
     };
-  }, [fetchPage, offset]);
+  }, [fetchPage, offset, limit]);
 
   const allTotal = Object.values(sources).reduce((s, n) => s + n, 0);
+  const tableData = async (): Promise<[string[], (string | number | null | undefined)[][]]> => {
+    const all: Lead[] = [];
+    for (let off = 0; off < Math.max(total, 1); off += 500) all.push(...(await fetchPage(500, off)).rows);
+    return [
+      ["Name", "Phone", "City", "Source page", "Status", "Joined group on", "Submitted", "Has account"],
+      all.map((l) => [l.name, phoneFmt(l.contact_no), l.city, l.source_page, l.status, fmtDate(l.date_of_joining), fmtDateTime(l.created_at), l.account_id ? "yes" : "no"]),
+    ];
+  };
   const exportCsv = async () => {
     setExporting(true);
     try {
-      const all: Lead[] = [];
-      for (let off = 0; off < Math.max(total, 1); off += 500) all.push(...(await fetchPage(500, off)).rows);
-      downloadCsv(
-        `whatsapp-leads-${new Date().toISOString().slice(0, 10)}.csv`,
-        ["Name", "Phone", "City", "Source page", "Status", "Joined group on", "Submitted", "Has account"],
-        all.map((l) => [l.name, phoneFmt(l.contact_no), l.city, l.source_page, l.status, fmtDate(l.date_of_joining), fmtDateTime(l.created_at), l.account_id ? "yes" : "no"])
-      );
+      const [h, r] = await tableData();
+      downloadCsv(`whatsapp-leads-${new Date().toISOString().slice(0, 10)}.csv`, h, r);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Export failed");
     } finally {
       setExporting(false);
     }
   };
 
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <PageHeader title="WhatsApp leads" subtitle="People who filled the “Join our WhatsApp group” form.">
+        <CopyButton onCopy={async () => { const [h, r] = await tableData(); await copyTsv(h, r); return r.length; }} />
         <CsvButton onClick={exportCsv} busy={exporting} />
       </PageHeader>
 
       <div className="ad-grid-kpi">
-        <div className="ad-card rp-stat"><span className="ad-muted" style={{ fontSize: 13 }}>Total leads</span><span className="v">{allTotal}</span></div>
+        <div className="ad-card rp-stat"><span className="ad-muted" style={{ fontSize: 13 }}>Total leads</span><span className="v">{allTotal}</span>
+          {filtersOn && <span className="ad-muted" style={{ fontSize: 12 }}>{total} match your filters</span>}</div>
         {Object.entries(sources).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, n]) => (
           <button key={k} type="button" className="ad-card hover rp-stat" style={{ textAlign: "left", cursor: "pointer", border: source === k ? "1.5px solid #e67300" : undefined, font: "inherit" }}
             onClick={() => setSource(source === k ? "" : k)}>
@@ -97,7 +128,22 @@ export default function LeadsPage() {
           <Search size={16} aria-hidden="true" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, phone or city" aria-label="Search leads" />
         </label>
-        {source && <button type="button" className="ad-btn ghost" onClick={() => setSource("")}>Source: {source} ✕</button>}
+        <select className={`ad-select ${source ? "is-set" : ""}`} value={source} onChange={(e) => setSource(e.target.value)} aria-label="Source page">
+          <option value="">All sources</option>
+          {Object.entries(sources).sort((a, b) => b[1] - a[1]).map(([k, n]) => (
+            <option key={k} value={k}>From {k === "unknown" ? "unknown page" : k} ({n})</option>
+          ))}
+        </select>
+        <select className={`ad-select ${signed ? "is-set" : ""}`} value={signed} onChange={(e) => setSigned(e.target.value)} aria-label="Signed up">
+          <option value="">Signed up or not</option>
+          <option value="yes">Has an account</option>
+          <option value="no">Not signed up yet</option>
+        </select>
+        <DateFilter value={dates} onChange={setDates} />
+        <select className={`ad-select ${sort !== "newest" ? "is-set" : ""}`} value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
+          {SORTS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+        </select>
+        <ResetButton show={filtersOn} onClick={resetFilters} />
       </div>
       {error && <div className="m3-error">{error}</div>}
 
@@ -127,10 +173,15 @@ export default function LeadsPage() {
               ))}
             </tbody>
           </table>
-          {!loading && rows.length === 0 && <div className="ad-empty">No leads match.</div>}
+          {!loading && rows.length === 0 && (
+            <div className="ad-empty">
+              No leads match.{" "}
+              {filtersOn && <button type="button" className="ad-link" style={{ border: 0, background: "none", cursor: "pointer" }} onClick={resetFilters}>Reset filters</button>}
+            </div>
+          )}
         </div>
       </div>
-      <Pager total={total} limit={LIMIT} offset={offset} onChange={setOffset} />
+      <Pager total={total} limit={limit} offset={offset} onChange={setOffset} onLimitChange={(n) => { setLimit(n); setOffset(0); }} />
     </div>
   );
 }

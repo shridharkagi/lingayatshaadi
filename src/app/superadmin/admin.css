@@ -373,3 +373,13 @@
 .ad-root .ad-quota .bar { height: 5px; background: #eef0f6; border-radius: 99px; overflow: hidden; }
 .ad-root .ad-quota .bar span { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #22b07d, #e6a100); }
 .ad-root .ad-quota .bar span.hot { background: linear-gradient(90deg, #f28c28, #e0457b); }
+.rv-old, .rv-new { white-space: pre-line; }
+
+/* contacts-taken popup */
+.ad-root .ct-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.ad-root .ct-stats > div { background: linear-gradient(135deg, #fff7ef, #fdf0f6); border: 1px solid #f6e1d3; border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.ad-root .ct-stats strong { font-size: 20px; color: var(--ad-text); }
+.ad-root .ct-stats small { font-size: 12px; color: var(--ad-muted); font-weight: 500; }
+.ad-root .ct-open { border: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-align: left; padding: 4px 6px; margin: -4px -6px; border-radius: 8px; transition: background .15s; }
+.ad-root .ct-open:hover { background: #fff3e8; }
+.ad-root .ct-open .lnk { font-size: 11px; color: #c25a00; font-weight: 600; }
