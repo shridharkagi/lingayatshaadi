@@ -2799,8 +2799,6 @@ export default function OtherProfilePage() {
       <PremiumUnlockModal
         isOpen={showPremiumUnlockModal}
         onClose={() => setShowPremiumUnlockModal(false)}
-        memberId={getMemberIdDisplay(profile)}
-        name={profile.fullName}
         whatsappNumber={config.whatsappContactNumber || config.callContactNumber || "6360130905"}
         callNumber={config.callContactNumber || config.whatsappContactNumber || "6360130905"}
       />

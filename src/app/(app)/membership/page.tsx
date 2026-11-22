@@ -6,6 +6,7 @@ import { Check } from "lucide-react";
 import { adminFetch } from "@/lib/api/adminClient";
 import { useAppConfig } from "@/contexts/AppConfigContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { fillWhatsAppTemplate } from "@/lib/whatsappTemplates";
 
 type Plan = {
   id: string;
@@ -34,7 +35,7 @@ export default function MembershipPage() {
   const supportNumber = (config.callContactNumber || "6360130905").replace(/\D/g, "");
   const supportWhatsapp = (config.whatsappContactNumber || config.callContactNumber || "6360130905").replace(/\D/g, "");
   const accountName = accountMeta?.fullName || accountMeta?.firstName || "Member";
-  const upgradePrefill = `My name is ${accountName}, I would like to upgrade my account.`;
+  const upgradePrefill = fillWhatsAppTemplate(config.whatsappTemplates.upgradeHelp, { name: accountName });
 
   useEffect(() => {
     const load = async () => {
@@ -70,12 +71,16 @@ export default function MembershipPage() {
   };
 
   const handleFreePlanWhatsApp = () => {
-    const msg = `Hi, I'm ${accountName}. I'd like to get started with the Free plan on LingayatBandhu — please help me activate it.`;
+    const msg = fillWhatsAppTemplate(config.whatsappTemplates.freePlan, { name: accountName });
     if (!openWhatsAppToSupport(msg)) window.open(`tel:${supportNumber}`, "_self");
   };
 
   const handleUpgradeContact = (plan: Plan) => {
-    const msg = `Hi, I want to upgrade to ${plan.name} (₹${plan.price}) plan. Please assist with manual payment and activation.`;
+    const msg = fillWhatsAppTemplate(config.whatsappTemplates.upgradePlan, {
+      name: accountName,
+      plan: plan.name,
+      price: plan.price,
+    });
     if (!openWhatsAppToSupport(msg)) window.open(`tel:${supportNumber}`, "_self");
   };
 

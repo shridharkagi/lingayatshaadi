@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireAuthUser } from "@/lib/server/requireAuthUser";
 import { readSiteConfig } from "@/lib/server/siteConfig";
+import { fillWhatsAppTemplate } from "@/lib/whatsappTemplates";
+import { ensureAccountCodeForUser, getPersistedAccountCodeMap } from "@/lib/server/accountCodes";
 
 async function notifyByEmail(payload: {
   to: string;
@@ -153,14 +155,30 @@ export async function POST(req: NextRequest) {
     note: body.note?.trim() || null,
   });
 
-  const prefilledWhatsAppMessage = `Upgrade Request
-Request ID: ${requestRow.id}
-User ID: ${auth.userId}
-Profile: ${profile?.full_name || "N/A"}
-Plan: ${plan.name} (${plan.code})
-Price: INR ${Number(plan.price || 0)}
-Callback: ${body.callbackNumber}
-Note: ${body.note?.trim() || "-"}`;
+  // Identify the requesting ACCOUNT (code U…, account holder's name), since
+  // subscriptions are account-level and the first profile may be a son/daughter.
+  const [codeMap, { data: authUserData }] = await Promise.all([
+    getPersistedAccountCodeMap(admin, [auth.userId]),
+    admin.auth.admin.getUserById(auth.userId),
+  ]);
+  const accountCode =
+    codeMap.get(auth.userId) ||
+    (await ensureAccountCodeForUser(admin, auth.userId, authUserData?.user?.created_at ?? null));
+  const meta = (authUserData?.user?.user_metadata || {}) as Record<string, unknown>;
+  const accountName =
+    (typeof meta.full_name === "string" && meta.full_name.trim()) ||
+    [meta.first_name, meta.last_name].filter((v) => typeof v === "string" && v.trim()).join(" ").trim() ||
+    profile?.full_name ||
+    "N/A";
+  const prefilledWhatsAppMessage = fillWhatsAppTemplate(site.whatsappTemplates.upgradeRequest, {
+    accountId: accountCode || "N/A",
+    name: accountName,
+    plan: plan.name,
+    planCode: plan.code,
+    price: Number(plan.price || 0),
+    callback: body.callbackNumber,
+    note: body.note?.trim() || "-",
+  });
   const whatsappPrefillUrl = `https://wa.me/${supportWhatsAppDigits}?text=${encodeURIComponent(prefilledWhatsAppMessage)}`;
 
   await admin

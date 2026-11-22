@@ -1,3 +1,4 @@
+import { normalizeWhatsAppTemplates } from "@/lib/whatsappTemplates";
 import { NextRequest, NextResponse } from "next/server";
 import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
 import type { SiteConfig } from "@/lib/server/siteConfig";
@@ -50,6 +51,9 @@ export async function POST(request: NextRequest) {
     if (typeof body.groomsHeroImageUrl === "string") patch.groomsHeroImageUrl = body.groomsHeroImageUrl;
     if (body.profileFieldVisibility && typeof body.profileFieldVisibility === "object") {
       patch.profileFieldVisibility = normalizeDataVisibilityConfig(body.profileFieldVisibility);
+    }
+    if (body.whatsappTemplates && typeof body.whatsappTemplates === "object") {
+      patch.whatsappTemplates = normalizeWhatsAppTemplates(body.whatsappTemplates);
     }
 
     const result = await mergeAndPersistSiteConfig(patch);

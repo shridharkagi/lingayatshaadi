@@ -7,6 +7,11 @@ import {
   DEFAULT_DATA_VISIBILITY_CONFIG,
   normalizeDataVisibilityConfig,
 } from "@/lib/dataVisibility";
+import {
+  type WhatsAppTemplates,
+  WHATSAPP_TEMPLATE_DEFAULTS,
+  normalizeWhatsAppTemplates,
+} from "@/lib/whatsappTemplates";
 
 const CONFIG_KEY = "lingayat_bandhu_config";
 const LEGACY_CONFIG_KEY = "lingayat_shaadi_config";
@@ -42,6 +47,8 @@ export interface AppConfig {
   groomsHeroImageUrl: string;
   /** Field visibility policy by viewer tier for profile detail page */
   profileFieldVisibility: DataVisibilityConfig;
+  /** Admin-editable pre-filled WhatsApp messages for upgrade buttons */
+  whatsappTemplates: WhatsAppTemplates;
 }
 
 const defaultConfig: AppConfig = {
@@ -64,6 +71,7 @@ const defaultConfig: AppConfig = {
   groomsHeroImageUrl:
     "https://images.unsplash.com/photo-1606800052052-a08af7148866?w=1600&q=70&fit=crop",
   profileFieldVisibility: DEFAULT_DATA_VISIBILITY_CONFIG,
+  whatsappTemplates: WHATSAPP_TEMPLATE_DEFAULTS,
 };
 
 const AppConfigContext = createContext<{
@@ -114,6 +122,7 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
               ? parsed.groomsHeroImageUrl
               : defaultConfig.groomsHeroImageUrl,
           profileFieldVisibility: normalizeDataVisibilityConfig(parsed.profileFieldVisibility),
+          whatsappTemplates: normalizeWhatsAppTemplates(parsed.whatsappTemplates),
         }));
       }
     } catch {
@@ -132,6 +141,7 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
             ...prev,
             ...serverConfig,
             profileFieldVisibility: normalizeDataVisibilityConfig(serverConfig.profileFieldVisibility),
+            whatsappTemplates: normalizeWhatsAppTemplates(serverConfig.whatsappTemplates),
           };
           try {
             localStorage.setItem(CONFIG_KEY, JSON.stringify(next));

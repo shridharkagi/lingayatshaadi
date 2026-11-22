@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { readSiteConfig } from "@/lib/server/siteConfig";
 import { DEFAULT_DATA_VISIBILITY_CONFIG } from "@/lib/dataVisibility";
+import { WHATSAPP_TEMPLATE_DEFAULTS } from "@/lib/whatsappTemplates";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -20,6 +21,7 @@ const DEFAULT_PUBLIC_CONFIG = {
   groomsHeroImageUrl:
     "https://images.unsplash.com/photo-1606800052052-a08af7148866?w=1600&q=70&fit=crop",
   profileFieldVisibility: DEFAULT_DATA_VISIBILITY_CONFIG,
+  whatsappTemplates: WHATSAPP_TEMPLATE_DEFAULTS,
 };
 
 export async function GET() {
@@ -40,6 +42,7 @@ export async function GET() {
       bridesHeroImageUrl: c.bridesHeroImageUrl,
       groomsHeroImageUrl: c.groomsHeroImageUrl,
       profileFieldVisibility: c.profileFieldVisibility,
+      whatsappTemplates: c.whatsappTemplates,
     }, { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } });
   } catch {
     return NextResponse.json(DEFAULT_PUBLIC_CONFIG, {

@@ -344,6 +344,7 @@ export default function ProfilesPage() {
             <button type="button" className="sa-btn ghost" disabled={busy} onClick={() => runAction([...selected], "restore")}>Restore</button>
           ) : (
             <>
+              <button type="button" className="sa-btn ghost" disabled={busy} onClick={() => runAction([...selected], "to_draft")}>Move to draft</button>
               <button type="button" className="sa-btn ghost" disabled={busy} onClick={() => runAction([...selected], "suspend")}>Suspend</button>
               <button type="button" className="sa-btn ghost" disabled={busy} onClick={() => runAction([...selected], "trash")}>Move to trash</button>
             </>

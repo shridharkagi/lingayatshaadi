@@ -3,6 +3,12 @@
 import { useState, useEffect } from "react";
 import { useAppConfig } from "@/contexts/AppConfigContext";
 import { adminFetch } from "@/lib/api/adminClient";
+import {
+  type WhatsAppTemplateKey,
+  type WhatsAppTemplates,
+  WHATSAPP_TEMPLATE_DEFAULTS,
+  WHATSAPP_TEMPLATE_FIELDS,
+} from "@/lib/whatsappTemplates";
 
 export default function SuperAdminSettingsPage() {
   const { config, updateConfig } = useAppConfig();
@@ -21,6 +27,14 @@ export default function SuperAdminSettingsPage() {
   const [groomsHeroImageUrl, setGroomsHeroImageUrl] = useState("");
   const [savingSeo, setSavingSeo] = useState(false);
   const [savingConfig, setSavingConfig] = useState(false);
+  const [waTemplates, setWaTemplates] = useState<WhatsAppTemplates>(WHATSAPP_TEMPLATE_DEFAULTS);
+
+  useEffect(() => {
+    setWaTemplates(config.whatsappTemplates);
+  }, [config.whatsappTemplates]);
+
+  const setTemplate = (key: WhatsAppTemplateKey, value: string) =>
+    setWaTemplates((t) => ({ ...t, [key]: value }));
 
   useEffect(() => {
     setWhatsappUrl(config.whatsappGroupUrl || "");
@@ -84,6 +98,7 @@ export default function SuperAdminSettingsPage() {
         externalScripts: externalScriptsBody,
         bridesHeroImageUrl,
         groomsHeroImageUrl,
+        whatsappTemplates: waTemplates,
       };
       const res = await adminFetch("/api/site-config", {
         method: "POST",
@@ -204,6 +219,44 @@ export default function SuperAdminSettingsPage() {
             <option>Manual review</option>
           </select>
         </div>
+
+        <hr className="my-6 border-gray-200" />
+
+        <h3 className="text-lg font-semibold text-gray-900">WhatsApp messages – upgrade buttons</h3>
+        <p className="text-xs text-gray-500 -mt-2">
+          Pre-filled text when a member taps these buttons. Words in {"{curly braces}"} are filled in automatically;
+          leave a box empty to use the default.
+        </p>
+        {WHATSAPP_TEMPLATE_FIELDS.map((f) => {
+          const isDefault = waTemplates[f.key] === WHATSAPP_TEMPLATE_DEFAULTS[f.key];
+          return (
+            <div key={f.key}>
+              <div className="flex items-baseline justify-between gap-3">
+                <label htmlFor={`wa-${f.key}`} className="block text-sm font-medium text-gray-700">{f.label}</label>
+                {!isDefault && (
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-gray-500 underline hover:text-gray-800"
+                    onClick={() => setTemplate(f.key, WHATSAPP_TEMPLATE_DEFAULTS[f.key])}
+                  >
+                    Reset to default
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5 mb-1">
+                {f.where}. Available: {f.placeholders.map((p) => `{${p}}`).join(" ")}
+              </p>
+              <textarea
+                id={`wa-${f.key}`}
+                value={waTemplates[f.key]}
+                onChange={(e) => setTemplate(f.key, e.target.value)}
+                rows={f.key === "upgradeRequest" ? 8 : 3}
+                maxLength={1000}
+                className="mt-1 w-full px-4 py-2 border rounded-lg text-sm"
+              />
+            </div>
+          );
+        })}
 
         <hr className="my-6 border-gray-200" />
 

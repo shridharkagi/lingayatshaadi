@@ -2,6 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useAppConfig } from "@/contexts/AppConfigContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { adminFetch } from "@/lib/api/adminClient";
+import { fillWhatsAppTemplate } from "@/lib/whatsappTemplates";
 import {
   CheckCircle2,
   Headset,
@@ -15,8 +19,6 @@ import {
 type PremiumUnlockModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  memberId?: string;
-  name?: string;
   whatsappNumber?: string;
   callNumber?: string;
 };
@@ -39,8 +41,6 @@ function sanitizePhone(input?: string) {
 export function PremiumUnlockModal({
   isOpen,
   onClose,
-  memberId,
-  name,
   whatsappNumber,
   callNumber,
 }: PremiumUnlockModalProps) {
@@ -58,11 +58,37 @@ export function PremiumUnlockModal({
     [callNumber, whatsappNumber]
   );
 
-  const waMessage = useMemo(() => {
-    const resolvedMemberId = (memberId || "N/A").trim();
-    const resolvedName = (name || "N/A").trim();
-    return `Hi, My member ID is: ${resolvedMemberId} and my name is ${resolvedName}, I would like to upgrade my Lingayat Bandhu membership plan. Please share details.`;
-  }, [memberId, name]);
+  const { config } = useAppConfig();
+  const { authUser, accountMeta } = useAuth();
+  // The message identifies the member who is upgrading (the logged-in
+  // account), not the profile they happen to be viewing.
+  const [accountCode, setAccountCode] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isOpen || !authUser || accountCode) return;
+    let cancelled = false;
+    adminFetch("/api/account/account-code")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json: { accountCode?: string | null } | null) => {
+        if (!cancelled && json?.accountCode) setAccountCode(json.accountCode);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, authUser, accountCode]);
+
+  const accountName =
+    accountMeta?.fullName?.trim() ||
+    [accountMeta?.firstName, accountMeta?.lastName].filter(Boolean).join(" ").trim() ||
+    "";
+  const waMessage = useMemo(
+    () =>
+      fillWhatsAppTemplate(config.whatsappTemplates.upgradeFromProfile, {
+        accountId: accountCode || "N/A",
+        name: accountName || "N/A",
+      }),
+    [config.whatsappTemplates.upgradeFromProfile, accountCode, accountName]
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -235,10 +261,10 @@ export function PremiumUnlockModal({
                 Activation support available instantly.
               </div>
               <div className="mt-1 text-center text-[10px] text-slate-400 dark:text-zinc-500">
-                {memberId || name ? (
+                {accountName || accountCode ? (
                   <span className="inline-flex items-center gap-1">
                     <UserRound size={11} />
-                    {name || "Member"} {memberId ? `(${memberId})` : ""}
+                    {accountName || "Member"} {accountCode ? `(${accountCode})` : ""}
                   </span>
                 ) : null}
               </div>

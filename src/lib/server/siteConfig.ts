@@ -6,6 +6,12 @@ import {
   DEFAULT_DATA_VISIBILITY_CONFIG,
   normalizeDataVisibilityConfig,
 } from "@/lib/dataVisibility";
+import {
+  type WhatsAppTemplates,
+  WHATSAPP_TEMPLATE_DEFAULTS,
+  normalizeWhatsAppTemplates,
+  whatsAppTemplateOverrides,
+} from "@/lib/whatsappTemplates";
 
 const CONFIG_PATH = join(process.cwd(), "data", "site-config.json");
 const SITE_SETTINGS_ROW_ID = "default";
@@ -28,6 +34,8 @@ export type SiteConfig = {
   bridesHeroImageUrl: string;
   groomsHeroImageUrl: string;
   profileFieldVisibility: DataVisibilityConfig;
+  /** Pre-filled WhatsApp messages for upgrade buttons (admin-editable). */
+  whatsappTemplates: WhatsAppTemplates;
 };
 
 export const DEFAULT_SITE_CONFIG: SiteConfig = {
@@ -48,6 +56,7 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
   groomsHeroImageUrl:
     "https://images.unsplash.com/photo-1606800052052-a08af7148866?w=1600&q=70&fit=crop",
   profileFieldVisibility: DEFAULT_DATA_VISIBILITY_CONFIG,
+  whatsappTemplates: WHATSAPP_TEMPLATE_DEFAULTS,
 };
 
 function asRecord(v: unknown): Record<string, unknown> | null {
@@ -61,6 +70,7 @@ export function normalizeSiteConfig(raw: Record<string, unknown> | null | undefi
     merged.externalScriptsBody = merged.externalScripts;
   }
   merged.profileFieldVisibility = normalizeDataVisibilityConfig(merged.profileFieldVisibility);
+  merged.whatsappTemplates = normalizeWhatsAppTemplates(merged.whatsappTemplates);
   return merged;
 }
 
@@ -122,7 +132,12 @@ export async function mergeAndPersistSiteConfig(partial: Partial<SiteConfig>): P
   { ok: true } | { ok: false; error: string }
 > {
   const current = await readSiteConfig();
-  const updated = normalizeSiteConfig({ ...current, ...partial } as Record<string, unknown>);
+  const merged = normalizeSiteConfig({ ...current, ...partial } as Record<string, unknown>);
+  // Persist only edited WhatsApp messages so later default improvements still apply.
+  const updated = {
+    ...merged,
+    whatsappTemplates: whatsAppTemplateOverrides(merged.whatsappTemplates),
+  } as unknown as SiteConfig;
 
   const admin = createSupabaseAdminSafe();
   if (admin) {

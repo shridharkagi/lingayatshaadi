@@ -46,12 +46,17 @@ export async function POST(req: NextRequest) {
         body.action === "suspend" ? "suspended" : body.action === "to_draft" ? "pending" : "verified";
       const nextModeration = body.action === "to_draft" ? "draft" : null;
       const nextVerified = body.action === "to_draft" ? false : undefined;
+      // Moving to draft takes the profile offline. Public listings fall back to
+      // `approved_snapshot` while edits are pending, so the snapshot must go too
+      // or the profile keeps showing. Re-approval creates a fresh snapshot.
+      const unpublish = body.action === "to_draft" ? { approved_snapshot: null } : {};
       const { error } = await admin
         .from("profiles")
         .update({
           profile_status: nextStatus,
           ...(nextModeration ? { moderation_status: nextModeration } : {}),
           ...(typeof nextVerified === "boolean" ? { verified: nextVerified } : {}),
+          ...unpublish,
         })
         .eq("id", body.profileId);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
