@@ -477,35 +477,6 @@ export async function POST(req: NextRequest) {
   }
   const nowIso = now;
   const replacementNote = `Expired automatically: replaced by newly assigned plan ${planRow.name} on ${new Date(nowIso).toLocaleString("en-IN")}.`;
-  for (const row of existingSubs || []) {
-    const sid = String(row.id || "");
-    if (!sid) continue;
-    const startsAtOld = String(row.starts_at || "");
-    const alreadyFuture = startsAtOld && startsAtOld > nowIso;
-    const targetExpiresAt = alreadyFuture ? startsAtOld : nowIso;
-    const noteValue = appendReplacementNote(row.notes, replacementNote);
-    let upd = await admin
-      .from("user_subscriptions")
-      .update({
-        status: "expired",
-        expires_at: targetExpiresAt,
-        notes: noteValue,
-      })
-      .eq("id", sid);
-    if (
-      upd.error &&
-      (isSchemaMismatchError(upd.error.message) || isUserSubscriptionsNotesColumnError(upd.error.message))
-    ) {
-      upd = await admin
-        .from("user_subscriptions")
-        .update({
-          status: "expired",
-          expires_at: targetExpiresAt,
-        })
-        .eq("id", sid);
-    }
-  }
-
   const subscriptionUserIdCandidates = Array.from(new Set([normalizedUserId, ...ownedProfileIds]));
   let subscriptionRowUserId = subscriptionUserIdCandidates[0] || normalizedUserId;
   let subscription: Record<string, unknown> | null = null;
@@ -562,6 +533,38 @@ export async function POST(req: NextRequest) {
   }
   const createdSubscription = subscription as Record<string, unknown>;
   const createdSubscriptionId = String(createdSubscription.id || "");
+
+  // End the previous active plan(s) only AFTER the new subscription is saved,
+  // so a failed insert never leaves the member without a plan.
+  for (const row of existingSubs || []) {
+    const sid = String(row.id || "");
+    if (!sid || sid === createdSubscriptionId) continue;
+    const startsAtOld = String(row.starts_at || "");
+    const alreadyFuture = startsAtOld && startsAtOld > nowIso;
+    const targetExpiresAt = alreadyFuture ? startsAtOld : nowIso;
+    const noteValue = appendReplacementNote(row.notes, replacementNote);
+    let upd = await admin
+      .from("user_subscriptions")
+      .update({
+        status: "expired",
+        expires_at: targetExpiresAt,
+        notes: noteValue,
+      })
+      .eq("id", sid);
+    if (
+      upd.error &&
+      (isSchemaMismatchError(upd.error.message) || isUserSubscriptionsNotesColumnError(upd.error.message))
+    ) {
+      upd = await admin
+        .from("user_subscriptions")
+        .update({
+          status: "expired",
+          expires_at: targetExpiresAt,
+        })
+        .eq("id", sid);
+    }
+  }
+
 
   const transactionUserIdCandidates = Array.from(
     new Set([normalizedUserId, subscriptionRowUserId, ...ownedProfileIds].filter(Boolean))

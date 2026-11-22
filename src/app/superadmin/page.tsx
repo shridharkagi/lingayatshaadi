@@ -1,562 +1,503 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Users,
-  UserPlus,
-  Heart,
-  ShieldCheck,
-  Clock,
-  Ban,
-  XCircle,
-  Crown,
-  Sparkles,
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  BadgeIndianRupee,
+  CalendarClock,
+  ImageIcon,
   RefreshCw,
+  ShieldCheck,
+  UserRoundCheck,
+  UserRoundX,
   type LucideIcon,
 } from "lucide-react";
-import { createSupabaseClientSafe } from "@/lib/supabase";
-import {
-  DateRangeFilter,
-  rangeFromPreset,
-  type DateRange,
-} from "@/components/superadmin/DateRangeFilter";
+import { adminFetch } from "@/lib/api/adminClient";
 
-interface StatsResponse {
-  range: { from?: string; to?: string };
-  signups: number;
-  profiles: number;
-  brides: number;
-  grooms: number;
-  status: { verified: number; pending: number; rejected: number; suspended: number };
-  type: { premium: number; free: number };
-  relationship: Record<string, number>;
-  recent: Array<{
-    id: string;
-    publicId: string | null;
-    fullName: string;
-    gender: string | null;
-    profilePhoto: string | null;
-    createdAt: string;
-  }>;
-}
-
-interface SubscriptionOverviewResponse {
-  totals?: {
-    activeSubscriptions?: number;
-    expiringIn7Days?: number;
-    totalCollected?: number;
-  };
-  subscriptionsByPlan?: Array<{
-    planId: string;
-    planName: string;
-    activeCount: number;
-    catalogPlanId: string | null;
-  }>;
-  recentSubscriptions?: Array<{
-    id: string;
-    planName: string;
-    status: string;
-    expiresAt: string | null;
-    createdAt: string | null;
-    memberLabel: string;
-  }>;
-  setupWarning?: string | null;
-}
-
-const RELATIONSHIP_LABELS: Record<string, string> = {
-  self: "Self",
-  son: "Son",
-  daughter: "Daughter",
-  brother: "Brother",
-  sister: "Sister",
-  other: "Other Dependent",
+type Overview = {
+  inbox: Record<string, number | string | null>;
+  kpis: Record<string, number>;
+  funnel: { accounts: number; withProfile: number; withLiveProfile: number; paid: number };
+  series: { day: string; signups: number; approvals: number }[];
+  mix: { gender: Record<string, number>; state: Record<string, number>; age: Record<string, number> };
+  recent: { action: string; entityType: string; entityId: string; at: string }[];
 };
 
-function formatDate(iso: string): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const today = new Date();
-  const sameDay =
-    d.getUTCFullYear() === today.getUTCFullYear() &&
-    d.getUTCMonth() === today.getUTCMonth() &&
-    d.getUTCDate() === today.getUTCDate();
-  if (sameDay) return `Today, ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
-  return d.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+const RANGES = [
+  { id: "7d", label: "7 days" },
+  { id: "30d", label: "30 days" },
+  { id: "90d", label: "90 days" },
+  { id: "365d", label: "12 months" },
+];
+
+const inr = (n: number) => `₹${Math.round(n || 0).toLocaleString("en-IN")}`;
+const num = (n: number) => (n || 0).toLocaleString("en-IN");
+
+function timeAgo(iso?: string | null) {
+  if (!iso) return "";
+  const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+  const d = Math.floor(s / 86400);
+  return d === 1 ? "yesterday" : `${d} days ago`;
 }
 
-interface KpiProps {
-  label: string;
-  value: number | string;
+function Delta({ cur, prev, suffix = "vs previous period" }: { cur: number; prev: number; suffix?: string }) {
+  if (!prev && !cur) return <span className="ad-flat">No activity yet</span>;
+  if (!prev) return <span className="ad-up">▲ new · {suffix}</span>;
+  const pct = Math.round(((cur - prev) / prev) * 100);
+  if (pct === 0) return <span className="ad-flat">● same as previous period</span>;
+  return (
+    <span className={pct > 0 ? "ad-up" : "ad-down"}>
+      {pct > 0 ? "▲" : "▼"} {Math.abs(pct)}% {suffix}
+    </span>
+  );
+}
+
+const ACTION_LABEL: Record<string, [string, string]> = {
+  "profile.approve": ["Approved", "t-green"],
+  "profile.reject": ["Rejected", "t-rose"],
+  "profile.suspend": ["Suspended", "t-rose"],
+  "profile.unsuspend": ["Unsuspended", "t-teal"],
+  "profile.trash": ["Trashed", "t-rose"],
+  "profile.restore": ["Restored", "t-teal"],
+  "profile.purge": ["Purged", "t-rose"],
+  "profile.transfer": ["Transferred", "t-indigo"],
+  "photo.approve": ["Photo OK", "t-green"],
+  "photo.reject": ["Photo rejected", "t-rose"],
+  "subscription.assign": ["Plan", "t-indigo"],
+  "subscription.adjust": ["Quota", "t-amber"],
+  "subscription.refund": ["Refund", "t-rose"],
+};
+
+function describe(action: string, entityType: string) {
+  const [label, cls] = ACTION_LABEL[action] || [action.split(".").pop() || action, "t-grey"];
+  return { label, cls, text: `${label} · ${entityType.replace(/_/g, " ")}` };
+}
+
+function InboxCard({
+  href,
+  icon: Icon,
+  tone,
+  n,
+  title,
+  meta,
+  chip,
+  delay,
+}: {
+  href: string;
   icon: LucideIcon;
-  tone: "primary" | "blue" | "rose" | "violet" | "amber" | "green" | "red" | "gray";
-  hint?: string;
-}
-
-const TONE_STYLES: Record<KpiProps["tone"], { bg: string; text: string }> = {
-  primary: { bg: "bg-[var(--primary)]", text: "text-[var(--primary)]" },
-  blue: { bg: "bg-blue-500", text: "text-blue-600" },
-  rose: { bg: "bg-rose-500", text: "text-rose-600" },
-  violet: { bg: "bg-violet-500", text: "text-violet-600" },
-  amber: { bg: "bg-amber-500", text: "text-amber-600" },
-  green: { bg: "bg-emerald-500", text: "text-emerald-600" },
-  red: { bg: "bg-red-500", text: "text-red-600" },
-  gray: { bg: "bg-gray-500", text: "text-gray-600" },
-};
-
-function KpiCard({ label, value, icon: Icon, tone, hint }: KpiProps) {
-  const t = TONE_STYLES[tone];
+  tone: string;
+  n: number;
+  title: string;
+  meta: string;
+  chip?: { text: string; cls: string } | null;
+  delay: number;
+}) {
   return (
-    <div className="bg-white rounded-xl shadow-sm p-5 flex items-start justify-between gap-3">
-      <div className="min-w-0">
-        <p className="text-xs uppercase tracking-wide text-gray-500">{label}</p>
-        <p className="text-2xl font-bold text-gray-900 mt-1 truncate">{value}</p>
-        {hint && <p className={`text-xs mt-1 ${t.text}`}>{hint}</p>}
+    <Link href={href} className={`ad-card hover ad-task ${n === 0 ? "zero" : ""}`} style={{ animationDelay: `${delay}s` }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span className={`ad-ico ${tone}`}>
+          <Icon size={20} />
+        </span>
+        {chip && n > 0 && <span className={`ad-chip ${chip.cls}`}>{chip.text}</span>}
       </div>
-      <div className={`w-11 h-11 rounded-xl ${t.bg} flex items-center justify-center text-white shrink-0`}>
-        <Icon size={22} className="text-white" />
+      <div className="n">{num(n)}</div>
+      <div style={{ fontWeight: 600 }}>{title}</div>
+      <div className="ad-muted" style={{ fontSize: 12 }}>
+        {n === 0 ? "All clear" : meta}
       </div>
-    </div>
+    </Link>
   );
 }
 
-function ProgressBar({ value, total, color }: { value: number; total: number; color: string }) {
-  const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+function Skeleton() {
   return (
-    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-      <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
-    </div>
-  );
-}
-
-function DashboardSkeleton() {
-  const bar = "h-8 rounded-lg bg-gray-200/80 animate-pulse";
-  return (
-    <div className="space-y-6" aria-hidden>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="bg-white rounded-xl shadow-sm p-5 space-y-3">
-            <div className="h-3 w-24 rounded bg-gray-200/80 animate-pulse" />
-            <div className={bar} />
-          </div>
+    <div style={{ display: "grid", gap: 14 }}>
+      <div className="ad-grid-inbox">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="ad-skel" style={{ height: 150 }} />
         ))}
       </div>
-      <div className="h-40 rounded-xl bg-white shadow-sm border border-gray-100 overflow-hidden">
-        <div className="h-full bg-gradient-to-r from-gray-100/0 via-gray-100/80 to-gray-100/0 animate-pulse" />
+      <div className="ad-grid-kpi">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="ad-skel" style={{ height: 110 }} />
+        ))}
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="h-64 rounded-xl bg-white shadow-sm p-5 space-y-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className={bar} />
-          ))}
-        </div>
-        <div className="h-64 rounded-xl bg-white shadow-sm p-5 space-y-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className={bar} />
-          ))}
-        </div>
+      <div className="ad-grid-2">
+        <div className="ad-skel" style={{ height: 280 }} />
+        <div className="ad-skel" style={{ height: 280 }} />
       </div>
     </div>
   );
 }
 
-export default function SuperAdminDashboard() {
-  const [range, setRange] = useState<DateRange>(() => rangeFromPreset("all"));
-  const [stats, setStats] = useState<StatsResponse | null>(null);
-  const [subscriptionOverview, setSubscriptionOverview] = useState<SubscriptionOverviewResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+export default function AdminOverviewPage() {
+  const [range, setRange] = useState("30d");
+  const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
 
-  const fetchStats = useMemo(
-    () => async (r: DateRange) => {
-      setLoading(true);
-      setError(null);
-      try {
-        const supabase = createSupabaseClientSafe();
-        if (!supabase) {
-          throw new Error("Supabase not configured");
-        }
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token;
-        if (!token) {
-          throw new Error("Not signed in");
-        }
-        const params = new URLSearchParams();
-        if (r.from) params.set("from", r.from);
-        if (r.to) params.set("to", r.to);
-        const [statsRes, subRes] = await Promise.all([
-          fetch(`/api/superadmin/stats?${params.toString()}`, {
-            headers: { Authorization: `Bearer ${token}` },
-            cache: "no-store",
-          }),
-          fetch("/api/superadmin/subscriptions/overview", {
-            headers: { Authorization: `Bearer ${token}` },
-            cache: "no-store",
-          }),
-        ]);
-        const [json, subJson] = await Promise.all([
-          statsRes.json() as Promise<StatsResponse & { error?: string }>,
-          subRes.json() as Promise<SubscriptionOverviewResponse & { error?: string }>,
-        ]);
-        if (!statsRes.ok) {
-          throw new Error((json as { error?: string })?.error || `Request failed (${statsRes.status})`);
-        }
-        setStats(json as StatsResponse);
-        if (subRes.ok) {
-          setSubscriptionOverview(subJson);
-        } else {
-          setSubscriptionOverview(null);
-        }
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load stats");
-        setStats(null);
-        setSubscriptionOverview(null);
-      } finally {
-        setLoading(false);
-      }
-    },
-    []
-  );
+  const load = useCallback(async (r: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await adminFetch(`/api/superadmin/overview?range=${r}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to load overview");
+      setData(json);
+      setUpdatedAt(new Date());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load overview");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    fetchStats(range);
-  }, [range, fetchStats]);
+    load(range);
+  }, [range, load]);
 
-  const totalProfiles = stats?.profiles || 0;
-  const conversion =
-    stats && stats.signups > 0 ? Math.round((stats.profiles / stats.signups) * 100) : null;
+  const inbox = data?.inbox || {};
+  const k = data?.kpis || ({} as Record<string, number>);
+  const n = (key: string) => Number(inbox[key] || 0);
+  const totalTasks =
+    n("pendingProfiles") + n("pendingPhotos") + n("pendingKyc") + n("upgradeOpen") + n("deletionRequests");
+  const rangeLabel = RANGES.find((r) => r.id === range)?.label || "";
+
+  const series = useMemo(
+    () =>
+      (data?.series || []).map((d) => ({
+        ...d,
+        label: new Date(d.day).toLocaleDateString("en-IN", { day: "numeric", month: "short" }),
+      })),
+    [data]
+  );
+
+  const gender = data?.mix.gender || {};
+  const genderTotal = (gender.female || 0) + (gender.male || 0) || 1;
+  const states = Object.entries(data?.mix.state || {}).sort((a, b) => b[1] - a[1]);
+  const stateTotal = states.reduce((s, [, v]) => s + v, 0) || 1;
+  const stateColors = ["#e67300", "#f2a93b", "#5b3aa8", "#0e6b73", "#c9cbd8"];
+  const ageOrder = ["18-23", "24-28", "29-33", "34-40", "41+"];
+  const ages = ageOrder.map((a) => ({ band: a, n: data?.mix.age?.[a] || 0 }));
+
+  const f = data?.funnel;
+  const funnel = f
+    ? [
+        { label: "Accounts", n: f.accounts, grad: "linear-gradient(90deg,#3f46b8,#6b5bd6)" },
+        { label: "Created a profile", n: f.withProfile, grad: "linear-gradient(90deg,#5b3aa8,#9a4fc4)" },
+        { label: "Profile live", n: f.withLiveProfile, grad: "linear-gradient(90deg,#c2367a,#e0457b)" },
+        { label: "Paid", n: f.paid, grad: "linear-gradient(90deg,#e67300,#f2a93b)" },
+      ]
+    : [];
+  const funnelMax = Math.max(f?.accounts || 1, 1);
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between flex-wrap gap-3">
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-end", gap: 12 }}>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-500 mt-1">Real-time platform metrics</p>
+          <h1 className="ad-h1">{greeting}</h1>
+          <p className="ad-muted" style={{ margin: "4px 0 0" }}>
+            {loading && !data
+              ? "Loading your dashboard…"
+              : totalTasks > 0
+                ? `${num(totalTasks)} items need your attention.`
+                : "You're all caught up."}{" "}
+            Numbers below cover the last {rangeLabel.toLowerCase()}.
+          </p>
         </div>
-        <button
-          type="button"
-          onClick={() => fetchStats(range)}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50"
-          disabled={loading}
-        >
-          <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-          {loading ? "Refreshing…" : "Refresh"}
-        </button>
-      </div>
-
-      <DateRangeFilter value={range} onChange={setRange} />
-
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 text-sm">
-          {error}
-        </div>
-      )}
-
-      {loading && !stats ? (
-        <DashboardSkeleton />
-      ) : (
-        <>
-      {/* KPI cards */}
-      <div
-        className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 ${loading && stats ? "opacity-60 transition-opacity" : ""}`}
-      >
-        <KpiCard
-          label="Total Signups"
-          value={stats?.signups ?? "—"}
-          icon={UserPlus}
-          tone="blue"
-          hint={range.preset === "all" ? "Auth users (all time)" : "Auth users in range"}
-        />
-        <KpiCard
-          label="Full Profiles"
-          value={stats?.profiles ?? "—"}
-          icon={Users}
-          tone="primary"
-          hint={
-            conversion != null
-              ? `${conversion}% of signups completed a profile`
-              : "Profiles created in range"
-          }
-        />
-        <KpiCard
-          label="Brides"
-          value={stats?.brides ?? "—"}
-          icon={Heart}
-          tone="rose"
-          hint={totalProfiles ? `${Math.round(((stats?.brides || 0) / totalProfiles) * 100)}% of profiles` : undefined}
-        />
-        <KpiCard
-          label="Grooms"
-          value={stats?.grooms ?? "—"}
-          icon={Heart}
-          tone="violet"
-          hint={totalProfiles ? `${Math.round(((stats?.grooms || 0) / totalProfiles) * 100)}% of profiles` : undefined}
-        />
-      </div>
-
-      {/* Subscription snapshot (global, not date-filtered) */}
-      {subscriptionOverview && (
-        <div className="bg-white rounded-xl shadow-sm p-5 border border-amber-100">
-          <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-            <div>
-              <h2 className="font-semibold text-gray-900">Subscriptions snapshot</h2>
-              <p className="text-xs text-gray-500 mt-1">
-                Live counts from the database (not tied to the date range above). Per-account spend is on{" "}
-                <Link href="/superadmin/users" className="text-[var(--primary)] font-medium underline">
-                  Users
-                </Link>
-                .
-              </p>
-            </div>
-            <Link
-              href="/superadmin/subscriptions"
-              className="text-sm text-[var(--primary)] font-medium hover:underline shrink-0"
-            >
-              Manage plans & assignments →
-            </Link>
-          </div>
-          {subscriptionOverview.setupWarning && (
-            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 mb-3">
-              {subscriptionOverview.setupWarning}
-            </p>
-          )}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-            <KpiCard
-              label="Active subscriptions"
-              value={subscriptionOverview.totals?.activeSubscriptions ?? "—"}
-              icon={Crown}
-              tone="amber"
-            />
-            <KpiCard
-              label="Expiring in 7 days"
-              value={subscriptionOverview.totals?.expiringIn7Days ?? "—"}
-              icon={Clock}
-              tone="amber"
-              hint="Active rows ending this week"
-            />
-            <KpiCard
-              label="Collected (sample)"
-              value={
-                subscriptionOverview.totals?.totalCollected != null
-                  ? `₹${Number(subscriptionOverview.totals.totalCollected).toLocaleString("en-IN")}`
-                  : "—"
-              }
-              icon={Sparkles}
-              tone="green"
-              hint="Sum of up to 2,000 most recent paid transactions"
-            />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div>
-              <h3 className="text-sm font-semibold text-gray-800 mb-2">Active members by plan</h3>
-              <div className="border border-gray-100 rounded-lg overflow-hidden max-h-56 overflow-y-auto">
-                <table className="w-full text-xs">
-                  <thead className="bg-gray-50 text-gray-500 sticky top-0">
-                    <tr>
-                      <th className="text-left px-2 py-2">Plan</th>
-                      <th className="text-right px-2 py-2 w-16">Count</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(subscriptionOverview.subscriptionsByPlan || []).length === 0 ? (
-                      <tr>
-                        <td colSpan={2} className="px-2 py-3 text-gray-500">
-                          No active subscriptions.
-                        </td>
-                      </tr>
-                    ) : (
-                      (subscriptionOverview.subscriptionsByPlan || []).map((row) => (
-                        <tr key={row.planId} className="border-t border-gray-100">
-                          <td className="px-2 py-1.5 text-gray-900">{row.planName}</td>
-                          <td className="px-2 py-1.5 text-right font-medium">{row.activeCount}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-gray-800 mb-2">Recent subscriptions</h3>
-              <div className="border border-gray-100 rounded-lg overflow-hidden max-h-56 overflow-y-auto">
-                <table className="w-full text-xs">
-                  <thead className="bg-gray-50 text-gray-500 sticky top-0">
-                    <tr>
-                      <th className="text-left px-2 py-2">Member</th>
-                      <th className="text-left px-2 py-2">Plan</th>
-                      <th className="text-left px-2 py-2">Ends</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(subscriptionOverview.recentSubscriptions || []).slice(0, 10).length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="px-2 py-3 text-gray-500">
-                          No rows.
-                        </td>
-                      </tr>
-                    ) : (
-                      (subscriptionOverview.recentSubscriptions || []).slice(0, 10).map((r) => (
-                        <tr key={r.id} className="border-t border-gray-100">
-                          <td className="px-2 py-1.5 text-gray-900 max-w-[140px] truncate" title={r.memberLabel}>
-                            {r.memberLabel}
-                          </td>
-                          <td className="px-2 py-1.5">{r.planName}</td>
-                          <td className="px-2 py-1.5 whitespace-nowrap text-gray-600">
-                            {r.expiresAt ? formatDate(r.expiresAt) : "—"}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Status + Subscription */}
-      <div className={`grid grid-cols-1 lg:grid-cols-2 gap-4 ${loading && stats ? "opacity-60 transition-opacity" : ""}`}>
-        <div className="bg-white rounded-xl shadow-sm p-5">
-          <h2 className="font-semibold text-gray-900 mb-4">Profile Status</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <KpiCard label="Verified" value={stats?.status?.verified ?? "—"} icon={ShieldCheck} tone="green" />
-            <KpiCard label="Pending" value={stats?.status?.pending ?? "—"} icon={Clock} tone="amber" />
-            <KpiCard label="Rejected" value={stats?.status?.rejected ?? "—"} icon={XCircle} tone="red" />
-            <KpiCard label="Suspended" value={stats?.status?.suspended ?? "—"} icon={Ban} tone="gray" />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm p-5">
-          <h2 className="font-semibold text-gray-900 mb-1">Profile type (premium / free)</h2>
-          <p className="text-xs text-gray-500 mb-4">Based on profile records, not payment subscriptions.</p>
-          <div className="grid grid-cols-2 gap-3 mb-5">
-            <KpiCard label="Premium" value={stats?.type?.premium ?? "—"} icon={Crown} tone="amber" />
-            <KpiCard label="Free" value={stats?.type?.free ?? "—"} icon={Sparkles} tone="gray" />
-          </div>
-          <div className="space-y-3">
-            <div>
-              <div className="flex justify-between text-xs text-gray-600 mb-1">
-                <span>Brides vs Grooms</span>
-                <span>
-                  {stats?.brides ?? 0} / {stats?.grooms ?? 0}
-                </span>
-              </div>
-              <div className="flex gap-1 h-2">
-                <div
-                  className="bg-rose-500 rounded-l-full transition-all"
-                  style={{
-                    width: `${
-                      totalProfiles
-                        ? Math.round(((stats?.brides || 0) / totalProfiles) * 100)
-                        : 0
-                    }%`,
-                  }}
-                />
-                <div
-                  className="bg-violet-500 rounded-r-full transition-all"
-                  style={{
-                    width: `${
-                      totalProfiles
-                        ? Math.round(((stats?.grooms || 0) / totalProfiles) * 100)
-                        : 0
-                    }%`,
-                  }}
-                />
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between text-xs text-gray-600 mb-1">
-                <span>Premium share</span>
-                <span>
-                  {stats && stats.profiles > 0
-                    ? `${Math.round((stats.type.premium / stats.profiles) * 100)}%`
-                    : "—"}
-                </span>
-              </div>
-              <ProgressBar
-                value={stats?.type.premium || 0}
-                total={stats?.profiles || 0}
-                color="bg-amber-500"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Relationship breakdown + recent registrations */}
-      <div className={`grid grid-cols-1 lg:grid-cols-2 gap-4 ${loading && stats ? "opacity-60 transition-opacity" : ""}`}>
-        <div className="bg-white rounded-xl shadow-sm p-5">
-          <h2 className="font-semibold text-gray-900 mb-4">Profiles by Relationship</h2>
-          {stats && Object.keys(stats.relationship).length === 0 && (
-            <p className="text-sm text-gray-500">No profiles in selected range.</p>
-          )}
-          <div className="space-y-3">
-            {stats &&
-              Object.entries(stats.relationship)
-                .sort((a, b) => b[1] - a[1])
-                .map(([rel, count]) => (
-                  <div key={rel}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-700">
-                        {RELATIONSHIP_LABELS[rel] || rel}
-                      </span>
-                      <span className="text-gray-500">{count}</span>
-                    </div>
-                    <ProgressBar value={count} total={totalProfiles} color="bg-[var(--primary)]" />
-                  </div>
-                ))}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-gray-900">Recent Registrations</h2>
-            <Link
-              href="/superadmin/users"
-              className="text-sm text-[var(--primary)] font-medium hover:underline"
-            >
-              View all
-            </Link>
-          </div>
-          {stats?.recent?.length === 0 && (
-            <p className="text-sm text-gray-500">No profiles in selected range.</p>
-          )}
-          <div className="space-y-2">
-            {(stats?.recent ?? []).map((p) => (
-              <div key={p.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50">
-                <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
-                  {p.profilePhoto ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={p.profilePhoto}
-                      alt={p.fullName}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">
-                      {p.fullName?.charAt(0) || "?"}
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900 truncate">{p.fullName || "—"}</p>
-                  <p className="text-xs text-gray-500">
-                    {p.publicId || "—"}
-                    {p.gender ? ` · ${p.gender === "female" ? "Bride" : "Groom"}` : ""}
-                  </p>
-                </div>
-                <span className="text-xs text-gray-500 whitespace-nowrap">
-                  {formatDate(p.createdAt)}
-                </span>
-              </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <div className="ad-pills" role="group" aria-label="Date range">
+            {RANGES.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                className={`ad-pill ${range === r.id ? "on" : ""}`}
+                onClick={() => setRange(r.id)}
+                aria-pressed={range === r.id}
+              >
+                {r.label}
+              </button>
             ))}
           </div>
+          <button type="button" className="ad-btn ghost" onClick={() => load(range)} aria-label="Refresh" title={updatedAt ? `Updated ${updatedAt.toLocaleTimeString("en-IN")}` : "Refresh"}>
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+          </button>
         </div>
       </div>
-        </>
+
+      {error && (
+        <div className="ad-card" style={{ borderColor: "#f3c4d4", color: "#b42358" }}>
+          Couldn&apos;t load the dashboard: {error}{" "}
+          <button type="button" className="ad-btn ghost" style={{ marginLeft: 8 }} onClick={() => load(range)}>
+            Try again
+          </button>
+        </div>
       )}
+
+      {!data && loading ? (
+        <Skeleton />
+      ) : data ? (
+        <>
+          <section aria-label="Action inbox" className="ad-grid-inbox">
+            <InboxCard
+              href="/superadmin/moderation"
+              icon={UserRoundCheck}
+              tone="t-amber"
+              n={n("pendingProfiles")}
+              title="Profiles to review"
+              meta={`${n("pendingNew")} new · ${n("pendingEdits")} edits after approval`}
+              chip={inbox.oldestPendingAt ? { text: `Oldest ${timeAgo(String(inbox.oldestPendingAt))}`, cls: "t-amber" } : null}
+              delay={0.02}
+            />
+            <InboxCard
+              href="/superadmin/moderation"
+              icon={ImageIcon}
+              tone="t-plum"
+              n={n("pendingPhotos")}
+              title="Photos to approve"
+              meta={`across ${n("pendingPhotoProfiles")} profiles`}
+              delay={0.06}
+            />
+            <InboxCard
+              href="/superadmin/verifications"
+              icon={ShieldCheck}
+              tone="t-indigo"
+              n={n("pendingKyc")}
+              title="KYC documents"
+              meta="waiting for verification"
+              delay={0.1}
+            />
+            <InboxCard
+              href="/superadmin/subscriptions"
+              icon={BadgeIndianRupee}
+              tone="t-green"
+              n={n("upgradeOpen")}
+              title="Upgrade requests"
+              meta={`${n("upgradeNew")} not yet contacted`}
+              chip={n("upgradeNew") > 0 ? { text: `${n("upgradeNew")} new`, cls: "t-rose" } : null}
+              delay={0.14}
+            />
+            <InboxCard
+              href="/superadmin/subscriptions"
+              icon={CalendarClock}
+              tone="t-teal"
+              n={n("plansExpiring7d")}
+              title="Plans expiring"
+              meta="in the next 7 days"
+              delay={0.18}
+            />
+            <InboxCard
+              href="/superadmin/deletion-requests"
+              icon={UserRoundX}
+              tone="t-rose"
+              n={n("deletionRequests")}
+              title="Deletion requests"
+              meta="waiting for a decision"
+              delay={0.22}
+            />
+          </section>
+
+          <section aria-label="Key numbers" className="ad-grid-kpi">
+            <div className="ad-card ad-kpi">
+              <div className="ad-muted" style={{ fontSize: 13 }}>Accounts (logins)</div>
+              <div className="v">{num(k.accountsTotal)}</div>
+              <span className="ad-muted" style={{ fontSize: 12 }}>
+                +{num(k.accountsNew)} new · <Delta cur={k.accountsNew} prev={k.accountsNewPrev} suffix="" />
+              </span>
+            </div>
+            <div className="ad-card ad-kpi">
+              <div className="ad-muted" style={{ fontSize: 13 }}>Live profiles</div>
+              <div className="v">{num(k.liveProfiles)}</div>
+              <span className="ad-muted" style={{ fontSize: 12 }}>
+                of {num(k.profilesTotal)} profiles · {num(k.approvedInRange)} approved
+              </span>
+            </div>
+            <div className="ad-card ad-kpi">
+              <div className="ad-muted" style={{ fontSize: 13 }}>Paid members (active)</div>
+              <div className="v">{num(k.paidMembers)}</div>
+              <span className="ad-muted" style={{ fontSize: 12 }}>
+                {k.accountsTotal ? Math.round((k.paidMembers / k.accountsTotal) * 100) : 0}% of accounts
+              </span>
+            </div>
+            <div className="ad-card ad-kpi">
+              <div className="ad-muted" style={{ fontSize: 13 }}>Revenue collected</div>
+              <div className="v">{inr(k.revenue)}</div>
+              <Delta cur={k.revenue} prev={k.revenuePrev} />
+            </div>
+            <div className="ad-card ad-kpi">
+              <div className="ad-muted" style={{ fontSize: 13 }}>Contact views</div>
+              <div className="v">{num(k.contactViews)}</div>
+              <Delta cur={k.contactViews} prev={k.contactViewsPrev} />
+            </div>
+            <div className="ad-card ad-kpi">
+              <div className="ad-muted" style={{ fontSize: 13 }}>Profile views</div>
+              <div className="v">{num(k.profileViews)}</div>
+              <Delta cur={k.profileViews} prev={k.profileViewsPrev} />
+            </div>
+          </section>
+
+          <section className="ad-grid-2">
+            <div className="ad-card">
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
+                <h2 className="ad-h2">Growth funnel</h2>
+                <span className="ad-muted" style={{ fontSize: 12 }}>All time · by account</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {funnel.map((s, i) => {
+                  const prev = i > 0 ? funnel[i - 1].n : 0;
+                  const conv = i > 0 && prev ? ` · ${Math.round((s.n / prev) * 100)}%` : "";
+                  return (
+                    <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div className="ad-muted" style={{ width: 130, fontSize: 12, flex: "none" }}>{s.label}</div>
+                      <div style={{ flex: 1 }}>
+                        <div
+                          className="ad-funnel-bar"
+                          style={{ width: `${Math.max((s.n / funnelMax) * 100, 6)}%`, background: s.grad, animationDelay: `${i * 0.08}s` }}
+                        >
+                          {num(s.n)}
+                          {conv}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="ad-muted" style={{ fontSize: 12, margin: "14px 0 0" }}>
+                Percentages show how many moved on from the step before.
+              </p>
+            </div>
+
+            <div className="ad-card">
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
+                <h2 className="ad-h2">Signups &amp; approvals</h2>
+                <div className="ad-muted" style={{ fontSize: 12, display: "flex", gap: 14 }}>
+                  <span><span className="ad-dot" style={{ background: "#e67300" }} />Signups</span>
+                  <span><span className="ad-dot" style={{ background: "#3f46b8" }} />Approvals</span>
+                </div>
+              </div>
+              <div style={{ height: 230 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={series} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="gSign" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0" stopColor="#e67300" stopOpacity={0.28} />
+                        <stop offset="1" stopColor="#e67300" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="gAppr" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0" stopColor="#3f46b8" stopOpacity={0.18} />
+                        <stop offset="1" stopColor="#3f46b8" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke="#eef0f5" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#5f6275" }} tickLine={false} axisLine={false} minTickGap={24} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#5f6275" }} tickLine={false} axisLine={false} />
+                    <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #ecedf4", boxShadow: "0 12px 28px rgba(30,27,46,.12)" }} />
+                    <Area type="monotone" dataKey="signups" name="Signups" stroke="#e67300" strokeWidth={2.5} fill="url(#gSign)" />
+                    <Area type="monotone" dataKey="approvals" name="Approvals" stroke="#3f46b8" strokeWidth={2.5} fill="url(#gAppr)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </section>
+
+          <section className="ad-grid-2">
+            <div className="ad-card">
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
+                <h2 className="ad-h2">Live profile mix</h2>
+                <Link href="/superadmin/analytics" style={{ fontSize: 12 }}>Open reports</Link>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                    <span>Brides {Math.round(((gender.female || 0) / genderTotal) * 100)}% · {gender.female || 0}</span>
+                    <span>Grooms {Math.round(((gender.male || 0) / genderTotal) * 100)}% · {gender.male || 0}</span>
+                  </div>
+                  <div className="ad-mix" style={{ marginTop: 6 }}>
+                    <div style={{ width: `${((gender.female || 0) / genderTotal) * 100}%`, background: "#e0457b" }} />
+                    <div style={{ width: `${((gender.male || 0) / genderTotal) * 100}%`, background: "#3f46b8" }} />
+                  </div>
+                </div>
+                <div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 12, fontSize: 12 }}>
+                    {states.slice(0, 5).map(([s, v], i) => (
+                      <span key={s}>
+                        <span className="ad-dot" style={{ background: stateColors[i] }} />
+                        {s} {Math.round((v / stateTotal) * 100)}%
+                      </span>
+                    ))}
+                  </div>
+                  <div className="ad-mix" style={{ marginTop: 6 }}>
+                    {states.slice(0, 5).map(([s, v], i) => (
+                      <div key={s} style={{ width: `${(v / stateTotal) * 100}%`, background: stateColors[i] }} />
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, marginBottom: 4 }}>Age bands</div>
+                  <div style={{ height: 130 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={ages} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+                        <XAxis dataKey="band" tick={{ fontSize: 11, fill: "#5f6275" }} tickLine={false} axisLine={false} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#5f6275" }} tickLine={false} axisLine={false} />
+                        <Tooltip cursor={{ fill: "rgba(91,58,168,.06)" }} contentStyle={{ borderRadius: 12, border: "1px solid #ecedf4" }} />
+                        <Bar dataKey="n" name="Profiles" radius={[8, 8, 0, 0]}>
+                          {ages.map((a, i) => (
+                            <Cell key={a.band} fill={i === 1 || i === 2 ? "#5b3aa8" : "#b9a6e6"} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="ad-card">
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <h2 className="ad-h2">Recent admin activity</h2>
+                <Link href="/superadmin/admin-logs" style={{ fontSize: 12 }}>Full audit log</Link>
+              </div>
+              {(data.recent || []).length === 0 && <p className="ad-muted">No admin actions recorded yet.</p>}
+              {(data.recent || []).map((r, i) => {
+                const d = describe(r.action, r.entityType || "");
+                return (
+                  <div key={i} className="ad-row">
+                    <span className={`ad-chip ${d.cls}`} style={{ minWidth: 92, justifyContent: "center" }}>{d.label}</span>
+                    <div style={{ flex: 1, minWidth: 0, fontSize: 13 }}>
+                      {r.entityType?.replace(/_/g, " ") || "item"}
+                      <span className="ad-muted" style={{ fontSize: 12 }}> · {String(r.entityId || "").slice(0, 8)}</span>
+                    </div>
+                    <span className="ad-muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>{timeAgo(r.at)}</span>
+                  </div>
+                );
+              })}
+              <div style={{ marginTop: 14, padding: 12, borderRadius: 12, background: "var(--ad-grad-soft)", fontSize: 13 }}>
+                <strong>Engagement</strong> in the last {rangeLabel.toLowerCase()}: {num(k.profileViews)} profile views,{" "}
+                {num(k.contactViews)} contact views, {num(k.interests)} interests sent.
+              </div>
+            </div>
+          </section>
+        </>
+      ) : null}
     </div>
   );
 }

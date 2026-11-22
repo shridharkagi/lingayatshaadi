@@ -52,6 +52,10 @@ export default function SuperAdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  // ?focus=<userId> (from global search): highlight, expand and scroll to that account.
+  const [focusId] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("focus")
+  );
   const [signupRange, setSignupRange] = useState<Range>("all");
   const [activityRange, setActivityRange] = useState<Range>("all");
   const [customFrom, setCustomFrom] = useState("");
@@ -68,6 +72,15 @@ export default function SuperAdminUsersPage() {
   const loadGenerationRef = useRef(0);
   const activityFetchGenerationRef = useRef(0);
   const [activityError, setActivityError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!focusId || rows.length === 0) return;
+    if (!rows.some((r) => r.id === focusId)) return;
+    setExpandedUserId(focusId);
+    requestAnimationFrame(() =>
+      document.getElementById(`acct-${focusId}`)?.scrollIntoView({ behavior: "smooth", block: "center" })
+    );
+  }, [focusId, rows]);
 
   const runAccountAction = async (userId: string, action: "suspend" | "unsuspend" | "delete") => {
     let reason: string | undefined;
@@ -356,7 +369,11 @@ export default function SuperAdminUsersPage() {
               </tr>
             ) : rows.map((u) => (
               <Fragment key={u.id}>
-                <tr key={u.id} className="border-t border-gray-100 hover:bg-gray-50">
+                <tr
+                  key={u.id}
+                  id={`acct-${u.id}`}
+                  className={`border-t border-gray-100 hover:bg-gray-50 ${focusId === u.id ? "bg-orange-50" : ""}`}
+                >
                   <td className="px-2.5 py-2.5 text-xs font-semibold text-[var(--primary)] whitespace-nowrap">{u.accountCode || "-"}</td>
                   <td className="px-2.5 py-2.5 text-xs">
                     <span className="inline-flex flex-wrap items-center gap-1.5">
