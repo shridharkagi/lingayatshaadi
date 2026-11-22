@@ -1625,7 +1625,7 @@ export default function OtherProfilePage() {
               {copiedMemberId && <span className="font-semibold">Copied</span>}
             </button>
           </div>
-          <h1 className="text-[26px] sm:text-3xl font-bold leading-tight tracking-[-0.01em]">{displayName}</h1>
+          <h1 className="text-[21px] sm:text-2xl font-bold leading-tight tracking-[-0.01em]">{displayName}</h1>
           <p className="mt-1 text-[15px] text-[#D9D4E4]">
             {[
               getAge(profile.dateOfBirth) ? `${getAge(profile.dateOfBirth)} yrs` : null,

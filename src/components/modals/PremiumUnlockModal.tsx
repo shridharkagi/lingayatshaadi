@@ -28,8 +28,7 @@ const GOLD = "#C9A227";
 const benefits = [
   "View Phone Number",
   "View Full Biodata",
-  "Send Unlimited Interests",
-  "Access Family Details",
+  "Unlimited Interests",
   "Priority Support",
   "WhatsApp Assistance",
 ];
@@ -167,13 +166,13 @@ export function PremiumUnlockModal({
           >
             <div className="mx-auto mt-2.5 h-1.5 w-14 rounded-full" style={{ background: "rgba(255,255,255,0.18)" }} />
 
-            <div className="px-5 pt-4 pb-3">
+            <div className="px-4 pt-3 pb-2">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h2 id="premium-unlock-title" className="text-[1.15rem] font-bold tracking-tight" style={{ color: "var(--lb-text)" }}>
+                  <h2 id="premium-unlock-title" className="text-[1.05rem] font-bold tracking-tight" style={{ color: "var(--lb-text)" }}>
                     Unlock Full Profile Access
                   </h2>
-                  <p className="mt-1.5 text-sm" style={{ color: "var(--lb-text-2)" }}>
+                  <p className="mt-1 text-[13px]" style={{ color: "var(--lb-text-2)" }}>
                     Connect directly with this profile and access complete details.
                   </p>
                 </div>
@@ -189,27 +188,28 @@ export function PremiumUnlockModal({
               </div>
 
               <div
-                className="mt-4 rounded-2xl border px-4 py-3"
+                className="mt-3 rounded-2xl border px-3 py-2.5"
                 style={{
                   borderColor: "rgba(235, 201, 131, 0.28)",
                   background: "linear-gradient(135deg, #2A2418 0%, var(--lb-raised) 70%)",
                 }}
               >
                 <div
-                  className="mb-2.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                  className="mb-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
                   style={{ background: "var(--lb-accent-tint)", color: "var(--lb-accent-text)" }}
                 >
                   <Sparkles size={12} />
                   Premium Benefits
                 </div>
-                <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {benefits.map((item) => (
+                <ul className="grid grid-cols-2 gap-1.5">
+                  {benefits.map((item, i) => (
                     <li
                       key={item}
-                      className="inline-flex items-center gap-2 rounded-xl border px-3 py-2.5 text-[13.5px] font-medium"
+                      // Odd count: let the last benefit span both columns.
+                      className={`${benefits.length % 2 === 1 && i === benefits.length - 1 ? "col-span-2 " : ""}flex items-center gap-1.5 rounded-lg border px-2 py-2 text-[12px] font-medium leading-tight`}
                       style={{ background: "rgba(255,255,255,0.05)", borderColor: "var(--lb-line)", color: "var(--lb-text)" }}
                     >
-                      <CheckCircle2 size={14} style={{ color: GOLD }} />
+                      <CheckCircle2 size={13} className="shrink-0" style={{ color: GOLD }} />
                       {item}
                     </li>
                   ))}
@@ -217,29 +217,26 @@ export function PremiumUnlockModal({
               </div>
 
               <div
-                className="mt-3 rounded-xl border px-3 py-2.5 text-xs"
+                className="mt-2 rounded-xl border px-3 py-2 text-xs"
                 style={{ background: "var(--lb-glass)", borderColor: "var(--lb-line)", color: "var(--lb-text-2)" }}
               >
                 <div className="inline-flex items-center gap-1.5 font-semibold" style={{ color: "var(--lb-text)" }}>
                   <ShieldCheck size={13} style={{ color: "var(--lb-verified)" }} />
                   Trusted by Lingayat families across Karnataka.
                 </div>
-                <p className="mt-1 text-[11.5px] opacity-90">
-                  Most members upgrade to connect faster.
-                </p>
               </div>
             </div>
 
             <div
-              className="sticky bottom-0 border-t px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"
+              className="sticky bottom-0 border-t px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2.5"
               style={{ background: "var(--lb-surface)", borderColor: "var(--lb-line)" }}
             >
-              <div className="space-y-2.5">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={openWhatsApp}
                   disabled={waLoading}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-[#25D366] px-4 py-3.5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(37,211,102,0.35)] transition hover:brightness-95 active:scale-[0.99] disabled:opacity-70"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-[#25D366] px-3 py-3 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(37,211,102,0.35)] transition hover:brightness-95 active:scale-[0.99] disabled:opacity-70"
                 >
                   {waLoading ? (
                     <span className="inline-flex items-center gap-2">
@@ -249,7 +246,7 @@ export function PremiumUnlockModal({
                   ) : (
                     <>
                       <MessageIcon />
-                      Upgrade via WhatsApp
+                      WhatsApp
                     </>
                   )}
                 </button>
@@ -258,7 +255,7 @@ export function PremiumUnlockModal({
                   type="button"
                   onClick={callSupport}
                   disabled={callLoading}
-                  className="lb-btn-glass w-full inline-flex items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-semibold disabled:opacity-70"
+                  className="lb-btn-glass w-full inline-flex items-center justify-center gap-2 rounded-full px-3 py-3 text-sm font-semibold disabled:opacity-70"
                   style={{ color: "var(--lb-accent-text)" }}
                 >
                   {callLoading ? (
@@ -269,13 +266,13 @@ export function PremiumUnlockModal({
                   ) : (
                     <>
                       <PhoneCall size={16} />
-                      Call Support
+                      Call
                     </>
                   )}
                 </button>
               </div>
 
-              <div className="mt-2.5 flex items-center justify-center gap-1.5 text-[11px]" style={{ color: "var(--lb-muted)" }}>
+              <div className="mt-2 flex items-center justify-center gap-1.5 text-[11px]" style={{ color: "var(--lb-muted)" }}>
                 <Headset size={12} />
                 Activation support available instantly.
               </div>
