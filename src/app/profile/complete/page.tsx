@@ -32,7 +32,6 @@ import {
   Loader2,
   type LucideIcon,
 } from "lucide-react";
-import { BrideIcon, GroomIcon } from "@/components/ui/icons/BrideGroomIcons";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { HobbiesSelector } from "@/components/ui/HobbiesSelector";
@@ -1147,11 +1146,11 @@ function ProfileCompleteInner() {
                   onChange={(e) => update("fullName", e.target.value)}
                   placeholder="Profile holder's name"
                 />
-                <IconField icon={UserIcon} label="This profile is a" required>
-                  <div className="grid grid-cols-2 gap-2.5" role="radiogroup" aria-label="Bride or groom">
+                <IconField icon={UserIcon} label="Gender" required>
+                  <div className="inline-flex gap-2.5" role="radiogroup" aria-label="Gender">
                     {[
-                      { v: "male", label: "Groom", sub: "Male", Icon: GroomIcon },
-                      { v: "female", label: "Bride", sub: "Female", Icon: BrideIcon },
+                      { v: "male", label: "Male" },
+                      { v: "female", label: "Female" },
                     ].map((g) => {
                       const active = profile.gender === g.v;
                       return (
@@ -1161,30 +1160,14 @@ function ProfileCompleteInner() {
                           role="radio"
                           aria-checked={active}
                           onClick={() => update("gender", g.v as "male" | "female")}
-                          className={`relative flex items-center gap-3 rounded-2xl border p-3 text-left transition-all duration-200 active:scale-[0.98] ${
+                          className={`inline-flex h-11 min-w-[104px] items-center justify-center gap-1.5 rounded-full border px-6 text-[15px] font-semibold transition-all active:scale-95 ${
                             active
-                              ? "border-[var(--lb-accent)]/60 bg-[var(--lb-accent-tint)] shadow-[0_8px_24px_var(--lb-accent-glow)]"
-                              : "border-[var(--lb-line)] bg-white/[0.04] hover:border-[var(--lb-line-strong)] hover:bg-white/[0.07]"
+                              ? "border-transparent bg-[image:var(--lb-accent-grad)] text-[var(--lb-on-accent)] shadow-[0_6px_18px_var(--lb-accent-glow)]"
+                              : "border-[var(--lb-line-strong)] bg-white/[0.04] text-[var(--lb-text-2)] hover:border-[var(--lb-accent)]/45 hover:bg-[var(--lb-accent-tint)]"
                           }`}
                         >
-                          <span
-                            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${
-                              active
-                                ? "bg-[image:var(--lb-accent-grad)] text-[var(--lb-on-accent)]"
-                                : "bg-white/[0.06] text-[var(--lb-accent-text)]"
-                            }`}
-                          >
-                            <g.Icon size={24} />
-                          </span>
-                          <span className="min-w-0">
-                            <span className="block text-[15px] font-semibold text-[var(--lb-text)]">{g.label}</span>
-                            <span className="block text-xs text-[var(--lb-muted)]">{g.sub}</span>
-                          </span>
-                          {active && (
-                            <span className="absolute right-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-[image:var(--lb-accent-grad)] text-[var(--lb-on-accent)]">
-                              <Check size={12} strokeWidth={3} />
-                            </span>
-                          )}
+                          {active && <Check size={15} strokeWidth={3} />}
+                          {g.label}
                         </button>
                       );
                     })}
