@@ -17,10 +17,10 @@ export function Button({
 }: ButtonProps) {
   const base = "rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer touch-manipulation";
   const variants = {
-    primary: "bg-[var(--primary)] text-white hover:bg-[var(--primary-light)] active:scale-[0.98]",
+    primary: "lb-btn-primary active:scale-[0.98]",
     secondary: "bg-[var(--accent)] text-white hover:bg-[var(--accent-light)] active:scale-[0.98]",
-    outline: "border-2 border-[var(--primary)] text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white",
-    ghost: "text-[var(--primary)] hover:bg-[var(--primary)]/10",
+    outline: "border border-[var(--lb-accent)]/50 text-[var(--lb-accent-text)] bg-transparent hover:bg-[var(--lb-accent-tint)]",
+    ghost: "text-[var(--lb-accent-text)] hover:bg-[var(--lb-accent-tint)]",
   };
   const sizes = {
     sm: "px-4 py-2 text-sm",

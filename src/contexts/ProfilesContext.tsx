@@ -8,6 +8,14 @@ import { searchProfiles } from "@/lib/api/profiles";
 import { withTimeout } from "@/lib/withTimeout";
 import { useAuth } from "@/contexts/AuthContext";
 
+
+/**
+ * Profiles kept in memory for profile-page next/prev navigation. Must cover the
+ * whole live catalogue, otherwise swiping stops early and older profiles are
+ * unreachable (was 48 while ~63 were live). Rows are small JSON — no images.
+ * Revisit with server-side neighbour lookup once the catalogue passes ~500.
+ */
+const PROFILE_NAV_LIST_LIMIT = 500;
 const PROFILE_LIST_TIMEOUT_MS = 14_000;
 
 interface ProfilesContextType {
@@ -39,7 +47,7 @@ export function ProfilesProvider({ children }: { children: React.ReactNode }) {
     setProfilesLoading(true);
     try {
       const { data, error } = await withTimeout(
-        searchProfiles({}, 48),
+        searchProfiles({}, PROFILE_NAV_LIST_LIMIT),
         PROFILE_LIST_TIMEOUT_MS,
         "Profile list"
       );
@@ -63,7 +71,7 @@ export function ProfilesProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         const { data, error } = await withTimeout(
-          searchProfiles({}, 48),
+          searchProfiles({}, PROFILE_NAV_LIST_LIMIT),
           PROFILE_LIST_TIMEOUT_MS,
           "Profile list"
         );

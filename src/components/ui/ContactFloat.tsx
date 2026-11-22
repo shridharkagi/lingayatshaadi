@@ -69,17 +69,17 @@ export function ContactFloat() {
         type="button"
         id="contact-float-btn"
         onClick={() => setPopupOpen(true)}
-        className="fixed bottom-24 right-4 z-50 flex items-center justify-center w-10 h-10 rounded-full bg-[var(--primary)] text-white shadow-md hover:scale-105 active:scale-95 transition-transform lg:bottom-6 lg:right-6 lg:w-14 lg:h-14 lg:shadow-lg cursor-pointer touch-manipulation"
+        className="fixed bottom-24 right-4 z-50 flex items-center justify-center w-12 h-12 rounded-full bg-[var(--primary)] text-white shadow-[0_10px_30px_var(--lb-accent-glow),0_0_0_5px_rgba(11,11,18,0.55)] hover:scale-105 active:scale-95 transition-transform lg:bottom-6 lg:right-6 lg:w-14 lg:h-14 cursor-pointer touch-manipulation"
         title="Contact us"
         aria-label="Contact us"
       >
-        <Phone size={14} className="lg:w-5 lg:h-5" />
+        <Phone size={19} className="lg:w-5 lg:h-5" />
       </button>
 
       {popupOpen && (
         <div
           id="contact-float-backdrop"
-          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 bg-black/40 sm:p-4"
+          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 bg-black/70 backdrop-blur-sm sm:p-4"
           onClick={() => setPopupOpen(false)}
           role="dialog"
           aria-modal="true"
@@ -87,7 +87,7 @@ export function ContactFloat() {
         >
           <div
             data-contact-popup-content
-            className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden mb-[max(1rem,env(safe-area-inset-bottom,0px))] sm:mb-0"
+            className="w-full max-w-sm bg-white rounded-[16px] border border-[var(--lb-line)] shadow-2xl overflow-hidden mb-[max(1rem,env(safe-area-inset-bottom,0px))] sm:mb-0"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)]">
@@ -112,7 +112,7 @@ export function ContactFloat() {
                 <Link
                   href={`tel:${config.callContactNumber}`}
                   onClick={() => setPopupOpen(false)}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-[var(--color-bg)] hover:bg-[var(--color-border)]/50 transition-colors border border-[var(--color-border)]/60"
+                  className="flex items-center gap-3 p-3 rounded-2xl bg-[var(--lb-glass)] hover:bg-white/10 transition-colors border border-[var(--lb-line)]"
                 >
                   <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--primary)] text-white flex-shrink-0">
                     <Phone size={19} />
@@ -133,7 +133,7 @@ export function ContactFloat() {
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => setPopupOpen(false)}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-[var(--color-bg)] hover:bg-[var(--color-border)]/50 transition-colors border border-[var(--color-border)]/60"
+                  className="flex items-center gap-3 p-3 rounded-2xl bg-[var(--lb-glass)] hover:bg-white/10 transition-colors border border-[var(--lb-line)]"
                 >
                   <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[#25D366] text-white flex-shrink-0">
                     <WhatsAppBrandIcon className="w-6 h-6" />
@@ -154,7 +154,7 @@ export function ContactFloat() {
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => setPopupOpen(false)}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-[var(--color-bg)] hover:bg-[var(--color-border)]/50 transition-colors border border-[var(--color-border)]/60"
+                  className="flex items-center gap-3 p-3 rounded-2xl bg-[var(--lb-glass)] hover:bg-white/10 transition-colors border border-[var(--lb-line)]"
                 >
                   <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[#25D366] text-white flex-shrink-0">
                     <Users2 size={19} />

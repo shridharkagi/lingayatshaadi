@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import Image from "@/components/ui/SmartImage";
 import { useState } from "react";
 
 interface ProfileAvatarProps {
@@ -35,7 +35,6 @@ export function ProfileAvatar({
         width={size}
         height={size}
         className="object-cover w-full h-full"
-        unoptimized
         onError={() => setErrored(true)}
       />
     </div>

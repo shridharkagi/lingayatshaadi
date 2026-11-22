@@ -117,14 +117,14 @@ export default function MembershipPage() {
 
   return (
     <div className="max-w-lg mx-auto pb-6">
-      <header className="bg-[var(--primary)] text-white px-4 py-8 text-center rounded-b-3xl">
+      <header className="lb-hero-panel text-white px-4 py-9 text-center rounded-b-[20px] border-t-0">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/90 mb-2">LingayatBandhu</p>
-        <h1 className="text-2xl font-bold">Upgrade to Premium</h1>
+        <h1 className="text-[28px] font-bold tracking-[-0.02em] lb-grad-text">Upgrade to Premium</h1>
         <p className="text-white/90 mt-2">Unlock more features and find your perfect match faster</p>
       </header>
 
       <div className="p-4 space-y-4">
-        <div className="bg-white rounded-2xl p-4 shadow-sm">
+        <div className="bg-[var(--lb-surface)] rounded-[14px] p-[18px] border border-[var(--lb-line)]">
           <h3 className="font-semibold text-[var(--foreground)] mb-3">Trust Badge</h3>
           <p className="text-gray-600 text-sm mb-4">
             Get verified and boost your profile visibility. Verified members get 3x more profile views.

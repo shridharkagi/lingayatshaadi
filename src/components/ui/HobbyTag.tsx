@@ -47,8 +47,8 @@ function getIconForHobby(label: string): React.ElementType {
 export function HobbyTag({ label }: { label: string }) {
   const Icon = getIconForHobby(label);
   return (
-    <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 bg-gray-50/80 text-gray-800 text-sm font-medium">
-      <Icon size={16} className="text-[var(--primary)] flex-shrink-0" />
+    <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[var(--lb-line)] bg-white/[0.05] text-[var(--lb-text-2)] text-sm font-medium">
+      <Icon size={16} className="text-[var(--lb-accent-text)] flex-shrink-0" />
       {label}
     </span>
   );

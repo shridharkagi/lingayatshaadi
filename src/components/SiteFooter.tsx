@@ -7,35 +7,35 @@ import { Heart } from "lucide-react";
 export function SiteFooter() {
   const year = new Date().getFullYear();
   return (
-    <footer className="bg-[var(--color-secondary-dark)] text-white py-10 sm:py-12 px-4">
+    <footer className="bg-[#08080D] border-t border-[var(--lb-line)] text-[var(--lb-text)] py-10 sm:py-12 px-4">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 sm:gap-6 mb-6 sm:mb-8">
           <Link href="/" className="flex items-center gap-2">
-            <Heart className="w-6 h-6 text-[var(--primary)] fill-[var(--primary)]" />
-            <span className="font-bold text-lg">LingayatBandhu</span>
+            <Heart className="w-6 h-6 text-[var(--lb-accent)] fill-[var(--lb-accent)]" />
+            <span className="font-bold text-lg lb-grad-text">LingayatBandhu</span>
           </Link>
           <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-sm">
-            <Link href="/contact" className="hover:text-[var(--primary)] transition">
+            <Link href="/contact" className="hover:text-[var(--lb-accent-text)] transition">
               Contact Us
             </Link>
-            <Link href="/privacy" className="hover:text-[var(--primary)] transition">
+            <Link href="/privacy" className="hover:text-[var(--lb-accent-text)] transition">
               Privacy Policy
             </Link>
-            <Link href="/terms" className="hover:text-[var(--primary)] transition">
+            <Link href="/terms" className="hover:text-[var(--lb-accent-text)] transition">
               Terms of Use
             </Link>
           </div>
         </div>
-        <p className="text-center text-sm text-white/70">
+        <p className="text-center text-sm text-[var(--lb-muted)]">
           © {year} LingayatBandhu. All rights reserved.
         </p>
-        <p className="text-center text-xs text-white/55 mt-3">
+        <p className="text-center text-xs text-[var(--lb-subtle)] mt-3">
           A product of{" "}
           <a
             href="https://www.zivantatech.in/"
             target="_blank"
             rel="noopener noreferrer"
-            className="underline hover:text-[var(--primary)] transition"
+            className="underline hover:text-[var(--lb-accent-text)] transition"
           >
             Zivanta Technologies
           </a>

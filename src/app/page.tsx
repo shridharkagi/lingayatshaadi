@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import Image from "@/components/ui/SmartImage";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Heart,
@@ -388,7 +388,6 @@ export default function LandingPage() {
             className="object-cover object-[64%_50%] sm:object-[62%_52%] lg:object-[58%_50%]"
             priority
             sizes="100vw"
-            unoptimized
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/76 via-black/46 to-black/12" />
         </div>
@@ -403,8 +402,7 @@ export default function LandingPage() {
             <Link href={primaryCta.href} className="inline-flex w-full max-w-[min(100%,280px)] sm:max-w-none sm:w-auto">
               <Button
                 size="lg"
-                className="w-full sm:w-auto border-0 text-white text-sm sm:text-base md:text-lg px-6 sm:px-8 md:px-10 py-2.5 sm:py-3.5 md:py-4 rounded-full shadow-lg hover:opacity-95 transition-opacity"
-                style={{ background: "var(--gradient-primary)" }}
+                className="lb-btn-primary w-full sm:w-auto border-0 text-sm sm:text-base md:text-lg px-6 sm:px-8 md:px-10 py-2.5 sm:py-3.5 md:py-4 rounded-xl"
               >
                 {primaryCta.label}
               </Button>
@@ -414,8 +412,7 @@ export default function LandingPage() {
               <Button
                 size="lg"
                 onClick={() => openAuthModal("signup")}
-                className="h-11 min-w-0 flex-1 border-0 text-white text-[15px] sm:text-base font-semibold px-4 sm:px-5 rounded-full shadow-lg hover:opacity-95 transition-opacity whitespace-nowrap inline-flex items-center justify-center leading-none"
-                style={{ background: "var(--gradient-primary)" }}
+                className="lb-btn-primary h-11 min-w-0 flex-1 border-0 text-[15px] sm:text-base font-semibold px-4 sm:px-5 rounded-xl whitespace-nowrap inline-flex items-center justify-center leading-none"
               >
                 {primaryCta.label}
               </Button>
@@ -439,7 +436,7 @@ export default function LandingPage() {
         className="py-10 sm:py-12 md:py-14 px-4"
         style={{
           background:
-            "linear-gradient(to bottom, #dfe8e9 0%, #dfe8e9 72%, rgba(223, 232, 233, 0.52) 90%, rgba(223, 232, 233, 0) 100%)",
+            "radial-gradient(70% 60% at 50% 0%, rgba(235, 201, 131, 0.10) 0%, rgba(11, 11, 18, 0) 70%), #0E0D16",
         }}
       >
         <div className="max-w-6xl mx-auto">
@@ -452,7 +449,7 @@ export default function LandingPage() {
               <Link
                 key={category.title}
                 href={category.href}
-                className="group relative aspect-square overflow-hidden rounded-xl border border-black/10 shadow-sm"
+                className="group relative aspect-square overflow-hidden rounded-2xl border border-[var(--lb-line)] shadow-[0_10px_28px_rgba(0,0,0,0.35)]"
               >
                 <Image
                   src={category.image}
@@ -472,7 +469,7 @@ export default function LandingPage() {
                 <Link
                   key={category.title}
                   href={category.href}
-                  className={`group relative overflow-hidden rounded-xl border border-black/10 shadow-sm ${mobileSpanClass}`}
+                  className={`group relative overflow-hidden rounded-2xl border border-[var(--lb-line)] shadow-[0_10px_28px_rgba(0,0,0,0.35)] ${mobileSpanClass}`}
                 >
                   <Image
                     src={category.image}
@@ -518,7 +515,6 @@ export default function LandingPage() {
                       fill
                       className="object-cover"
                       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                      unoptimized
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
                     <div className="absolute top-3 left-3 w-12 h-12 rounded-xl bg-white/90 flex items-center justify-center shadow-md">
@@ -564,7 +560,6 @@ export default function LandingPage() {
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-300"
                       sizes="(max-width: 640px) 42vw, (max-width: 1024px) 36vw, 220px"
-                      unoptimized
                     />
                   </div>
                   <div className="p-4 sm:p-5 flex-1 min-w-0 flex flex-col justify-center">
@@ -598,9 +593,9 @@ export default function LandingPage() {
       {/* Premium Banner */}
       <section className="px-4 py-10 sm:py-12">
         <div className="max-w-6xl mx-auto">
-          <div className="rounded-2xl p-5 sm:p-6 md:p-8 shadow-[var(--shadow-card)] flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6" style={{ background: "var(--gradient-premium)" }}>
+          <div className="lb-hero-panel rounded-[16px] p-5 sm:p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center">
+              <div className="w-14 h-14 rounded-2xl bg-[var(--lb-accent-tint)] border border-[var(--lb-accent)]/25 flex items-center justify-center">
                 <span className="text-2xl">💎</span>
               </div>
               <div>
@@ -611,7 +606,7 @@ export default function LandingPage() {
               </div>
             </div>
             <Link href="/contact">
-              <button className="bg-[var(--color-secondary-dark)] text-white px-6 py-3 rounded-full font-medium hover:bg-black transition shadow-lg whitespace-nowrap">
+              <button className="inline-flex items-center justify-center lb-btn-primary px-6 h-12 rounded-xl font-semibold whitespace-nowrap">
                 Learn More
               </button>
             </Link>
@@ -639,7 +634,6 @@ export default function LandingPage() {
                 fill
                 className="object-cover"
                 sizes="(max-width: 1024px) 100vw, 50vw"
-                unoptimized
               />
             </div>
           </div>
@@ -681,7 +675,6 @@ export default function LandingPage() {
                         fill
                         className="object-cover"
                         sizes="(max-width: 1024px) 280px, 33vw"
-                        unoptimized
                       />
                     </div>
                     <div className="p-4">
@@ -762,7 +755,6 @@ export default function LandingPage() {
                 fill
                 className="object-cover"
                 sizes="(max-width: 1024px) 100vw, 40vw"
-                unoptimized
               />
             </div>
             <div className="p-6 md:p-8 flex-1">

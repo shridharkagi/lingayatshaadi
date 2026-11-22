@@ -58,8 +58,8 @@ export function BottomNav() {
   }, [isLoggedIn, user?.id, authUser?.id]);
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-[var(--border)] z-50 pb-[env(safe-area-inset-bottom)]">
-      <div className="flex justify-around items-center h-16 max-w-lg mx-auto px-1">
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--lb-line)] bg-[#0D0C14]/95 backdrop-blur-xl pb-[env(safe-area-inset-bottom)]" aria-label="Main">
+      <div className="flex justify-around items-center h-[66px] max-w-lg mx-auto px-1">
         {navItems.map(({ href, icon: Icon, label }) => {
           const isProtected = href === "/activities" || href === "/account";
           const resolvedHref = href === "/activities" && isLoggedIn ? "/notifications" : href;
@@ -75,17 +75,17 @@ export function BottomNav() {
                 key={href}
                 type="button"
                 onClick={() => openAuthModal("login")}
-                className="flex flex-col items-center justify-center flex-1 py-2 px-1 transition-colors min-w-0 text-gray-500"
+                className="flex flex-col items-center justify-center flex-1 py-1.5 px-1 transition-colors min-w-0 text-[var(--lb-subtle)] active:scale-95"
               >
-                <div className="relative">
-                  <Icon size={22} strokeWidth={2} />
+                <div className="relative flex h-[30px] w-[50px] items-center justify-center rounded-full">
+                  <Icon size={21} strokeWidth={1.9} />
                   {showBadge && (
-                    <span className="absolute -top-1 -right-2 bg-[var(--accent)] text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
+                    <span className="absolute -top-0.5 right-0.5 min-w-[17px] h-[17px] px-1 rounded-full bg-[image:var(--lb-accent-grad)] text-[var(--lb-on-accent)] text-[10px] font-bold flex items-center justify-center ring-2 ring-[#0D0C14]">
                       {unreadCount > 9 ? "9+" : unreadCount}
                     </span>
                   )}
                 </div>
-                <span className="text-[10px] mt-0.5 truncate w-full text-center">{label}</span>
+                <span className="text-[10.5px] mt-0.5 truncate w-full text-center">{label}</span>
               </button>
             );
           }
@@ -94,19 +94,24 @@ export function BottomNav() {
             <Link
               key={href}
               href={resolvedHref}
-              className={`flex flex-col items-center justify-center flex-1 py-2 px-1 transition-colors min-w-0 ${
-                isActive ? "text-[var(--primary)]" : "text-gray-500"
+              aria-current={isActive ? "page" : undefined}
+              className={`flex flex-col items-center justify-center flex-1 py-1.5 px-1 transition-colors min-w-0 active:scale-95 ${
+                isActive ? "text-[var(--lb-accent-text)] font-semibold" : "text-[var(--lb-subtle)]"
               }`}
             >
-              <div className="relative">
-                <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
+              <div
+                className={`relative flex h-[30px] w-[50px] items-center justify-center rounded-full transition-colors duration-200 ${
+                  isActive ? "bg-[var(--lb-accent-tint)]" : ""
+                }`}
+              >
+                <Icon size={21} strokeWidth={isActive ? 2.2 : 1.9} />
                 {showBadge && (
-                  <span className="absolute -top-1 -right-2 bg-[var(--accent)] text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
+                  <span className="absolute -top-0.5 right-0.5 min-w-[17px] h-[17px] px-1 rounded-full bg-[image:var(--lb-accent-grad)] text-[var(--lb-on-accent)] text-[10px] font-bold flex items-center justify-center ring-2 ring-[#0D0C14]">
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
               </div>
-              <span className="text-[10px] mt-0.5 truncate w-full text-center">{label}</span>
+              <span className="text-[10.5px] mt-0.5 truncate w-full text-center">{label}</span>
             </Link>
           );
         })}

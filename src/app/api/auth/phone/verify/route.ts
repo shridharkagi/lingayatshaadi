@@ -10,6 +10,7 @@ import { findAuthUserByPhone } from "@/lib/server/authUsers";
 import { issueMagicLinkSession } from "@/lib/server/issueMagicLinkSession";
 import { ensureFreePlanForUser } from "@/lib/server/freePlanProvisioning";
 import { ACCOUNT_SUSPENDED_LOGIN_MESSAGE, isAccountAuthSuspended } from "@/lib/auth/accountStatus";
+import { invalidateAuthUsersCache } from "@/lib/server/authUsers";
 
 export const runtime = "nodejs";
 
@@ -101,6 +102,7 @@ function resolveVerifyPurpose(rawPurpose: unknown, hasPassword: boolean): OtpPur
 }
 
 export async function POST(request: NextRequest) {
+  invalidateAuthUsersCache();
   const reqId = Math.random().toString(36).slice(2, 10);
   const routeStart = nowMs();
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();

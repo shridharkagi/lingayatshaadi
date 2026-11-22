@@ -528,7 +528,32 @@ async function listUsersFromRpc(admin: SupabaseClient): Promise<AuthUserLite[] |
   }
 }
 
+/**
+ * Admin screens call this on almost every request. Share one in-flight load and
+ * reuse the result for a short window so navigating the console doesn't re-list
+ * every auth account each time. Staleness is bounded to AUTH_USERS_CACHE_MS.
+ */
+const AUTH_USERS_CACHE_MS = 15_000;
+let authUsersCache: { at: number; promise: Promise<AuthUserLite[]> } | null = null;
+
+export function invalidateAuthUsersCache(): void {
+  authUsersCache = null;
+}
+
 export async function listAllAuthUsers(admin: SupabaseClient): Promise<AuthUserLite[]> {
+  const now = Date.now();
+  if (authUsersCache && now - authUsersCache.at < AUTH_USERS_CACHE_MS) {
+    return authUsersCache.promise;
+  }
+  const promise = listAllAuthUsersUncached(admin);
+  authUsersCache = { at: now, promise };
+  promise.catch(() => {
+    if (authUsersCache?.promise === promise) authUsersCache = null;
+  });
+  return promise;
+}
+
+async function listAllAuthUsersUncached(admin: SupabaseClient): Promise<AuthUserLite[]> {
   // 1. Primary: SECURITY DEFINER RPC. Reliable on this project where the
   //    standard listUsers + auth-schema paths both fail, and unlike the
   //    profiles-based fallbacks this one preserves raw_user_meta_data

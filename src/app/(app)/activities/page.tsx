@@ -87,6 +87,12 @@ function formatViewedAtLabel(timestamp: string): string {
   return `Viewed on ${getOrdinalDay(day)} ${month}, ${year} at ${hour}:${minute} ${dayPeriod} IST`;
 }
 
+/** "29 yrs · Lecturer" — skips empty parts so we never render a dangling separator. */
+function ageAndDetail(dateOfBirth?: string | null, detail?: string | null): string {
+  const age = dateOfBirth ? getAge(dateOfBirth) : null;
+  return [age ? `${age} yrs` : null, detail?.trim() || null].filter(Boolean).join(" · ");
+}
+
 export default function ActivitiesPage() {
   const router = useRouter();
   const { user } = useAuth();
@@ -454,15 +460,16 @@ export default function ActivitiesPage() {
 
   return (
     <div className="max-w-2xl mx-auto pb-6">
-      <header className="bg-white border-b border-[var(--border)] px-3 sm:px-4 py-4">
-        <h1 className="text-xl font-bold text-[var(--foreground)]">Activities</h1>
+      <header className="px-3 sm:px-4 pt-6 pb-3">
+        <h1 className="text-[28px] font-bold tracking-[-0.02em] text-[var(--lb-text)]">Activities</h1>
+        <p className="mt-0.5 text-[13px] text-[var(--lb-subtle)]">Interests, views, contacts and your shortlist</p>
       </header>
 
       <div ref={tabsAnchorRef} />
       {tabsPinned && <div className="h-[72px]" />}
       <div
-        className={`${tabsPinned ? "fixed top-0 left-0 right-0 z-30" : "relative"} bg-white border-b border-[var(--border)] transition-shadow ${
-          tabsPinned ? "shadow-sm" : ""
+        className={`${tabsPinned ? "fixed top-0 left-0 right-0 z-30" : "relative"} border-b border-[var(--lb-line)] transition-shadow ${
+          tabsPinned ? "bg-[#0B0B12]/90 backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.45)]" : "bg-transparent"
         }`}
       >
         <div className="max-w-2xl mx-auto px-3 sm:px-4 py-2">
@@ -480,10 +487,10 @@ export default function ActivitiesPage() {
                   role="tab"
                   aria-selected={isActive}
                   onClick={() => setTab(id)}
-                  className={`relative min-w-0 flex flex-col items-center justify-center gap-1 py-2 rounded-xl transition-colors ${
+                  className={`relative min-w-0 flex flex-col items-center justify-center gap-1 py-2.5 rounded-2xl border transition-colors active:scale-95 ${
                     isActive
-                      ? "bg-[var(--primary)] text-white shadow-sm"
-                      : "text-gray-600 hover:bg-gray-100"
+                      ? "bg-[var(--lb-accent-tint)] border-[var(--lb-accent)]/35 text-[var(--lb-accent-text)]"
+                      : "border-transparent text-[var(--lb-muted)] hover:bg-white/5"
                   }`}
                 >
                   <Icon size={18} />
@@ -491,7 +498,7 @@ export default function ActivitiesPage() {
                   {count > 0 && (
                     <span
                       className={`absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full text-[9px] sm:text-[10px] font-semibold flex items-center justify-center ${
-                        isActive ? "bg-white text-[var(--primary)]" : "bg-[var(--primary)] text-white"
+                        isActive ? "bg-[image:var(--lb-accent-grad)] text-[var(--lb-on-accent)]" : "bg-white/10 text-[var(--lb-text-2)]"
                       }`}
                     >
                       {count > 99 ? "99+" : count}
@@ -509,7 +516,7 @@ export default function ActivitiesPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-semibold text-[var(--foreground)]">Received</h3>
-              <span className="text-xs px-2 py-1 rounded-full bg-[var(--primary)]/10 text-[var(--primary)] font-medium">
+              <span className="text-xs min-w-[26px] text-center px-2 py-1 rounded-full bg-[var(--lb-accent-tint)] text-[var(--lb-accent-text)] font-semibold">
                 {receivedInterests.length}
               </span>
             </div>
@@ -524,7 +531,7 @@ export default function ActivitiesPage() {
               />
             ) : (
               receivedInterests.map(({ id, profile, message }) => (
-                <div key={id} className="flex gap-3 sm:gap-4 p-3 sm:p-4 bg-white rounded-2xl shadow-sm">
+                <div key={id} className="flex gap-3 sm:gap-4 p-3 sm:p-4 bg-[var(--lb-surface)] rounded-[14px] border border-[var(--lb-line)]">
                   <Link href={`/profile/${getProfileSlug(profile!)}`}>
                     <ProfileAvatar
                       src={profile!.profilePhoto}
@@ -539,7 +546,7 @@ export default function ActivitiesPage() {
                       </h4>
                     </Link>
                     <p className="text-sm text-gray-500">
-                      {getAge(profile!.dateOfBirth)} yrs • {profile!.profession}
+                      {ageAndDetail(profile!.dateOfBirth, profile!.profession || profile!.city)}
                     </p>
                     {message && <p className="text-sm text-gray-600 mt-1">&quot;{message}&quot;</p>}
                     <div className="flex gap-2 mt-2">
@@ -551,7 +558,7 @@ export default function ActivitiesPage() {
                             router.push(`/messages/${profile!.id}`);
                           }
                         }}
-                        className="px-4 py-1.5 rounded-lg bg-[var(--primary)] text-white text-sm font-medium"
+                        className="lb-btn-primary h-9 px-4 rounded-full text-sm font-semibold"
                       >
                         Accept
                       </button>
@@ -560,7 +567,7 @@ export default function ActivitiesPage() {
                           await declineInterest(id);
                           loadInterests();
                         }}
-                        className="px-4 py-1.5 rounded-lg border border-[var(--border)] text-sm"
+                        className="lb-btn-glass h-9 px-4 rounded-full text-sm font-medium"
                       >
                         Decline
                       </button>
@@ -571,7 +578,7 @@ export default function ActivitiesPage() {
             )}
             <div className="flex items-center justify-between gap-3 mt-6">
               <h3 className="font-semibold text-[var(--foreground)]">Sent</h3>
-              <span className="text-xs px-2 py-1 rounded-full bg-[var(--primary)]/10 text-[var(--primary)] font-medium">
+              <span className="text-xs min-w-[26px] text-center px-2 py-1 rounded-full bg-[var(--lb-accent-tint)] text-[var(--lb-accent-text)] font-semibold">
                 {sentInterests.length}
               </span>
             </div>
@@ -604,7 +611,7 @@ export default function ActivitiesPage() {
                     <Link
                       key={id}
                       href={`/profile/${getProfileSlug(profile!)}`}
-                      className="flex gap-3 sm:gap-4 p-3 sm:p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition"
+                      className="flex gap-3 sm:gap-4 p-3 sm:p-4 bg-[var(--lb-surface)] rounded-[14px] border border-[var(--lb-line)] hover:border-[var(--lb-line-strong)] transition"
                     >
                       <ProfileAvatar
                         src={profile!.profilePhoto}
@@ -635,7 +642,7 @@ export default function ActivitiesPage() {
                                 await withdrawSentInterest(id);
                                 await loadInterests();
                               }}
-                              className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-medium text-gray-700 hover:bg-gray-50"
+                              className="lb-btn-glass h-9 px-3.5 rounded-full text-xs font-medium"
                             >
                               Undo interest
                             </button>
@@ -654,7 +661,7 @@ export default function ActivitiesPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-semibold text-[var(--foreground)]">Who viewed your profile</h3>
-              <span className="text-xs px-2 py-1 rounded-full bg-[var(--primary)]/10 text-[var(--primary)] font-medium">
+              <span className="text-xs min-w-[26px] text-center px-2 py-1 rounded-full bg-[var(--lb-accent-tint)] text-[var(--lb-accent-text)] font-semibold">
                 <span className="sm:hidden">Unique: {profileViews.length}</span>
                 <span className="hidden sm:inline">Unique viewers: {profileViews.length}</span>
               </span>
@@ -673,7 +680,7 @@ export default function ActivitiesPage() {
                   <Link
                     key={`${v.viewerId}-${v.viewedAt}-${idx}`}
                     href={`/profile/${getProfileSlug(v.profile!)}`}
-                    className="flex gap-3 sm:gap-4 p-3 sm:p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition"
+                    className="flex gap-3 sm:gap-4 p-3 sm:p-4 bg-[var(--lb-surface)] rounded-[14px] border border-[var(--lb-line)] hover:border-[var(--lb-line-strong)] transition"
                   >
                     <ProfileAvatar
                       src={v.profile!.profilePhoto}
@@ -685,7 +692,7 @@ export default function ActivitiesPage() {
                         {canViewSensitiveFields ? v.profile!.fullName : maskLastName(v.profile!.fullName || "")}
                       </h4>
                       <p className="text-sm text-gray-500">
-                        {getAge(v.profile!.dateOfBirth)} yrs • {v.profile!.profession}
+                        {ageAndDetail(v.profile!.dateOfBirth, v.profile!.profession || v.profile!.city)}
                       </p>
                       <p className="text-xs text-gray-400 mt-1">
                         Viewed {formatTimeAgo(v.viewedAt)}
@@ -702,7 +709,7 @@ export default function ActivitiesPage() {
         {activeTab === "contacted" && (
           <div className="space-y-4">
             {/* Total counter card on top */}
-            <div className="relative overflow-hidden bg-gradient-to-r from-[var(--primary)] to-[#f19a4b] text-white rounded-2xl px-4 sm:px-5 py-3.5 sm:py-4 shadow-sm">
+            <div className="relative overflow-hidden bg-gradient-to-br from-[#2A2418] via-[#1A1824] to-[#15141E] border border-[var(--lb-accent)]/25 text-[var(--lb-text)] rounded-[14px] px-4 sm:px-5 py-4">
               <div className="absolute -right-8 -top-10 w-20 h-20 rounded-full bg-white/8" />
               <div className="absolute -right-4 -bottom-10 w-16 h-16 rounded-full bg-white/8" />
 
@@ -768,13 +775,13 @@ export default function ActivitiesPage() {
                       ? `/profile/${c.cached.memberId}`
                       : null;
                   const cardClassName =
-                    "flex flex-wrap gap-x-3 gap-y-1 sm:gap-x-4 sm:gap-y-2 p-3 sm:p-4 bg-white rounded-2xl shadow-sm transition";
+                    "flex flex-wrap gap-x-3 gap-y-1 sm:gap-x-4 sm:gap-y-2 p-3 sm:p-4 bg-[var(--lb-surface)] rounded-[14px] border border-[var(--lb-line)] transition";
                   return (
                     profileHref ? (
                       <Link
                         key={`${c.profileId}-${c.viewedAt}-${idx}`}
                         href={profileHref}
-                        className={`${cardClassName} hover:shadow-md`}
+                        className={`${cardClassName} hover:border-[var(--lb-line-strong)]`}
                       >
                         <ProfileAvatar src={photo} alt={name} size={64} />
                         <div className="flex-1 min-w-0">
@@ -784,7 +791,7 @@ export default function ActivitiesPage() {
                           )}
                           {meta.length > 0 && (
                             <p className="text-[13px] sm:text-sm text-gray-500 mt-0.5 leading-snug truncate">
-                              {meta.join(" • ")}
+                              {meta.join(" · ")}
                             </p>
                           )}
                         </div>
@@ -807,7 +814,7 @@ export default function ActivitiesPage() {
                           )}
                           {meta.length > 0 && (
                             <p className="text-[13px] sm:text-sm text-gray-500 mt-0.5 leading-snug truncate">
-                              {meta.join(" • ")}
+                              {meta.join(" · ")}
                             </p>
                           )}
                         </div>
@@ -839,7 +846,7 @@ export default function ActivitiesPage() {
             ) : (
               <div className="space-y-3">
                 {shortlistedProfiles.map((profile) => (
-                  <div key={profile.id} className="flex gap-3 sm:gap-4 p-3 sm:p-4 bg-white rounded-2xl shadow-sm">
+                  <div key={profile.id} className="flex gap-3 sm:gap-4 p-3 sm:p-4 bg-[var(--lb-surface)] rounded-[14px] border border-[var(--lb-line)]">
                     <Link href={`/profile/${getProfileSlug(profile)}`}>
                       <ProfileAvatar src={profile.profilePhoto} alt={profile.fullName} size={64} />
                     </Link>
@@ -850,12 +857,12 @@ export default function ActivitiesPage() {
                         </h4>
                       </Link>
                       <p className="text-sm text-gray-500">
-                        {getAge(profile.dateOfBirth)} yrs • {profile.profession}
+                        {ageAndDetail(profile.dateOfBirth, profile.profession || profile.city)}
                       </p>
                       <div className="flex gap-2 mt-2">
                         <Link
                           href={`/profile/${getProfileSlug(profile)}`}
-                          className="px-4 py-1.5 rounded-lg bg-[var(--primary)] text-white text-sm font-medium"
+                          className="inline-flex items-center justify-center lb-btn-primary h-9 px-4 rounded-full text-sm font-semibold"
                         >
                           View
                         </Link>
@@ -879,7 +886,7 @@ export default function ActivitiesPage() {
                             await removeFromShortlist(shortlistOwnerId, profile.id);
                             loadShortlist();
                           }}
-                          className="px-4 py-1.5 rounded-lg border border-[var(--border)] text-sm"
+                          className="lb-btn-glass h-9 px-4 rounded-full text-sm font-medium"
                         >
                           Remove
                         </button>
@@ -906,12 +913,12 @@ export default function ActivitiesPage() {
             ) : (
               <div className="space-y-3">
                 {blockedProfiles.map((profile) => (
-                  <div key={profile.id} className="flex gap-3 sm:gap-4 p-3 sm:p-4 bg-white rounded-2xl shadow-sm">
+                  <div key={profile.id} className="flex gap-3 sm:gap-4 p-3 sm:p-4 bg-[var(--lb-surface)] rounded-[14px] border border-[var(--lb-line)]">
                     <ProfileAvatar src={profile.profilePhoto} alt={profile.fullName} size={64} />
                     <div className="flex-1 min-w-0">
                       <h4 className="font-semibold text-[var(--foreground)]">{profile.fullName}</h4>
                       <p className="text-sm text-gray-500">
-                        {getAge(profile.dateOfBirth)} yrs • {profile.profession}
+                        {ageAndDetail(profile.dateOfBirth, profile.profession || profile.city)}
                       </p>
                       <button
                         onClick={async () => {
@@ -919,7 +926,7 @@ export default function ActivitiesPage() {
                           await unblockUser(user.id, profile.id);
                           loadBlocked();
                         }}
-                        className="mt-2 px-4 py-1.5 rounded-lg bg-gray-100 text-gray-700 text-sm"
+                        className="lb-btn-glass mt-2 h-9 px-4 rounded-full text-sm font-medium"
                       >
                         Unblock
                       </button>

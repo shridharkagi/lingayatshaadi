@@ -1,10 +1,11 @@
 "use client";
 
+import { formatHeightShort } from "@/lib/formatHeight";
 import { useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
+import Image from "@/components/ui/SmartImage";
 import { Edit2, Shield, Heart, Settings, ChevronRight, Camera, Images, Briefcase, Share2 } from "lucide-react";
 import { getAge } from "@/lib/utils";
 import { HobbyTag } from "@/components/ui/HobbyTag";
@@ -69,7 +70,7 @@ export default function MyProfilePage() {
   return (
     <div className="w-full max-w-2xl mx-auto min-h-screen bg-[var(--background)]">
       {/* Orange Header with rounded bottom corners */}
-      <header className="bg-[var(--primary)] text-white px-6 py-3 rounded-b-[10px] shadow-md">
+      <header className="lb-hero-panel text-white px-5 py-4 rounded-b-[16px] border-t-0">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold">My Profile</h1>
           <div className="flex items-center gap-2">
@@ -96,14 +97,13 @@ export default function MyProfilePage() {
               alt={user.fullName}
               fill
               className="object-cover rounded-t-2xl"
-              unoptimized
               priority
             />
             {/* Profile Info Overlay */}
             <div className="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-black/70 via-black/40 to-transparent">
               <h2 className="text-xl font-bold text-white mb-1">{user.fullName}</h2>
               <p className="text-white/95 text-sm mb-1.5">
-                {getAge(user.dateOfBirth)} yrs • {user.height}&quot;
+                {[getAge(user.dateOfBirth) ? `${getAge(user.dateOfBirth)} yrs` : null, formatHeightShort(user.height)].filter(Boolean).join(" · ")}
               </p>
               {user.profession && (
                 <p className="text-white/95 text-sm flex items-center gap-1.5">

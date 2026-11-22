@@ -383,6 +383,7 @@ export interface SearchCursorFilters {
   ageRange?: [number, number];
   maritalStatuses?: string[];
   professionTypes?: string[];
+  foodHabits?: string[];
   query?: string;
 }
 
@@ -459,6 +460,7 @@ export async function searchProfilesCursor(
 
     const queryText = (filters.query || "").trim().toLowerCase();
     const selectedProfessionTypes = filters.professionTypes || [];
+    const selectedFoodHabits = (filters.foodHabits || []).map((f) => f.trim().toLowerCase()).filter(Boolean);
 
     while (collected.length < pageSize && !reachedEnd) {
       let query = supabase.from(PUBLIC_PROFILES).select("*");
@@ -495,13 +497,20 @@ export async function searchProfilesCursor(
       }
 
       const rows = (data || []) as ProfileRow[];
-      cursor += rows.length;
-      if (rows.length < chunkSize) reachedEnd = true;
-
+      // Advance the cursor only past rows we actually examined. Previously the cursor jumped
+      // over the whole chunk even when we stopped early at pageSize, silently skipping profiles.
+      let consumed = 0;
       for (const row of rows) {
+        consumed += 1;
         const profile = profileForPublic(row);
 
         if (selectedProfessionTypes.length > 0 && !profileMatchesProfessionFilter(profile, selectedProfessionTypes)) {
+          continue;
+        }
+        if (
+          selectedFoodHabits.length > 0 &&
+          !selectedFoodHabits.includes(String(profile.foodHabits || "").trim().toLowerCase())
+        ) {
           continue;
         }
         if (queryText) {
@@ -512,6 +521,9 @@ export async function searchProfilesCursor(
         collected.push(profile);
         if (collected.length >= pageSize) break;
       }
+      cursor = rangeFrom + consumed;
+      // The end is reached only when the database returned a short chunk AND we used all of it.
+      if (rows.length < chunkSize && consumed >= rows.length) reachedEnd = true;
     }
 
     return {

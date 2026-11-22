@@ -129,7 +129,7 @@ export function PremiumUnlockModal({
             role="dialog"
             aria-modal="true"
             aria-labelledby="premium-unlock-title"
-            className="w-full max-w-lg rounded-t-[28px] bg-white text-slate-900 shadow-[0_-12px_45px_rgba(0,0,0,0.22)] dark:bg-zinc-900 dark:text-zinc-100"
+            className="w-full max-w-lg rounded-t-[18px] bg-white text-slate-900 shadow-[0_-12px_45px_rgba(0,0,0,0.22)] dark:bg-zinc-900 dark:text-zinc-100"
             initial={{ y: 480, opacity: 0.85 }}
             animate={{ y: dragDeltaY, opacity: 1 }}
             exit={{ y: 520, opacity: 0.9 }}
@@ -160,8 +160,8 @@ export function PremiumUnlockModal({
                 </button>
               </div>
 
-              <div className="mt-4 rounded-2xl border border-[#f2e5bf] bg-gradient-to-br from-[#fffdf5] to-[#fff6dc] px-4 py-3 dark:border-zinc-700 dark:from-zinc-900 dark:to-zinc-900">
-                <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-[#fff2c6] px-2.5 py-1 text-[11px] font-semibold text-[#7a5b06] dark:bg-zinc-800 dark:text-zinc-200">
+              <div className="mt-4 rounded-2xl border border-[var(--lb-accent)]/25 bg-gradient-to-br from-[#2A2418] to-[#1A1824] px-4 py-3 dark:border-zinc-700 dark:from-zinc-900 dark:to-zinc-900">
+                <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-[var(--lb-accent-tint)] px-2.5 py-1 text-[11px] font-semibold text-[var(--lb-accent-text)] dark:bg-zinc-800 dark:text-zinc-200">
                   <Sparkles size={12} />
                   Premium Benefits
                 </div>

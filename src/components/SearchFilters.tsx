@@ -363,8 +363,7 @@ export function SearchFilters({
             <div className="flex justify-center pt-2">
               <Link
                 href="/signup"
-                className="inline-block px-8 py-3 rounded-full font-medium text-white shadow-lg hover:opacity-95 transition-opacity"
-                style={{ background: "var(--gradient-primary)" }}
+                className="inline-flex items-center justify-center lb-btn-primary inline-block px-8 py-3 rounded-xl font-semibold"
               >
                 Create Free Profile
               </Link>

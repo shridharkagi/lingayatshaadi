@@ -129,7 +129,7 @@ export function WhatsAppGroupCta({ sourcePage }: { sourcePage: WhatsAppLeadSourc
 
   return (
     <div className="md:hidden">
-      <div className="rounded-2xl border border-green-200 bg-gradient-to-br from-green-50 to-white p-4 shadow-sm">
+      <div className="rounded-[14px] border border-[#25D366]/25 bg-gradient-to-br from-[#25D366]/10 to-[var(--lb-surface)] p-4">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-[#25D366] text-white">
             <WhatsAppBrandIcon className="h-5 w-5" />
@@ -154,13 +154,13 @@ export function WhatsAppGroupCta({ sourcePage }: { sourcePage: WhatsAppLeadSourc
 
       {modalOpen && (
         <div
-          className="fixed inset-0 z-[70] bg-black/40 p-4"
+          className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm p-4"
           role="dialog"
           aria-modal="true"
           onClick={() => setModalOpen(false)}
         >
           <div
-            className="mx-auto mt-16 w-full max-w-sm rounded-2xl bg-white shadow-xl"
+            className="mx-auto mt-16 w-full max-w-sm rounded-[16px] bg-[var(--lb-surface)] border border-[var(--lb-line)] shadow-xl"
             onClick={(evt) => evt.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
@@ -181,7 +181,7 @@ export function WhatsAppGroupCta({ sourcePage }: { sourcePage: WhatsAppLeadSourc
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
-                  className="w-full rounded-xl border border-[var(--color-border)] px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none"
+                  className="w-full h-12 rounded-xl border border-[var(--lb-line)] bg-[var(--lb-field)] px-3 text-sm text-[var(--lb-text)] focus:border-[var(--lb-accent)]/60 focus:outline-none"
                 />
               </div>
               <div>
@@ -191,7 +191,7 @@ export function WhatsAppGroupCta({ sourcePage }: { sourcePage: WhatsAppLeadSourc
                   onChange={(e) => setContactNo(e.target.value)}
                   required
                   inputMode="numeric"
-                  className="w-full rounded-xl border border-[var(--color-border)] px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none"
+                  className="w-full h-12 rounded-xl border border-[var(--lb-line)] bg-[var(--lb-field)] px-3 text-sm text-[var(--lb-text)] focus:border-[var(--lb-accent)]/60 focus:outline-none"
                 />
               </div>
               <div>
@@ -200,7 +200,7 @@ export function WhatsAppGroupCta({ sourcePage }: { sourcePage: WhatsAppLeadSourc
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   required
-                  className="w-full rounded-xl border border-[var(--color-border)] px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none"
+                  className="w-full h-12 rounded-xl border border-[var(--lb-line)] bg-[var(--lb-field)] px-3 text-sm text-[var(--lb-text)] focus:border-[var(--lb-accent)]/60 focus:outline-none"
                 />
               </div>
               <p className="text-[11px] leading-snug text-gray-500">

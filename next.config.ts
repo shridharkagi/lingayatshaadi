@@ -11,6 +11,9 @@ const nextConfig: NextConfig = {
     root: projectRoot,
   },
   images: {
+    formats: ["image/avif", "image/webp"],
+    // Member photos rarely change URL (new upload = new path), so cache optimised variants for 30 days.
+    minimumCacheTTL: 60 * 60 * 24 * 30,
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com", pathname: "/**" },
       { protocol: "https", hostname: "*.supabase.co", pathname: "/storage/v1/object/public/**" },

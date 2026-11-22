@@ -4,6 +4,7 @@ import { createSupabaseAdmin } from "@/lib/supabase";
 import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
 import { logAdminAudit } from "@/lib/server/adminAudit";
 import { moveProfileToTrash } from "@/lib/server/moveProfileToTrash";
+import { invalidateAuthUsersCache } from "@/lib/server/authUsers";
 
 type AccountAction = "suspend" | "unsuspend" | "delete";
 
@@ -107,6 +108,7 @@ async function deleteAuthUserRow(
  * /api/auth/phone/verify.
  */
 export async function POST(req: NextRequest) {
+  invalidateAuthUsersCache();
   const auth = await requireSuperAdmin(req);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 

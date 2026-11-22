@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import Image from "next/image";
+import Image from "@/components/ui/SmartImage";
 import Link from "next/link";
-import { SlidersHorizontal, X, Search } from "lucide-react";
+import { SlidersHorizontal, X, Search, ShieldCheck, UserPlus } from "lucide-react";
 import { ProfilesPageHeader } from "@/components/ProfilesPageHeader";
 import { ProfileCard } from "@/components/ui/ProfileCard";
 import {
@@ -15,7 +15,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { listProfilesByUserId } from "@/lib/api/profiles";
 import { BottomNav } from "@/components/ui/BottomNav";
 import { useAuthModal } from "@/contexts/AuthModalContext";
-import { ViewerForensicWatermark } from "@/components/ViewerForensicWatermark";
 import { SiteFooter } from "@/components/SiteFooter";
 import { getAccountAccessState } from "@/lib/api/accessState";
 import { maskLastNameKeepPrefix, type AccountAccessState } from "@/lib/accessPolicy";
@@ -47,6 +46,15 @@ function getPageSizeForViewport(width: number): number {
   if (width < 1024) return 18;
   return 24;
 }
+
+type QuickFilterKey = "maritalStatuses" | "foodHabits" | "professionTypes";
+
+/** One-tap chips that toggle values in the existing filter state (no new filter logic). */
+const QUICK_FILTERS: Array<{ key: QuickFilterKey; value: string }> = [
+  { key: "maritalStatuses", value: "Never Married" },
+  { key: "foodHabits", value: "Vegetarian" },
+  { key: "professionTypes", value: "IT / Software" },
+];
 
 function countActiveFilters(
   f: SearchFiltersState,
@@ -136,6 +144,17 @@ export function ProfilesView({
     };
   }, [isLoggedIn, authUser?.id]);
 
+  const toggleQuickFilter = useCallback(
+    (key: QuickFilterKey, value: string) => {
+      setFilters((prev) => {
+        const current = prev[key] as string[];
+        const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
+        return { ...prev, [key]: next };
+      });
+    },
+    []
+  );
+
   const showCreateProfileStrip =
     !isLoggedIn || (ownedProfilesLoaded && !hasAnyOwnedProfile);
 
@@ -171,6 +190,7 @@ export function ProfilesView({
         ageRange: filters.ageRange,
         maritalStatuses: filters.maritalStatuses,
         professionTypes: filters.professionTypes,
+        foodHabits: filters.foodHabits,
         query: debouncedQuery,
       },
       { cursor: 0, pageSize }
@@ -196,6 +216,7 @@ export function ProfilesView({
         ageRange: filters.ageRange,
         maritalStatuses: filters.maritalStatuses,
         professionTypes: filters.professionTypes,
+        foodHabits: filters.foodHabits,
         query: debouncedQuery,
       },
       { cursor, pageSize }
@@ -237,120 +258,93 @@ export function ProfilesView({
     <div className="min-h-screen bg-[var(--color-bg)]">
       <ProfilesPageHeader />
 
-      {/* Compact hero — z-[22] above forensic watermark (fixed z-[21]) */}
+      {/* Hero — z-[22] above forensic watermark (fixed z-[21]) */}
       <section
-        className={`relative h-[min(380px,56vh)] min-h-[335px] sm:h-[340px] md:h-[380px] overflow-visible sm:overflow-hidden ${
-          isLoggedIn ? "pt-[4.9rem] sm:pt-[4.75rem]" : "pt-[5.5rem] sm:pt-16"
+        className={`relative overflow-hidden ${
+          isLoggedIn ? "pt-[4.25rem] sm:pt-[4.5rem]" : "pt-[4.25rem] sm:pt-[4.5rem]"
         }`}
       >
         <div className="absolute inset-0">
           <Image
             src={heroImage}
-            alt={title}
+            alt=""
             fill
-            className="object-cover"
+            className="object-cover saturate-[0.85]"
             priority
             sizes="100vw"
-            unoptimized
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/74 via-black/48 to-[var(--color-bg)]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0B0B12]/30 via-[#0B0B12]/65 to-[#0B0B12]" />
+          <div className="absolute inset-0 bg-[radial-gradient(70%_60%_at_90%_10%,rgba(235,201,131,0.16)_0%,transparent_70%),radial-gradient(60%_50%_at_0%_85%,rgba(211,155,98,0.14)_0%,transparent_70%)]" />
+          <div className="absolute inset-0 opacity-60 [background-image:radial-gradient(rgba(255,255,255,0.10)_1px,transparent_1.4px)] [background-size:16px_16px]" />
         </div>
-        <div
-          className={`relative z-[22] isolate h-full max-w-6xl mx-auto px-3.5 sm:px-4 flex flex-col justify-center text-white items-center text-center sm:items-start sm:text-left ${
-            isLoggedIn ? "pt-2.5 pb-2.5 sm:pt-1 sm:pb-3.5" : "pt-4 pb-4 sm:pt-2 sm:pb-5"
-          }`}
-        >
-          <div className="w-full max-w-[min(100%,44rem)] rounded-xl bg-black/20 px-2.5 py-2 backdrop-blur-[1px] sm:bg-transparent sm:p-0 sm:backdrop-blur-0">
-          <h1 className="text-[clamp(1.15rem,6.1vw,2.2rem)] sm:text-3xl md:text-4xl font-bold mb-1.5 sm:mb-2.5 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] max-w-2xl px-0.5 leading-[1.12]">
+        <div className="relative z-[22] isolate max-w-6xl mx-auto px-5 sm:px-6 pt-7 pb-14 sm:pt-10 sm:pb-20">
+          <span className="lb-glass inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium text-[var(--lb-text-2)]">
+            <ShieldCheck size={13} className="text-[var(--lb-accent-text)]" aria-hidden />
+            Verified Lingayat profiles
+          </span>
+          <h1 className="mt-3.5 text-[34px] sm:text-[44px] font-bold leading-[1.05] tracking-[-0.02em] text-[var(--lb-text)]">
             {title}
           </h1>
-          <p className="text-[clamp(0.92rem,4.35vw,1.12rem)] sm:text-base text-white/95 max-w-2xl px-0.5 leading-snug sm:leading-relaxed drop-shadow-[0_1px_8px_rgba(0,0,0,0.45)]">
-            {subtitle}
-          </p>
-          <div className="mt-2.5 sm:mt-4 flex w-full max-w-md sm:max-w-none flex-wrap items-center justify-center gap-2 sm:justify-start sm:gap-2">
-            {isLoggedIn && (
-              <Link
-                href="/account"
-                className="min-h-[40px] inline-flex items-center justify-center px-4 py-2 rounded-full bg-white/20 hover:bg-white/30 text-xs sm:text-sm font-medium transition"
-              >
-                My Account
-              </Link>
-            )}
-            {isLoggedIn && (
-              <Link
-                href="/search"
-                className="min-h-[40px] inline-flex items-center justify-center px-4 py-2 rounded-full bg-black/20 hover:bg-black/30 text-xs sm:text-sm font-medium transition"
-              >
-                Advanced Search
-              </Link>
-            )}
-            {!isLoggedIn && (
+          <p className="mt-2 max-w-md text-[15px] sm:text-base leading-relaxed text-[var(--lb-text-2)]">{subtitle}</p>
+          <div className="mt-5 flex flex-wrap items-center gap-2.5">
+            {isLoggedIn ? (
+              <>
+                <Link
+                  href="/search"
+                  className="lb-btn-primary inline-flex h-11 items-center gap-2 rounded-xl px-5 text-[14px] font-semibold"
+                >
+                  <Search size={16} strokeWidth={2.2} aria-hidden />
+                  Advanced search
+                </Link>
+                <Link
+                  href="/account"
+                  className="lb-btn-glass inline-flex h-11 items-center rounded-xl px-5 text-[14px] font-medium"
+                >
+                  My account
+                </Link>
+              </>
+            ) : (
               <button
                 type="button"
                 onClick={() => openAuthModal("login")}
-                className="min-h-[40px] inline-flex items-center justify-center rounded-full bg-white px-5 py-1.5 text-[17px] sm:text-base font-semibold text-[#1f1f1f] shadow-[0_8px_18px_rgba(0,0,0,0.30)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#f7f7f7] hover:shadow-[0_12px_24px_rgba(0,0,0,0.36)] active:translate-y-0 active:shadow-[0_6px_14px_rgba(0,0,0,0.28)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/85 focus-visible:ring-offset-2 focus-visible:ring-offset-black/35"
+                className="lb-btn-primary inline-flex h-11 items-center rounded-xl px-6 text-[15px] font-semibold"
               >
                 Log in
               </button>
             )}
           </div>
-          </div>
-          {showCreateProfileStrip && (
-            <div className="mt-2 sm:mt-3.5 w-full max-w-xl flex flex-col gap-2 rounded-2xl border border-white/20 bg-black/40 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:py-2.5 sm:pl-4 sm:pr-4">
-              <p className="min-w-0 text-left text-[11px] leading-snug text-white/95 sm:flex-1 sm:text-xs">
-                List your profile — quick setup, family-friendly privacy.
-              </p>
-              {isLoggedIn ? (
-                <Link
-                  href="/account?createProfile=1"
-                  className="inline-flex min-h-[40px] w-full shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-[var(--primary)] px-4 py-2.5 text-xs font-semibold text-white shadow-sm ring-1 ring-white/10 transition hover:brightness-105 sm:w-auto sm:min-h-0 sm:px-4 sm:py-2"
-                >
-                  Create your profile
-                </Link>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => openAuthModal("signup")}
-                  className="inline-flex min-h-[40px] w-full shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-[var(--primary)] px-4 py-2.5 text-xs font-semibold text-white shadow-sm ring-1 ring-white/10 transition hover:brightness-105 sm:w-auto sm:min-h-0 sm:px-4 sm:py-2"
-                >
-                  Create your profile
-                </button>
-              )}
-            </div>
-          )}
         </div>
       </section>
 
-      {/* Sticky search + filter bar — less overlap when CTA strip is shown */}
-      <div
-        className={`sticky top-14 sm:top-16 z-30 px-3 sm:px-4 ${
-          showCreateProfileStrip ? "mt-3 sm:-mt-5" : "-mt-2 sm:-mt-8"
-        }`}
-      >
+      {/* Sticky search + filter bar */}
+      <div className="sticky top-14 sm:top-16 z-30 -mt-10 px-3.5 sm:px-4">
         <div className="max-w-6xl mx-auto">
-          <div className="bg-white/95 backdrop-blur rounded-2xl shadow-lg border border-[var(--color-border)] p-2.5 sm:p-4 flex items-stretch sm:items-center gap-2.5 sm:gap-3 min-h-[52px] sm:min-h-0">
-            <div className="relative flex-1 min-w-0">
+          <div className="flex items-stretch gap-2 rounded-[14px] border border-[var(--lb-line)] bg-[#1A1824]/95 p-2 shadow-[0_16px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+            <label className="relative flex flex-1 min-w-0 items-center">
+              <span className="sr-only">Search {itemNoun}</span>
               <Search
                 size={18}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--lb-subtle)] pointer-events-none"
+                aria-hidden
               />
               <input
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search by name, city, profession…"
-                className="w-full min-w-0 pl-10 pr-2.5 sm:pr-3 py-2.5 sm:py-3 rounded-xl bg-[var(--color-bg)] focus:bg-white border border-transparent focus:border-[var(--primary)] focus:outline-none text-sm transition"
+                placeholder="Name, city or profession"
+                className="h-[50px] w-full min-w-0 rounded-2xl border border-[var(--lb-line)] bg-[var(--lb-field)] pl-11 pr-3 text-[14px] text-[var(--lb-text)] transition focus:border-[var(--lb-accent)]/60 focus:outline-none"
               />
-            </div>
+            </label>
             <button
               type="button"
               onClick={() => setFilterOpen(true)}
-              className="relative flex shrink-0 items-center justify-center gap-1.5 sm:gap-2 pl-2.5 pr-2.5 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-[var(--color-border)] bg-white hover:bg-gray-50 text-sm font-medium text-gray-700 transition min-w-[48px] sm:min-w-0"
+              aria-label={activeCount > 0 ? `Filters, ${activeCount} active` : "Filters"}
+              className="lb-btn-glass relative flex h-[50px] min-w-[54px] shrink-0 items-center justify-center gap-2 rounded-2xl px-3 sm:px-4 text-sm font-medium"
             >
-              <SlidersHorizontal size={18} className="shrink-0" />
+              <SlidersHorizontal size={19} className="shrink-0 text-[var(--lb-accent-text)]" />
               <span className="hidden sm:inline">Filters</span>
               {activeCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[10px] font-bold rounded-full bg-[var(--primary)] text-white">
+                <span className="absolute -top-1.5 -right-1.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[image:var(--lb-accent-grad)] px-1.5 text-[11px] font-bold text-[var(--lb-on-accent)] ring-2 ring-[#1A1824]">
                   {activeCount}
                 </span>
               )}
@@ -359,29 +353,92 @@ export function ProfilesView({
         </div>
       </div>
 
+      {showCreateProfileStrip && (
+        <div className="px-3.5 sm:px-4 mt-4">
+          <div className="max-w-6xl mx-auto lb-ring rounded-[14px]">
+            <div className="flex items-center gap-3 rounded-[13px] bg-gradient-to-br from-[#1A1824] to-[#15131E] p-3.5">
+              <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[10px] bg-[var(--lb-accent-tint)]">
+                <UserPlus size={20} className="text-[var(--lb-accent-text)]" aria-hidden />
+              </div>
+              <p className="min-w-0 flex-1 text-[12.5px] leading-snug text-[var(--lb-muted)]">
+                <strong className="block text-[13.5px] font-semibold text-[var(--lb-text)]">List your profile</strong>
+                Quick setup, family-friendly privacy.
+              </p>
+              {isLoggedIn ? (
+                <Link
+                  href="/account?createProfile=1"
+                  className="lb-btn-primary inline-flex h-10 shrink-0 items-center rounded-xl px-4 text-[13px] font-semibold"
+                >
+                  Create
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => openAuthModal("signup")}
+                  className="lb-btn-primary inline-flex h-10 shrink-0 items-center rounded-xl px-4 text-[13px] font-semibold"
+                >
+                  Create
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Listing */}
-      <section className="px-3 sm:px-4 pt-6 pb-24 lg:pb-12">
+      <section className="px-3.5 sm:px-4 pt-5 pb-28 lg:pb-12">
         <div className="max-w-6xl mx-auto">
-          <div className="flex flex-wrap items-center justify-center gap-2 mb-5 sm:justify-start">
-            <h2 className="text-lg sm:text-xl font-bold text-[var(--color-text-primary)] mr-1">
-              {profilesLoading
-                ? `Loading ${itemNoun}…`
-                : showingFiltered
-                ? `${profiles.length}${hasMore ? "+" : ""} ${itemNoun}`
-                : `${profiles.length}${hasMore ? "+" : ""} ${itemNoun}`}
-            </h2>
-            {!profilesLoading && (
-              <span className="text-xs px-2 py-1 rounded-full bg-[var(--primary)]/10 text-[var(--primary)] font-medium">
-                {showingFiltered ? "Filtered results" : "Latest available"}
-              </span>
-            )}
+          <div className="-mx-3.5 mb-5 flex gap-2 overflow-x-auto px-3.5 pb-1 [scrollbar-width:none] sm:mx-0 sm:px-0" role="group" aria-label="Quick filters">
+            <button
+              type="button"
+              onClick={resetFilters}
+              aria-pressed={activeCount === 0}
+              className={`h-9 shrink-0 rounded-full px-4 text-[13px] transition active:scale-95 ${
+                activeCount === 0 ? "lb-btn-primary font-semibold" : "lb-btn-glass font-medium"
+              }`}
+            >
+              All {itemNoun}
+            </button>
+            {QUICK_FILTERS.map((chip) => {
+              const on = (filters[chip.key] as string[]).includes(chip.value);
+              return (
+                <button
+                  key={chip.value}
+                  type="button"
+                  onClick={() => toggleQuickFilter(chip.key, chip.value)}
+                  aria-pressed={on}
+                  className={`h-9 shrink-0 rounded-full px-4 text-[13px] transition active:scale-95 ${
+                    on ? "lb-btn-primary font-semibold" : "lb-btn-glass font-medium"
+                  }`}
+                >
+                  {chip.value}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mb-4 flex items-end justify-between gap-3">
+            <div>
+              <h2 className="text-[19px] font-semibold text-[var(--lb-text)]">
+                {profilesLoading
+                  ? `Loading ${itemNoun}…`
+                  : showingFiltered
+                  ? `${profiles.length}${hasMore ? "+" : ""} ${itemNoun} found`
+                  : `Latest ${itemNoun}`}
+              </h2>
+              {!profilesLoading && (
+                <p className="mt-0.5 text-[12.5px] text-[var(--lb-subtle)]">
+                  {showingFiltered ? "Matching your filters" : "Newest profiles first"}
+                </p>
+              )}
+            </div>
             {activeCount > 0 && (
               <button
                 onClick={resetFilters}
-                className="ml-auto inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-[var(--primary)] hover:bg-[var(--primary)]/5 rounded-lg transition"
+                className="lb-btn-glass inline-flex h-9 items-center gap-1.5 rounded-xl px-3 text-[13px] font-medium"
               >
                 <X size={14} />
-                Clear filters
+                Clear
               </button>
             )}
           </div>
@@ -413,7 +470,7 @@ export function ProfilesView({
                   void loadMoreProfiles();
                 }}
                 disabled={loadingMore}
-                className="rounded-xl border border-[var(--color-border)] bg-white px-5 py-2.5 text-sm font-medium text-[var(--color-text-primary)] hover:bg-gray-50 disabled:opacity-60"
+                className="lb-btn-glass h-11 rounded-xl px-6 text-sm font-semibold text-[var(--lb-accent-text)] disabled:opacity-60"
               >
                 {loadingMore ? "Loading..." : `Load More ${itemNoun}`}
               </button>
@@ -425,9 +482,9 @@ export function ProfilesView({
               {Array.from({ length: 4 }).map((_, i) => (
                 <div
                   key={i}
-                  className="rounded-2xl bg-white border border-[var(--color-border)] overflow-hidden animate-pulse"
+                  className="flex gap-3.5 rounded-[14px] bg-[var(--lb-surface)] border border-[var(--lb-line)] p-2 animate-pulse"
                 >
-                  <div className="aspect-[4/5] bg-gray-200" />
+                  <div className="aspect-[3/4] w-[38%] rounded-2xl bg-gray-200" />
                   <div className="p-4 space-y-2">
                     <div className="h-3.5 bg-gray-200 rounded w-3/4" />
                     <div className="h-2.5 bg-gray-100 rounded w-1/2" />
@@ -443,31 +500,31 @@ export function ProfilesView({
       {/* Filter panel */}
       {filterOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm"
           onClick={() => setFilterOpen(false)}
           aria-modal="true"
           role="dialog"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="absolute inset-x-0 bottom-0 sm:inset-y-0 sm:right-0 sm:left-auto sm:w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-t-none sm:rounded-l-3xl shadow-2xl flex flex-col max-h-[90vh] sm:max-h-none animate-in slide-in-from-bottom sm:slide-in-from-right duration-200"
+            className="absolute inset-x-0 bottom-0 sm:inset-y-0 sm:right-0 sm:left-auto sm:w-full sm:max-w-md bg-[var(--lb-surface)] border-t border-[var(--lb-line)] sm:border-t-0 sm:border-l rounded-t-[18px] sm:rounded-t-none sm:rounded-l-[18px] shadow-[0_-20px_60px_rgba(0,0,0,0.5)] flex flex-col max-h-[90vh] sm:max-h-none animate-in slide-in-from-bottom sm:slide-in-from-right duration-200"
           >
             <div className="sm:hidden pt-3 pb-1 flex justify-center">
               <div className="w-10 h-1.5 rounded-full bg-gray-300" />
             </div>
             <div className="flex items-center justify-between px-5 pt-3 pb-4 border-b border-[var(--color-border)]">
               <div className="flex items-center gap-2">
-                <SlidersHorizontal size={20} className="text-[var(--primary)]" />
+                <SlidersHorizontal size={20} className="text-[var(--lb-accent-text)]" />
                 <h3 className="text-lg font-semibold">Filters</h3>
                 {activeCount > 0 && (
-                  <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-[var(--primary)] text-white">
+                  <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-[image:var(--lb-accent-grad)] text-[var(--lb-on-accent)]">
                     {activeCount}
                   </span>
                 )}
               </div>
               <button
                 onClick={() => setFilterOpen(false)}
-                className="p-2 rounded-lg hover:bg-gray-100 transition"
+                className="lb-btn-glass flex h-11 w-11 items-center justify-center rounded-full"
                 aria-label="Close filters"
               >
                 <X size={20} />
@@ -480,16 +537,16 @@ export function ProfilesView({
                 lockedProfileType={lockedProfileType}
               />
             </div>
-            <div className="border-t border-[var(--color-border)] px-5 py-3 flex items-center gap-3 bg-white">
+            <div className="border-t border-[var(--lb-line)] px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] flex items-center gap-3 bg-[var(--lb-surface)]">
               <button
                 onClick={resetFilters}
-                className="flex-1 py-3 rounded-xl border border-[var(--color-border)] text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+                className="inline-flex items-center justify-center lb-btn-glass flex-1 h-[52px] rounded-xl text-sm font-semibold"
               >
                 Reset
               </button>
               <button
                 onClick={() => setFilterOpen(false)}
-                className="flex-1 py-3 rounded-xl bg-[var(--primary)] text-white text-sm font-semibold hover:bg-[var(--primary-hover)] transition"
+                className="lb-btn-primary flex-[2] h-[52px] rounded-xl text-[15px] font-semibold"
               >
                 Show {profiles.length} result{profiles.length === 1 ? "" : "s"}
               </button>
@@ -498,7 +555,6 @@ export function ProfilesView({
         </div>
       )}
 
-      {isLoggedIn && <ViewerForensicWatermark />}
 
       {/* Keep footer for guests, but always show mobile bottom nav on listing routes. */}
       <BottomNav />

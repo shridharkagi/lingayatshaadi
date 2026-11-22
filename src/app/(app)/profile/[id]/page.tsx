@@ -2,7 +2,7 @@
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
+import Image from "@/components/ui/SmartImage";
 import {
   useState,
   useCallback,
@@ -74,7 +74,6 @@ import { HobbyTag } from "@/components/ui/HobbyTag";
 import { LanguageTag } from "@/components/ui/LanguageTag";
 import { ProfileCard } from "@/components/ui/ProfileCard";
 import { ContactsList } from "@/components/ui/ContactsList";
-import { ViewerForensicWatermark } from "@/components/ViewerForensicWatermark";
 import { Profile } from "@/types";
 import { trackContactView } from "@/lib/contactViewHistory";
 import type { RevealedContacts } from "@/lib/api/contactViews";
@@ -82,7 +81,7 @@ import { hasMeaningfulPreferences } from "@/lib/partnerPreferenceDefaults";
 import { computeProfileCompletion } from "@/lib/profileCompletion";
 import { buildProfileSeoTitle } from "@/lib/profileSeo";
 import { buildProfileShareFooter, buildProfileShareText, getShortProfilePath } from "@/lib/profileShare";
-import { formatHeightForDisplay } from "@/lib/formatHeight";
+import { formatHeightForDisplay, formatHeightShort } from "@/lib/formatHeight";
 import { getAccountAccessState } from "@/lib/api/accessState";
 import { maskBirthDateKeepYear, maskLastName, maskLastNameKeepPrefix, MASKED_VALUE, type AccountAccessState } from "@/lib/accessPolicy";
 import { normalizeDataVisibilityConfig, resolveViewerTier } from "@/lib/dataVisibility";
@@ -185,19 +184,19 @@ function PartnerPreferenceTiles({ profile }: { profile: Profile }) {
 
   return (
     <div>
-      <p className="mb-2.5 text-sm text-gray-500">What {firstName} is looking for</p>
+      <p className="mb-2.5 text-sm text-[var(--lb-muted)]">What {firstName} is looking for</p>
       {compactItems.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3">
           {compactItems.map((item) => (
             <div
               key={item.label}
-              className={`${item.span} rounded-xl border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 sm:px-3 sm:py-2 min-h-[56px] flex flex-col justify-center`}
+              className={`${item.span} rounded-[10px] border border-[var(--lb-line)] bg-white/[0.04] px-2.5 py-1.5 sm:px-3 sm:py-2 min-h-[56px] flex flex-col justify-center`}
             >
-              <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+              <p className="text-[11px] font-medium tracking-[0.01em] text-[var(--lb-subtle)]">
                 {item.label}
               </p>
               <p
-                className="mt-0.5 break-words leading-snug text-[#2d241d] text-[0.82rem] sm:text-[0.9rem] font-semibold"
+                className="mt-0.5 break-words leading-snug text-[var(--lb-text)] text-[0.82rem] sm:text-[0.9rem] font-semibold"
               >
                 {item.value}
               </p>
@@ -222,7 +221,7 @@ function DetailSection({
 }) {
   return (
     <div className="flex items-start gap-3 py-4 border-b border-gray-100 last:border-0 last:pb-0 first:pt-0">
-      <Icon size={18} className="text-gray-400 mt-0.5 flex-shrink-0" />
+      <Icon size={18} className="text-[var(--lb-accent-text)] mt-0.5 flex-shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-xs sm:text-sm text-gray-500 mb-1">{heading}</p>
         <div className="text-sm sm:text-base text-[var(--foreground)] space-y-0.5">{children}</div>
@@ -232,8 +231,8 @@ function DetailSection({
 }
 
 /** Swipe card: JS timeouts match CSS transition durations (exit → route → enter). */
-const SWIPE_EXIT_ROUTE_MS = 470;
-const SWIPE_ENTER_SETTLE_MS = 830;
+const SWIPE_EXIT_ROUTE_MS = 260;
+const SWIPE_ENTER_SETTLE_MS = 480;
 
 /** Full-screen gallery: horizontal swipe must clearly dominate vertical movement
  * so scrolling the page on the image does not advance photos. */
@@ -472,7 +471,15 @@ export default function OtherProfilePage() {
     };
   }, [profileFromContext, profilesLoading, profiles.length, lookupPublicId, lookupUuidPrefix, fallbackProfile]);
 
-  const currentIdx = profile ? profiles.findIndex((p) => p.id === profile.id) : -1;
+  /**
+   * Next/prev stays within the same section as the open profile (brides with
+   * brides, grooms with grooms) — mirrors "More brides/grooms you may like".
+   */
+  const navProfiles = useMemo(() => {
+    const g = profile?.gender;
+    return g ? profiles.filter((p) => p.gender === g) : profiles;
+  }, [profiles, profile?.gender]);
+  const currentIdx = profile ? navProfiles.findIndex((p) => p.id === profile.id) : -1;
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   const swipeCardRef = useRef<HTMLDivElement>(null);
@@ -623,31 +630,78 @@ export default function OtherProfilePage() {
     setSwipeOffset(dist);
     window.setTimeout(() => {
       pendingEnterRef.current = "prev";
-      const prevProfile = profiles[currentIdx - 1];
+      const prevProfile = navProfiles[currentIdx - 1];
       const prevSlug = getProfileSlug(prevProfile);
       setDisplayedSlug(prevSlug);
       startTransition(() => {
         router.replace(`/profile/${prevSlug}`, { scroll: false });
       });
     }, SWIPE_EXIT_ROUTE_MS);
-  }, [currentIdx, router, isTransitioning, profiles, cardSlideDistance]);
+  }, [currentIdx, router, isTransitioning, navProfiles, cardSlideDistance]);
 
   const goNext = useCallback(() => {
-    if (currentIdx < 0 || currentIdx >= profiles.length - 1 || isTransitioning) return;
+    if (currentIdx < 0 || currentIdx >= navProfiles.length - 1 || isTransitioning) return;
     setIsTransitioning(true);
     setSwipeExiting(true);
     const dist = cardSlideDistance();
     setSwipeOffset(-dist);
     window.setTimeout(() => {
       pendingEnterRef.current = "next";
-      const nextProfile = profiles[currentIdx + 1];
+      const nextProfile = navProfiles[currentIdx + 1];
       const nextSlug = getProfileSlug(nextProfile);
       setDisplayedSlug(nextSlug);
       startTransition(() => {
         router.replace(`/profile/${nextSlug}`, { scroll: false });
       });
     }, SWIPE_EXIT_ROUTE_MS);
-  }, [currentIdx, router, isTransitioning, profiles, cardSlideDistance]);
+  }, [currentIdx, router, isTransitioning, navProfiles, cardSlideDistance]);
+
+  /**
+   * Warm up the neighbouring profiles: prefetch their routes and decode their
+   * cover photos so a next/prev slide lands on a ready card, not a blank one.
+   */
+  useEffect(() => {
+    if (currentIdx < 0) return;
+    const neighbours = [navProfiles[currentIdx + 1], navProfiles[currentIdx - 1], navProfiles[currentIdx + 2]].filter(
+      Boolean
+    ) as Profile[];
+    const preloaded: HTMLImageElement[] = [];
+    for (const p of neighbours) {
+      try {
+        router.prefetch(`/profile/${getProfileSlug(p)}`);
+      } catch {
+        // prefetch is best-effort
+      }
+      if (p.profilePhoto) {
+        const img = new window.Image();
+        img.decoding = "async";
+        img.src = p.profilePhoto;
+        preloaded.push(img);
+      }
+    }
+    return () => {
+      preloaded.length = 0;
+    };
+  }, [currentIdx, navProfiles, router]);
+
+  /** Desktop: ← / → move between profiles (ignored while typing or when a dialog/gallery is open). */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.closest("input, textarea, select, [contenteditable='true']") || t.isContentEditable)) return;
+      if (document.querySelector('[aria-modal="true"]')) return;
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        goNext();
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        goPrev();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [goNext, goPrev]);
 
   useEffect(() => {
     const el = swipeCardRef.current;
@@ -670,6 +724,14 @@ export default function OtherProfilePage() {
         swipeCardRef.current?.offsetWidth ??
         Math.min(typeof window !== "undefined" ? window.innerWidth * 0.92 : 400, 440);
       const enterFrom = dir === "next" ? w * 1.08 : -w * 1.08;
+      if (typeof window !== "undefined" && window.scrollY > 80) {
+        window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+      }
+      try {
+        navigator.vibrate?.(8);
+      } catch {
+        // haptics unsupported
+      }
       swipePointerId.current = null;
       setSwipeDragging(false);
       setSlideEnterInstant(true);
@@ -710,18 +772,18 @@ export default function OtherProfilePage() {
         const cap = 100;
         x = x <= cap ? x : cap + (x - cap) * 0.2;
       }
-      if (currentIdx >= profiles.length - 1 && x < 0) {
+      if (currentIdx >= navProfiles.length - 1 && x < 0) {
         const cap = -100;
         x = x >= cap ? x : cap + (x - cap) * 0.2;
       }
       return Math.max(-span, Math.min(span, x));
     },
-    [currentIdx, profiles.length]
+    [currentIdx, navProfiles.length]
   );
 
   const onSwipePointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      if (profiles.length <= 1 || currentIdx < 0 || isTransitioning || swipeExiting) return;
+      if (navProfiles.length <= 1 || currentIdx < 0 || isTransitioning || swipeExiting) return;
       if ((e.target as HTMLElement).closest("button")) return;
       if (e.pointerType === "mouse" && e.button !== 0) return;
       swipePointerId.current = e.pointerId;
@@ -733,7 +795,7 @@ export default function OtherProfilePage() {
       // Defer setPointerCapture until we know the gesture is horizontal-dominant
       // so vertical page scroll on the photo is not hijacked.
     },
-    [profiles.length, currentIdx, isTransitioning, swipeExiting]
+    [navProfiles.length, currentIdx, isTransitioning, swipeExiting]
   );
 
   const onSwipePointerMove = useCallback(
@@ -798,7 +860,7 @@ export default function OtherProfilePage() {
 
       const commitNext =
         axisWasHorizontal &&
-        currentIdx < profiles.length - 1 &&
+        currentIdx < navProfiles.length - 1 &&
         (raw <= -threshold || (raw < -28 && vx < -FLING));
       const commitPrev =
         axisWasHorizontal &&
@@ -817,7 +879,7 @@ export default function OtherProfilePage() {
         setSwipeOffset(-exitDist);
         window.setTimeout(() => {
           pendingEnterRef.current = "next";
-          const nextProfile = profiles[currentIdx + 1];
+          const nextProfile = navProfiles[currentIdx + 1];
           const nextSlug = getProfileSlug(nextProfile);
           setDisplayedSlug(nextSlug);
           startTransition(() => {
@@ -832,7 +894,7 @@ export default function OtherProfilePage() {
         setSwipeOffset(exitDist);
         window.setTimeout(() => {
           pendingEnterRef.current = "prev";
-          const prevProfile = profiles[currentIdx - 1];
+          const prevProfile = navProfiles[currentIdx - 1];
           const prevSlug = getProfileSlug(prevProfile);
           setDisplayedSlug(prevSlug);
           startTransition(() => {
@@ -842,7 +904,7 @@ export default function OtherProfilePage() {
         return;
       }
     },
-    [currentIdx, profiles, router, setDisplayedSlug]
+    [currentIdx, navProfiles, router, setDisplayedSlug]
   );
 
   // Keyboard navigation
@@ -861,14 +923,14 @@ export default function OtherProfilePage() {
   }, [goPrev, goNext]);
 
   useEffect(() => {
-    if (currentIdx < 0 || profiles.length < 2) return;
-    if (currentIdx < profiles.length - 1) {
-      router.prefetch(`/profile/${getProfileSlug(profiles[currentIdx + 1])}`);
+    if (currentIdx < 0 || navProfiles.length < 2) return;
+    if (currentIdx < navProfiles.length - 1) {
+      router.prefetch(`/profile/${getProfileSlug(navProfiles[currentIdx + 1])}`);
     }
     if (currentIdx > 0) {
-      router.prefetch(`/profile/${getProfileSlug(profiles[currentIdx - 1])}`);
+      router.prefetch(`/profile/${getProfileSlug(navProfiles[currentIdx - 1])}`);
     }
-  }, [currentIdx, profiles, router]);
+  }, [currentIdx, navProfiles, router]);
 
   useEffect(() => {
     if (!showGallery) {
@@ -887,6 +949,33 @@ export default function OtherProfilePage() {
     const id = window.setTimeout(() => setGalleryImgOpacity(1), 48);
     return () => window.clearTimeout(id);
   }, [currentImageIndex, showGallery]);
+
+  /** Gallery: Esc closes, ←/→ change photo, and the page behind doesn't scroll. */
+  useEffect(() => {
+    if (!showGallery || !profile) return;
+    // Same rule as `allPhotos` below: cover photo first, then the rest without the duplicate.
+    const count =
+      (profile.profilePhoto ? 1 : 0) + (profile.photos || []).filter((ph) => ph !== profile.profilePhoto).length;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setShowGallery(false);
+      } else if (e.key === "ArrowRight" && count > 1) {
+        e.preventDefault();
+        setCurrentImageIndex((prev) => (prev < count - 1 ? prev + 1 : 0));
+      } else if (e.key === "ArrowLeft" && count > 1) {
+        e.preventDefault();
+        setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : count - 1));
+      }
+    };
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [showGallery, profile]);
 
   const swipeMotion = useMemo(() => {
     const wPx = Math.max(cardWidth, 260);
@@ -972,9 +1061,16 @@ export default function OtherProfilePage() {
         document.body.removeChild(textArea);
       }
       setCopiedMemberId(true);
+      showToast(`Member ID ${memberId} copied`);
+      try {
+        navigator.vibrate?.(12);
+      } catch {
+        // haptics unsupported
+      }
       setTimeout(() => setCopiedMemberId(false), 2000);
     } catch (err) {
       console.error("Failed to copy:", err);
+      showToast("Could not copy Member ID", "error");
     }
   };
 
@@ -1178,12 +1274,11 @@ export default function OtherProfilePage() {
 
   return (
     <div
-      className={`w-full max-w-[1800px] mx-auto px-3 sm:px-2 lg:px-2 xl:px-3${showForensicOverlay ? " pb-20" : " pb-6"}`}
+      className={`w-full max-w-[1800px] mx-auto px-3 sm:px-2 lg:px-2 xl:px-3${" pb-24"}`}
     >
       {moderationBanner}
-      {showForensicOverlay && <ViewerForensicWatermark />}
       {showConfidentialBanner && (
-        <div className="mx-0 sm:mx-2 mt-1 flex gap-2 items-start rounded-2xl bg-amber-50/90 border border-amber-100 px-3 py-2.5 text-[11px] sm:text-xs text-amber-950 leading-snug">
+        <div className="mx-0 sm:mx-2 mt-1 flex gap-2 items-start rounded-2xl bg-white/[0.04] border border-[var(--lb-line)] px-3 py-2.5 text-[11px] sm:text-xs text-[var(--lb-muted)] leading-snug">
           <div className="flex-1 min-w-0">
             <span>Member details are confidential — for your matrimonial search only. Misuse may lead to suspension. </span>
             <Link href="/terms" className="underline font-medium text-[var(--primary)]">
@@ -1206,7 +1301,7 @@ export default function OtherProfilePage() {
           <button
             type="button"
             onClick={dismissConfidentialStrip}
-            className="flex-shrink-0 p-1 rounded-lg hover:bg-amber-200/60 text-amber-900/80"
+            className="flex-shrink-0 p-1 rounded-lg hover:bg-white/10 text-[var(--lb-muted)]"
             aria-label="Hide notice for this session"
           >
             <X size={18} strokeWidth={2} />
@@ -1214,127 +1309,156 @@ export default function OtherProfilePage() {
         </div>
       )}
       {showGallery && hasMultiplePhotos && (
-        <div
-          className="fixed inset-0 z-50 bg-black flex flex-col"
-        >
-          <button
+        <div className="fixed inset-0 z-[90] flex items-center justify-center p-3 sm:p-6 animate-[lb-fade-in_.18s_ease-out]">
+          {/* Blurred app behind — tap to close */}
+          <div
+            className="absolute inset-0 bg-[#05050A]/55 backdrop-blur-md"
             onClick={() => setShowGallery(false)}
-            className="absolute top-4 right-4 z-10 p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition"
-            aria-label="Close gallery"
+            aria-hidden
+          />
+          <div
+            className="relative flex max-h-[88dvh] w-[min(92vw,520px)] flex-col overflow-hidden rounded-[20px] border border-[var(--lb-line-strong)] bg-[#0F0E17]/95 shadow-[0_30px_80px_rgba(0,0,0,0.65)] animate-[lb-pop-in_.22s_cubic-bezier(.2,.8,.2,1)]"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Photos of ${displayName || "member"}`}
           >
-            <X size={24} />
-          </button>
-          
-          {/* Image counter */}
-          <div className="absolute top-4 left-4 z-10 px-3 py-1.5 rounded-full bg-black/50 text-white text-sm font-medium">
-            {currentImageIndex + 1} / {allPhotos.length}
-          </div>
-          
-          {/* Main image display */}
-          <div className="flex-1 flex items-center justify-center relative">
-            {/* Previous button */}
+          {/* Top bar */}
+          <div className="flex items-center gap-3 px-3.5 pt-3.5 pb-2.5">
             <button
-              onClick={() => setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : allPhotos.length - 1))}
-              className="absolute left-4 z-10 p-3 rounded-full bg-white/20 hover:bg-white/30 text-white transition"
-              aria-label="Previous image"
+              type="button"
+              onClick={() => setShowGallery(false)}
+              className="lb-btn-glass flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+              aria-label="Close photos"
             >
-              <ChevronLeft size={28} strokeWidth={2.5} />
+              <X size={22} />
             </button>
-            
-            {/* Current image: vertical scroll must not change photo — require horizontal-dominant swipe. */}
-            <div
-              className="relative w-full h-full flex items-center justify-center px-16 touch-pan-y"
-              style={{ touchAction: "pan-y" }}
-              onTouchStart={(e) => {
-                const t = e.touches[0];
-                galleryTouchStart.current = { x: t.clientX, y: t.clientY };
-              }}
-              onTouchEnd={(e) => {
-                const start = galleryTouchStart.current;
-                galleryTouchStart.current = null;
-                if (!start) return;
-                const t = e.changedTouches[0];
-                const dx = start.x - t.clientX;
-                const dy = start.y - t.clientY;
-                const horizDominant =
-                  Math.abs(dx) >= Math.abs(dy) * GALLERY_SWIPE_DOMINANCE &&
-                  Math.abs(dx) >= GALLERY_SWIPE_MIN_DX;
-                if (!horizDominant) return;
-                if (dx > 0) {
-                  setCurrentImageIndex((prev) => (prev < allPhotos.length - 1 ? prev + 1 : 0));
-                } else {
-                  setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : allPhotos.length - 1));
-                }
-              }}
-            >
-              <div
-                className="relative max-w-4xl max-h-[80vh] w-full h-full"
-                style={{
-                  opacity: galleryImgOpacity,
-                  transition: `opacity ${GALLERY_IMG_TRANSITION_MS}ms ease-out`,
-                }}
-              >
-                <Image
-                  src={allPhotos[currentImageIndex]}
-                  alt={`${profile.fullName} photo ${currentImageIndex + 1}`}
-                  fill
-                  className={`object-contain ${!canViewSensitiveFields ? "select-none pointer-events-none" : ""}`}
-                  style={!canViewSensitiveFields ? { filter: "blur(var(--blur-md))" } : undefined}
-                  unoptimized
-                  sizes="100vw"
-                />
-              </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[15px] font-semibold text-[var(--lb-text)]">{displayName}</p>
+              <p className="text-[12.5px] text-[var(--lb-muted)] tabular-nums">
+                Photo {currentImageIndex + 1} of {allPhotos.length}
+              </p>
             </div>
-            
-            {/* Next button */}
-            <button
-              onClick={() => setCurrentImageIndex((prev) => (prev < allPhotos.length - 1 ? prev + 1 : 0))}
-              className="absolute right-4 z-10 p-3 rounded-full bg-white/20 hover:bg-white/30 text-white transition"
-              aria-label="Next image"
+          </div>
+
+          {/* Photo stage — swipe left/right; vertical drags are ignored */}
+          <div
+            className="relative flex h-[min(58dvh,560px)] items-center justify-center px-3 touch-pan-y"
+            style={{ touchAction: "pan-y" }}
+            onTouchStart={(e) => {
+              const t = e.touches[0];
+              galleryTouchStart.current = { x: t.clientX, y: t.clientY };
+            }}
+            onTouchEnd={(e) => {
+              const start = galleryTouchStart.current;
+              galleryTouchStart.current = null;
+              if (!start) return;
+              const t = e.changedTouches[0];
+              const dx = start.x - t.clientX;
+              const dy = start.y - t.clientY;
+              const horizDominant =
+                Math.abs(dx) >= Math.abs(dy) * GALLERY_SWIPE_DOMINANCE && Math.abs(dx) >= GALLERY_SWIPE_MIN_DX;
+              if (!horizDominant) return;
+              if (dx > 0) {
+                setCurrentImageIndex((prev) => (prev < allPhotos.length - 1 ? prev + 1 : 0));
+              } else {
+                setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : allPhotos.length - 1));
+              }
+            }}
+          >
+            <div
+              className="relative h-full w-full max-w-4xl"
+              style={{
+                opacity: galleryImgOpacity,
+                transition: `opacity ${GALLERY_IMG_TRANSITION_MS}ms ease-out`,
+              }}
             >
-              <ChevronRight size={28} strokeWidth={2.5} />
+              <Image
+                key={allPhotos[currentImageIndex]}
+                src={allPhotos[currentImageIndex]}
+                alt={`${displayName || "Member"} photo ${currentImageIndex + 1}`}
+                fill
+                priority
+                className={`object-contain drop-shadow-[0_20px_50px_rgba(0,0,0,0.6)] ${
+                  !canViewSensitiveFields ? "select-none pointer-events-none" : ""
+                }`}
+                style={!canViewSensitiveFields ? { filter: "blur(var(--blur-md))" } : undefined}
+                sizes="100vw"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : allPhotos.length - 1))}
+              className="absolute left-2 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur-md transition hover:bg-black/65 active:scale-95"
+              aria-label="Previous photo"
+            >
+              <ChevronLeft size={24} strokeWidth={2.4} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentImageIndex((prev) => (prev < allPhotos.length - 1 ? prev + 1 : 0))}
+              className="absolute right-2 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur-md transition hover:bg-black/65 active:scale-95"
+              aria-label="Next photo"
+            >
+              <ChevronRight size={24} strokeWidth={2.4} />
             </button>
           </div>
-          
-          {/* Thumbnail strip at bottom */}
-          <div className="p-4 bg-black/50 backdrop-blur-sm">
-            <div className="flex gap-2 justify-center overflow-x-auto max-w-4xl mx-auto">
+
+          {/* Dots + thumbnails */}
+          <div className="px-4 pt-3 pb-4">
+            <div className="mb-3 flex justify-center gap-1.5" aria-hidden>
+              {allPhotos.map((_, i) => (
+                <span
+                  key={i}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    i === currentImageIndex ? "w-5 bg-[var(--lb-accent)]" : "w-1.5 bg-white/30"
+                  }`}
+                />
+              ))}
+            </div>
+            <div className="mx-auto flex max-w-4xl justify-center gap-2.5 overflow-x-auto px-1 py-1.5 [scrollbar-width:none]">
               {allPhotos.map((src, i) => (
                 <button
                   key={i}
+                  type="button"
                   onClick={() => setCurrentImageIndex(i)}
-                  className={`relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden transition-all duration-300 ease-out ${
-                    i === currentImageIndex ? "ring-2 ring-white scale-110" : "opacity-60 hover:opacity-100"
+                  aria-label={`Show photo ${i + 1}`}
+                  aria-current={i === currentImageIndex ? "true" : undefined}
+                  className={`relative h-16 w-14 flex-shrink-0 overflow-hidden rounded-xl transition-all duration-200 ${
+                    i === currentImageIndex
+                      ? "ring-2 ring-[var(--lb-accent)] ring-offset-2 ring-offset-[#05050A]"
+                      : "opacity-50 hover:opacity-90"
                   }`}
                 >
                   <Image
                     src={src}
-                    alt={`Thumbnail ${i + 1}`}
+                    alt=""
                     fill
                     className="object-cover"
-                    unoptimized
-                    sizes="64px"
+                    style={!canViewSensitiveFields ? { filter: "blur(var(--blur-md))" } : undefined}
+                    sizes="56px"
                   />
                 </button>
               ))}
             </div>
           </div>
+          </div>
         </div>
       )}
-      <header className="sticky top-0 z-20 -mx-3 sm:-mx-2 lg:-mx-2 xl:-mx-3 bg-white/95 backdrop-blur border-b border-[var(--border)] px-3 sm:px-4 py-3 flex items-center justify-between rounded-none sm:rounded-b-2xl">
+      <header className="sticky top-0 z-20 -mx-3 sm:-mx-2 lg:-mx-2 xl:-mx-3 bg-[#0B0B12]/85 backdrop-blur-xl border-b border-[var(--lb-line)] px-3 sm:px-4 py-2.5 flex items-center justify-between rounded-none sm:rounded-b-2xl">
         <button
           onClick={() => router.back()}
-          className="flex items-center gap-2 px-3 py-2 -ml-2 rounded-xl hover:bg-gray-100 transition-colors font-medium text-[var(--foreground)]"
+          className="lb-btn-glass flex h-11 items-center gap-1.5 rounded-xl pl-2.5 pr-3 -ml-1 font-medium text-[var(--lb-text)]" aria-label="Go back"
         >
           <ChevronLeft size={22} strokeWidth={2.5} />
           <span className="hidden sm:inline">Back</span>
         </button>
         
         <Link href="/home" className="min-w-0 flex-1 px-2 text-center leading-none hover:opacity-90 transition-opacity">
-          <span className="text-[clamp(1.02rem,3.65vw,1.2rem)] font-semibold text-[var(--primary)] tracking-tight truncate block max-w-[15.5rem] mx-auto sm:max-w-none">
+          <span className="text-[clamp(1.02rem,3.65vw,1.2rem)] font-semibold lb-grad-text tracking-tight truncate block max-w-[15.5rem] mx-auto sm:max-w-none">
             LingayatBandhu
           </span>
-          <span className="mt-0.5 block text-[9.5px] sm:text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[var(--primary)]/85 truncate max-w-[15.5rem] mx-auto sm:max-w-none">
+          <span className="mt-0.5 block text-[9.5px] sm:text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[var(--lb-subtle)] truncate max-w-[15.5rem] mx-auto sm:max-w-none">
             MATRIMONY
           </span>
         </Link>
@@ -1345,12 +1469,12 @@ export default function OtherProfilePage() {
       <div className="mt-2 lg:grid lg:grid-cols-[minmax(340px,40%)_minmax(0,60%)] lg:gap-3 xl:gap-4 lg:items-start">
       <div className="space-y-3 lg:sticky lg:top-[84px]">
       <div
-        className="relative w-full isolate contain-layout overflow-hidden rounded-2xl"
+        className="relative w-full md:max-w-[560px] md:mx-auto lg:max-w-none isolate contain-layout overflow-hidden rounded-[18px]"
         style={{ perspective: 1100, WebkitPerspective: 1100 }}
       >
         <div
           ref={swipeCardRef}
-          className="relative z-[1] overflow-hidden rounded-t-2xl rounded-b-none select-none touch-pan-y"
+          className="relative z-[1] overflow-hidden rounded-[18px] select-none touch-pan-y"
           style={{
             // Prefer native vertical scroll; horizontal profile swipe is handled in JS after axis lock.
             touchAction: "pan-y",
@@ -1362,25 +1486,25 @@ export default function OtherProfilePage() {
               slideEnterInstant || swipeDragging
                 ? "none"
                 : isEnteringSlide
-                  ? "transform 0.72s cubic-bezier(0.14, 0.88, 0.18, 1)"
+                  ? "transform 0.42s cubic-bezier(0.16, 0.9, 0.2, 1)"
                   : swipeExiting && Math.abs(swipeOffset) > 2
-                    ? "transform 0.45s cubic-bezier(0.28, 0.85, 0.36, 1)"
-                    : "transform 0.58s cubic-bezier(0.24, 1, 0.36, 1)",
+                    ? "transform 0.26s cubic-bezier(0.4, 0, 0.9, 0.6)"
+                    : "transform 0.36s cubic-bezier(0.24, 1, 0.36, 1)",
             willChange: swipeDragging || swipeExiting || isEnteringSlide ? "transform" : "auto",
             boxShadow:
               swipeDragging && Math.abs(swipeOffset) > 4
                 ? `0 ${swipeMotion.shadowY}px ${swipeMotion.shadowBlur}px rgba(0,0,0,${swipeMotion.shadowAlpha})`
-                : "0 4px 24px rgba(0,0,0,0.08)",
+                : "0 18px 44px rgba(0,0,0,0.45)",
           }}
           onPointerDown={onSwipePointerDown}
           onPointerMove={onSwipePointerMove}
           onPointerUp={finishSwipePointer}
           onPointerCancel={finishSwipePointer}
         >
-          {profiles.length > 1 && currentIdx >= 0 && (
+          {navProfiles.length > 1 && currentIdx >= 0 && (
             <>
               <div
-                className="pointer-events-none absolute inset-0 z-[6] rounded-t-2xl rounded-b-none bg-gradient-to-l from-[var(--primary)]/45 to-transparent"
+                className="pointer-events-none absolute inset-0 z-[6] rounded-[18px] bg-gradient-to-l from-[var(--primary)]/45 to-transparent"
                 style={{
                   opacity: swipeOffset < -8 ? swipeMotion.hint * 0.55 : 0,
                   transition: "opacity 0.08s ease-out",
@@ -1388,14 +1512,14 @@ export default function OtherProfilePage() {
                 aria-hidden
               />
               <div
-                className="pointer-events-none absolute inset-0 z-[6] rounded-t-2xl rounded-b-none bg-gradient-to-r from-black/35 to-transparent"
+                className="pointer-events-none absolute inset-0 z-[6] rounded-[18px] bg-gradient-to-r from-black/35 to-transparent"
                 style={{
                   opacity: swipeOffset > 8 ? swipeMotion.hint * 0.45 : 0,
                   transition: "opacity 0.08s ease-out",
                 }}
                 aria-hidden
               />
-              <div className="pointer-events-none absolute inset-0 z-[7] rounded-t-2xl rounded-b-none" aria-hidden>
+              <div className="pointer-events-none absolute inset-0 z-[7] rounded-[18px]" aria-hidden>
                 <span
                   className="absolute top-[16%] right-[8%] font-black tracking-[0.2em] text-[clamp(1.65rem,8vw,2.75rem)] uppercase text-white"
                   style={{
@@ -1422,20 +1546,27 @@ export default function OtherProfilePage() {
               </div>
             </>
           )}
-          <div className="relative aspect-[4/6] md:aspect-[3/4] md:max-h-[620px] md:mx-auto md:w-[min(100%,560px)] lg:w-full lg:max-h-[760px] max-h-[640px] bg-gray-200 overflow-hidden rounded-t-2xl rounded-b-none">
+          <div className="relative aspect-[4/6] md:aspect-[3/4] md:max-h-[620px] md:mx-auto md:w-[min(100%,560px)] lg:w-full lg:max-h-[760px] max-h-[640px] bg-[var(--lb-raised)] overflow-hidden rounded-[18px]">
             <Image
               src={profile.profilePhoto || "/placeholder.svg"}
               alt={profile.fullName}
               fill
-              className="object-cover rounded-t-2xl rounded-b-none pointer-events-none"
-              unoptimized
+              className="object-cover rounded-[18px] pointer-events-none"
               priority
               draggable={false}
             />
+            {navProfiles.length > 1 && currentIdx >= 0 && (
+              <span
+                className="pointer-events-none absolute top-3 left-3 z-10 inline-flex h-9 items-center rounded-full border border-white/15 bg-black/55 px-3 text-[12.5px] font-medium text-white/90 backdrop-blur-md tabular-nums"
+                aria-live="polite"
+              >
+                {currentIdx + 1} of {navProfiles.length}
+              </span>
+            )}
             {hasMultiplePhotos && (
               <button
                 onClick={() => setShowGallery(true)}
-                className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-black/50 hover:bg-black/70 text-white transition z-10 flex items-center gap-1.5 text-sm font-medium"
+                className="absolute top-3 right-3 h-9 px-3 rounded-full bg-black/55 border border-white/15 backdrop-blur-md hover:bg-black/70 text-white transition z-10 flex items-center gap-1.5 text-[13px] font-medium"
                 aria-label="View gallery"
               >
                 <Images size={18} />
@@ -1447,7 +1578,7 @@ export default function OtherProfilePage() {
                 type="button"
                 onClick={goPrev}
                 disabled={currentIdx <= 0}
-                className="p-2.5 rounded-full bg-black/40 hover:bg-black/60 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg pointer-events-auto"
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-black/45 border border-white/15 backdrop-blur-md hover:bg-black/65 active:scale-95 disabled:opacity-0 disabled:pointer-events-none transition-all shadow-lg pointer-events-auto"
                 aria-label="Previous profile"
               >
                 <ChevronLeft size={24} className="text-white" strokeWidth={2.5} />
@@ -1455,8 +1586,8 @@ export default function OtherProfilePage() {
               <button
                 type="button"
                 onClick={goNext}
-                disabled={currentIdx >= profiles.length - 1}
-                className="p-2.5 rounded-full bg-black/40 hover:bg-black/60 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg pointer-events-auto"
+                disabled={currentIdx >= navProfiles.length - 1}
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-black/45 border border-white/15 backdrop-blur-md hover:bg-black/65 active:scale-95 disabled:opacity-0 disabled:pointer-events-none transition-all shadow-lg pointer-events-auto"
                 aria-label="Next profile"
               >
                 <ChevronRight size={24} className="text-white" strokeWidth={2.5} />
@@ -1464,39 +1595,55 @@ export default function OtherProfilePage() {
             </div>
           </div>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent text-white rounded-b-none pointer-events-none">
-          <h1 className="text-xl sm:text-2xl font-bold">{displayName}</h1>
-          <p className="text-white/90">
-            {getAge(profile.dateOfBirth)} yrs • {profile.height}&quot;
-            {profile.district && <span> • {profile.district}</span>}
+        <div className="absolute bottom-0 left-0 right-0 px-5 pb-5 pt-28 bg-gradient-to-t from-[#0B0B12] via-[#0B0B12]/75 to-transparent text-white pointer-events-none rounded-b-[18px]">
+          <div className="flex flex-wrap items-center gap-2 mb-2.5">
+            {profile.verified && (
+              <span className="lb-verified inline-flex h-[26px] items-center gap-1 rounded-full px-2.5 text-[11.5px] font-bold" title="Verified profile">
+                <BadgeCheck size={13} strokeWidth={2.4} />
+                Verified
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                void handleCopyMemberId();
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className={`pointer-events-auto inline-flex h-[28px] items-center gap-1.5 rounded-full border px-2.5 text-[11.5px] font-medium backdrop-blur-md transition-colors active:scale-95 ${
+                copiedMemberId
+                  ? "border-emerald-300/40 bg-emerald-400/20 text-emerald-100"
+                  : "border-white/15 bg-white/10 text-white/90 hover:bg-white/20"
+              }`}
+              aria-label={`Copy Member ID ${getMemberIdDisplay(profile)}`}
+            >
+              {getMemberIdDisplay(profile)}
+              {copiedMemberId ? <Check size={13} strokeWidth={2.6} /> : <Copy size={12} className="opacity-80" />}
+              {copiedMemberId && <span className="font-semibold">Copied</span>}
+            </button>
+          </div>
+          <h1 className="text-[26px] sm:text-3xl font-bold leading-tight tracking-[-0.01em]">{displayName}</h1>
+          <p className="mt-1 text-[15px] text-[#D9D4E4]">
+            {[
+              getAge(profile.dateOfBirth) ? `${getAge(profile.dateOfBirth)} yrs` : null,
+              formatHeightShort(profile.height),
+              profile.district || null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
           {profile.profession && (
-            <p className="text-white/90 text-sm mt-1 flex items-center gap-1.5">
+            <p className="mt-1 text-[14px] font-medium text-[var(--lb-accent-text)] flex items-center gap-1.5">
               <Briefcase size={14} className="flex-shrink-0" />
               {profile.profession}
             </p>
           )}
-          {(() => {
-            if (!profile.verified) return null;
-            return (
-              <span
-                className="inline-flex items-center gap-1 mt-2 px-2.5 py-1 text-xs font-semibold text-emerald-800 bg-emerald-100 rounded-[8px]"
-                title="Verified profile"
-              >
-                <BadgeCheck size={13} />
-                Verified
-              </span>
-            );
-          })()}
-          <span className="inline-block mt-2 ml-2 px-2.5 py-1 text-xs font-medium text-white bg-white/20 rounded-[8px]">
-            {getMemberIdDisplay(profile)}
-          </span>
         </div>
         </div>
       </div>
 
       {/* Action buttons - mobile-first, large tap targets */}
-      <div className="px-2 sm:px-3 py-2.5 rounded-b-2xl rounded-t-none bg-gradient-to-b from-white to-gray-50 border border-gray-100 border-t-gray-200/70">
+      <div className="mt-3 md:max-w-[560px] md:mx-auto lg:max-w-none">
         <div className={`grid ${FEATURE_MESSAGING_ENABLED ? "grid-cols-6" : "grid-cols-5"} gap-2`}>
           <button
             onClick={async () => {
@@ -1534,40 +1681,40 @@ export default function OtherProfilePage() {
               }
             }}
             disabled={hasShownInterest || sendingInterest}
-            className={`flex flex-col items-center justify-center gap-1 px-1.5 py-2 rounded-xl transition min-h-[56px] border ${
+            className={`flex flex-col items-center justify-center gap-1.5 px-1 py-2.5 rounded-[12px] transition min-h-[68px] border active:scale-95 ${
               hasShownInterest
-                ? "bg-red-50 border-red-200 text-red-600 shadow-[inset_0_0_0_1px_rgba(239,68,68,0.08)]"
-                : "bg-white hover:bg-gray-100 active:bg-gray-200 border-gray-200/80"
+                ? "bg-[var(--lb-accent-tint)] border-[var(--lb-accent)]/35 text-[var(--lb-accent-text)]"
+                : "lb-btn-primary border-transparent"
             } ${sendingInterest ? "opacity-70" : ""}`}
           >
-            <Heart size={18} className={`flex-shrink-0 ${hasShownInterest ? "fill-red-600" : ""}`} />
-            <span className="text-[11px] sm:text-xs font-semibold truncate">Interest</span>
+            <Heart size={18} className={`flex-shrink-0 ${hasShownInterest ? "fill-[var(--lb-accent)]" : ""}`} />
+            <span className="text-[11.5px] sm:text-xs font-semibold truncate">Interest</span>
           </button>
           {FEATURE_MESSAGING_ENABLED &&
             (interestAccepted ? (
               <Link href={`/messages/${profile.id}`} className="min-h-[56px]">
-                <button className="w-full h-full flex flex-col items-center justify-center gap-1 px-1.5 py-2 rounded-xl bg-white hover:bg-gray-100 active:bg-gray-200 transition border border-gray-200/80">
+                <button className="w-full h-full flex flex-col items-center justify-center gap-1.5 px-1 py-2.5 rounded-[12px] active:scale-95 bg-[var(--lb-surface)] hover:bg-[var(--lb-raised)] transition border border-[var(--lb-line)] text-[var(--lb-text)]">
                   <MessageCircle size={18} className="flex-shrink-0" />
-                  <span className="text-[11px] sm:text-xs font-semibold truncate">Message</span>
+                  <span className="text-[11.5px] sm:text-xs font-semibold truncate">Message</span>
                 </button>
               </Link>
             ) : (
               <button
                 disabled
                 title="Accept interest request first to message"
-                className="flex flex-col items-center justify-center gap-1 px-1.5 py-2 rounded-xl opacity-50 cursor-not-allowed min-h-[56px] border border-gray-200 bg-white"
+                className="flex flex-col items-center justify-center gap-1 px-1.5 py-2 rounded-xl opacity-50 cursor-not-allowed min-h-[68px] border border-[var(--lb-line)] bg-[var(--lb-surface)]"
               >
                 <MessageCircle size={18} className="flex-shrink-0" />
-                <span className="text-[11px] sm:text-xs font-semibold truncate">Message</span>
+                <span className="text-[11.5px] sm:text-xs font-semibold truncate">Message</span>
               </button>
             ))}
           {!isLoggedIn ? (
             <a
               href={`tel:${(config.callContactNumber || "6360130905").replace(/\D/g, "")}`}
-              className="flex flex-col items-center justify-center gap-1 px-1.5 py-2 rounded-xl bg-white hover:bg-gray-100 active:bg-gray-200 transition min-h-[56px] border border-gray-200/80"
+              className="flex flex-col items-center justify-center gap-1.5 px-1 py-2.5 rounded-[12px] active:scale-95 bg-white hover:bg-gray-100 active:bg-gray-200 transition min-h-[56px] border border-gray-200/80"
             >
               <Phone size={18} className="flex-shrink-0" />
-              <span className="text-[11px] sm:text-xs font-semibold truncate">Contact</span>
+              <span className="text-[11.5px] sm:text-xs font-semibold truncate">Contact</span>
             </a>
           ) : (
             <button
@@ -1578,14 +1725,14 @@ export default function OtherProfilePage() {
                 }
                 toggleContactDetails();
               }}
-              className={`flex flex-col items-center justify-center gap-1 px-1.5 py-2 rounded-xl transition min-h-[56px] border ${
-                showContact 
-                  ? "bg-blue-50 border-blue-200 text-blue-600 shadow-[inset_0_0_0_1px_rgba(59,130,246,0.08)]"
-                  : "bg-white hover:bg-gray-100 active:bg-gray-200 border-gray-200/80"
+              className={`flex flex-col items-center justify-center gap-1.5 px-1 py-2.5 rounded-[12px] transition min-h-[68px] border active:scale-95 ${
+                showContact
+                  ? "bg-[var(--lb-accent-tint)] border-[var(--lb-accent)]/35 text-[var(--lb-accent-text)]"
+                  : "bg-[var(--lb-surface)] hover:bg-[var(--lb-raised)] border-[var(--lb-line)] text-[var(--lb-text)]"
               }`}
             >
               <Phone size={18} className="flex-shrink-0" />
-              <span className="text-[11px] sm:text-xs font-semibold truncate">Contact</span>
+              <span className="text-[11.5px] sm:text-xs font-semibold truncate">Contact</span>
             </button>
           )}
           <button
@@ -1625,35 +1772,35 @@ export default function OtherProfilePage() {
               }
             }}
             disabled={savingShortlist}
-            className={`flex flex-col items-center justify-center gap-1 px-1.5 py-2 rounded-xl transition min-h-[56px] border ${
+            className={`flex flex-col items-center justify-center gap-1.5 px-1 py-2.5 rounded-[12px] transition min-h-[68px] border active:scale-95 ${
               isSaved
-                ? "bg-amber-50 border-amber-200 text-amber-700 shadow-[inset_0_0_0_1px_rgba(245,158,11,0.1)]"
-                : "bg-white hover:bg-gray-100 active:bg-gray-200 border-gray-200/80"
+                ? "bg-[var(--lb-accent-tint)] border-[var(--lb-accent)]/35 text-[var(--lb-accent-text)]"
+                : "bg-[var(--lb-surface)] hover:bg-[var(--lb-raised)] border-[var(--lb-line)] text-[var(--lb-text)]"
             }`}
             aria-label="Save to shortlist"
           >
-            <Bookmark size={18} className={`flex-shrink-0 ${isSaved ? "fill-amber-700" : ""}`} />
-            <span className="text-[11px] sm:text-xs font-semibold truncate">Save</span>
+            <Bookmark size={18} className={`flex-shrink-0 ${isSaved ? "fill-[var(--lb-accent)]" : ""}`} />
+            <span className="text-[11.5px] sm:text-xs font-semibold truncate">Save</span>
           </button>
           <button
             type="button"
             onClick={openSupportPopup}
-            className="flex flex-col items-center justify-center gap-1 px-1.5 py-2 rounded-xl transition min-h-[56px] border bg-white hover:bg-gray-100 active:bg-gray-200 border-gray-200/80"
+            className="flex flex-col items-center justify-center gap-1.5 px-1 py-2.5 rounded-[12px] transition min-h-[68px] border active:scale-95 bg-[var(--lb-surface)] hover:bg-[var(--lb-raised)] border-[var(--lb-line)] text-[var(--lb-text)]"
             aria-label="Contact support"
           >
             <Headset size={18} className="flex-shrink-0" />
-            <span className="text-[11px] sm:text-xs font-semibold truncate">Support</span>
+            <span className="text-[11.5px] sm:text-xs font-semibold truncate">Support</span>
           </button>
           <button
             type="button"
             onClick={() => {
               void shareCurrentProfile();
             }}
-            className="flex flex-col items-center justify-center gap-1 px-1.5 py-2 rounded-xl transition min-h-[56px] border bg-white hover:bg-gray-100 active:bg-gray-200 border-gray-200/80"
+            className="flex flex-col items-center justify-center gap-1.5 px-1 py-2.5 rounded-[12px] transition min-h-[68px] border active:scale-95 bg-[var(--lb-surface)] hover:bg-[var(--lb-raised)] border-[var(--lb-line)] text-[var(--lb-text)]"
             aria-label="Share profile"
           >
             <Share2 size={18} className="flex-shrink-0" />
-            <span className="text-[11px] sm:text-xs font-semibold truncate">Share</span>
+            <span className="text-[11.5px] sm:text-xs font-semibold truncate">Share</span>
           </button>
         </div>
 
@@ -1663,7 +1810,7 @@ export default function OtherProfilePage() {
               href={whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="group flex flex-row items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl bg-[#eafaf0] hover:bg-[#dcf6e7] active:bg-[#cfefd9] transition text-[#179c4a] min-h-[44px] border border-[#bfe8cf] w-full font-semibold"
+              className="group flex flex-row items-center justify-center gap-2.5 px-4 py-3 rounded-[12px] bg-[#25D366]/10 hover:bg-[#25D366]/15 active:bg-[#25D366]/20 transition text-[#86EFAC] min-h-[48px] border border-[#25D366]/30 w-full font-semibold"
               aria-label="Join WhatsApp Group"
             >
               <svg
@@ -1685,7 +1832,7 @@ export default function OtherProfilePage() {
       <div className="space-y-4 mt-1 lg:max-h-[calc(100vh-104px)] lg:overflow-y-auto lg:pr-0.5">
         <div className="space-y-4">
         {profile.aboutMeVisible && profile.aboutMe && (
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <div className="bg-[var(--lb-surface)] rounded-[14px] p-[18px] border border-[var(--lb-line)]">
             <h3 className="font-semibold text-base sm:text-lg text-[var(--foreground)] mb-2">About Me</h3>
             <p className="text-sm sm:text-base text-gray-600">{aboutMeTruncated}</p>
             {aboutMeWords > 100 && (
@@ -1697,7 +1844,7 @@ export default function OtherProfilePage() {
         )}
 
         {/* Profile Details - reference design (Location, Education & Career, Family) */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+        <div className="bg-[var(--lb-surface)] rounded-[14px] p-[18px] border border-[var(--lb-line)]">
           <h3 className="font-semibold text-base sm:text-lg text-[var(--foreground)] mb-3">Profile Details</h3>
           {!isLoggedIn && (
             <button
@@ -1827,20 +1974,21 @@ export default function OtherProfilePage() {
                   </div>
                 </div>
 
-                <div className="ml-auto rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2 py-1.5 min-w-[132px] sm:min-w-[152px]">
-                  <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                <div className="ml-auto rounded-[10px] border border-[var(--lb-line)] bg-white/[0.04] px-2 py-1.5 min-w-[132px] sm:min-w-[152px]">
+                  <p className="text-[11px] font-medium tracking-[0.01em] text-[var(--lb-subtle)]">
                     Member ID
                   </p>
                   <button
                     onClick={handleCopyMemberId}
-                    className="mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded transition-colors cursor-pointer font-semibold text-[0.84rem] text-[#2d241d]"
-                    title="Click to copy"
+                    className="mt-0.5 inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 hover:bg-white/10 active:scale-95 transition cursor-pointer font-semibold text-[0.84rem] text-[var(--lb-text)]"
+                    title="Tap to copy"
+                    aria-label={`Copy Member ID ${getMemberIdDisplay(profile)}`}
                   >
                     <span>{getMemberIdDisplay(profile)}</span>
                     {copiedMemberId ? (
-                      <Check size={14} className="text-green-600" />
+                      <span className="inline-flex items-center gap-1 text-emerald-300"><Check size={14} />Copied</span>
                     ) : (
-                      <Copy size={14} className="text-gray-500" />
+                      <Copy size={14} className="text-[var(--lb-subtle)]" />
                     )}
                   </button>
                 </div>
@@ -1849,49 +1997,49 @@ export default function OtherProfilePage() {
               <div className="mt-2.5 space-y-2">
                 <div className="grid grid-cols-3 md:grid-cols-6 gap-2 [grid-auto-rows:minmax(min-content,auto)]">
                   {displayName && (
-                    <div className="col-span-2 md:col-span-4 rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
-                      <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                    <div className="col-span-2 md:col-span-4 rounded-[10px] border border-[var(--lb-line)] bg-white/[0.04] px-2.5 py-2 min-h-0">
+                      <p className="text-[11px] font-medium tracking-[0.01em] text-[var(--lb-subtle)]">
                         Full Name
                       </p>
-                      <p className="mt-0.5 text-[0.88rem] font-semibold text-[#2d241d] break-words leading-snug">{displayName}</p>
+                      <p className="mt-0.5 text-[0.88rem] font-semibold text-[var(--lb-text)] break-words leading-snug">{displayName}</p>
                     </div>
                   )}
 
-                  <div className="col-span-1 md:col-span-2 rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
-                    <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                  <div className="col-span-1 md:col-span-2 rounded-[10px] border border-[var(--lb-line)] bg-white/[0.04] px-2.5 py-2 min-h-0">
+                    <p className="text-[11px] font-medium tracking-[0.01em] text-[var(--lb-subtle)]">
                       Height
                     </p>
-                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] leading-snug">{formatHeightForDisplay(profile.height)}</p>
+                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[var(--lb-text)] leading-snug">{formatHeightForDisplay(profile.height)}</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2 [grid-auto-rows:minmax(min-content,auto)]">
-                  {displayDateOfBirth && <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
-                    <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                  {displayDateOfBirth && <div className="rounded-[10px] border border-[var(--lb-line)] bg-white/[0.04] px-2.5 py-2 min-h-0">
+                    <p className="text-[11px] font-medium tracking-[0.01em] text-[var(--lb-subtle)]">
                       Birth Date
                     </p>
-                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] leading-snug">{displayDateOfBirth}</p>
+                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[var(--lb-text)] leading-snug">{displayDateOfBirth}</p>
                   </div>}
 
-                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
-                    <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                  <div className="rounded-[10px] border border-[var(--lb-line)] bg-white/[0.04] px-2.5 py-2 min-h-0">
+                    <p className="text-[11px] font-medium tracking-[0.01em] text-[var(--lb-subtle)]">
                       Marital Status
                     </p>
-                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] leading-snug break-words">{profile.maritalStatus}</p>
+                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[var(--lb-text)] leading-snug break-words">{profile.maritalStatus}</p>
                   </div>
 
-                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
-                    <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                  <div className="rounded-[10px] border border-[var(--lb-line)] bg-white/[0.04] px-2.5 py-2 min-h-0">
+                    <p className="text-[11px] font-medium tracking-[0.01em] text-[var(--lb-subtle)]">
                       Caste
                     </p>
-                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] leading-snug break-words">{profile.caste}</p>
+                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[var(--lb-text)] leading-snug break-words">{profile.caste}</p>
                   </div>
 
-                  {displaySubCaste && <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
-                    <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                  {displaySubCaste && <div className="rounded-[10px] border border-[var(--lb-line)] bg-white/[0.04] px-2.5 py-2 min-h-0">
+                    <p className="text-[11px] font-medium tracking-[0.01em] text-[var(--lb-subtle)]">
                       Sub-Caste
                     </p>
-                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">{displaySubCaste}</p>
+                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[var(--lb-text)] break-words leading-snug">{displaySubCaste}</p>
                   </div>}
                 </div>
               </div>
@@ -1920,11 +2068,11 @@ export default function OtherProfilePage() {
               </div>
               <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
                 {displayFatherName && (
-                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
-                    <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                  <div className="rounded-[10px] border border-[var(--lb-line)] bg-white/[0.04] px-2.5 py-2 min-h-0">
+                    <p className="text-[11px] font-medium tracking-[0.01em] text-[var(--lb-subtle)]">
                       Father
                     </p>
-                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">
+                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[var(--lb-text)] break-words leading-snug">
                       {displayFatherName}
                       {profile.fatherOccupation ? ` (${profile.fatherOccupation})` : ""}
                     </p>
@@ -1932,32 +2080,32 @@ export default function OtherProfilePage() {
                 )}
 
                 {displayMotherName && (
-                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
-                    <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                  <div className="rounded-[10px] border border-[var(--lb-line)] bg-white/[0.04] px-2.5 py-2 min-h-0">
+                    <p className="text-[11px] font-medium tracking-[0.01em] text-[var(--lb-subtle)]">
                       Mother
                     </p>
-                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">
+                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[var(--lb-text)] break-words leading-snug">
                       {displayMotherName}
                       {profile.motherOccupation ? ` (${profile.motherOccupation})` : ""}
                     </p>
                   </div>
                 )}
 
-                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
-                  <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                <div className="rounded-[10px] border border-[var(--lb-line)] bg-white/[0.04] px-2.5 py-2 min-h-0">
+                  <p className="text-[11px] font-medium tracking-[0.01em] text-[var(--lb-subtle)]">
                     Food
                   </p>
-                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">
+                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[var(--lb-text)] break-words leading-snug">
                     {profile.foodHabits || "—"}
                   </p>
                 </div>
 
                 {displaySibling && (
-                  <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
-                    <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                  <div className="rounded-[10px] border border-[var(--lb-line)] bg-white/[0.04] px-2.5 py-2 min-h-0">
+                    <p className="text-[11px] font-medium tracking-[0.01em] text-[var(--lb-subtle)]">
                       Sibling
                     </p>
-                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">
+                    <p className="mt-0.5 text-[0.86rem] font-semibold text-[var(--lb-text)] break-words">
                       {displaySibling}
                     </p>
                   </div>
@@ -1972,7 +2120,7 @@ export default function OtherProfilePage() {
             hidden for non-logged-in viewers. We still show the card if any
             of the remaining astrology fields are present. */}
         {getRule("horoscopeDetails") !== "hide" && (profile.rashi || profile.nakshatra || profile.timeOfBirth || profile.placeOfBirth || profile.horoscopeOtherDetails) && (
-          <div className="bg-white rounded-2xl p-4 shadow-sm">
+          <div className="bg-[var(--lb-surface)] rounded-[14px] p-[18px] border border-[var(--lb-line)]">
             <h3 className="font-semibold text-[var(--foreground)] mb-1">Horoscope Details</h3>
             <div className="flex items-center gap-2 mb-2">
               <Calendar size={18} className="text-gray-400 flex-shrink-0" />
@@ -1980,51 +2128,51 @@ export default function OtherProfilePage() {
             </div>
             <div className="grid grid-cols-2 gap-2 [grid-auto-rows:minmax(min-content,auto)]">
               {displayTimeOfBirth && (
-                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
-                  <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                <div className="rounded-[10px] border border-[var(--lb-line)] bg-white/[0.04] px-2.5 py-2 min-h-0">
+                  <p className="text-[11px] font-medium tracking-[0.01em] text-[var(--lb-subtle)]">
                     Time of Birth
                   </p>
-                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words">
+                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[var(--lb-text)] break-words">
                     {displayTimeOfBirth}
                   </p>
                 </div>
               )}
               {profile.placeOfBirth && (
-                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
-                  <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                <div className="rounded-[10px] border border-[var(--lb-line)] bg-white/[0.04] px-2.5 py-2 min-h-0">
+                  <p className="text-[11px] font-medium tracking-[0.01em] text-[var(--lb-subtle)]">
                     Place of Birth
                   </p>
-                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">
+                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[var(--lb-text)] break-words leading-snug">
                     {profile.placeOfBirth}
                   </p>
                 </div>
               )}
               {profile.rashi && (
-                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
-                  <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                <div className="rounded-[10px] border border-[var(--lb-line)] bg-white/[0.04] px-2.5 py-2 min-h-0">
+                  <p className="text-[11px] font-medium tracking-[0.01em] text-[var(--lb-subtle)]">
                     Zodiac Sign
                   </p>
-                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">
+                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[var(--lb-text)] break-words leading-snug">
                     {profile.rashi}
                   </p>
                 </div>
               )}
               {profile.nakshatra && (
-                <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
-                  <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                <div className="rounded-[10px] border border-[var(--lb-line)] bg-white/[0.04] px-2.5 py-2 min-h-0">
+                  <p className="text-[11px] font-medium tracking-[0.01em] text-[var(--lb-subtle)]">
                     Nakshatra
                   </p>
-                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">
+                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[var(--lb-text)] break-words leading-snug">
                     {profile.nakshatra}
                   </p>
                 </div>
               )}
               {profile.horoscopeOtherDetails && (
-                <div className="col-span-2 rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-1.5 h-full">
-                  <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                <div className="col-span-2 rounded-[10px] border border-[var(--lb-line)] bg-white/[0.04] px-2.5 py-1.5 h-full">
+                  <p className="text-[11px] font-medium tracking-[0.01em] text-[var(--lb-subtle)]">
                     Other Details
                   </p>
-                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words line-clamp-2">
+                  <p className="mt-0.5 text-[0.86rem] font-semibold text-[var(--lb-text)] break-words line-clamp-2">
                     {profile.horoscopeOtherDetails}
                   </p>
                 </div>
@@ -2035,7 +2183,7 @@ export default function OtherProfilePage() {
 
         {/* Hobbies and Interests - placed after Horoscope Details */}
         {profile.hobbies && profile.hobbies.length > 0 && (
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <div className="bg-[var(--lb-surface)] rounded-[14px] p-[18px] border border-[var(--lb-line)]">
             <h3 className="font-semibold text-base sm:text-lg text-[var(--foreground)] mb-3 pb-2 border-b border-gray-200">
               Hobbies and Interests
             </h3>
@@ -2049,7 +2197,7 @@ export default function OtherProfilePage() {
 
         {/* Languages - tag-style display */}
         {((profile.languagesKnown && profile.languagesKnown.trim()) || profile.motherTongue) && (
-          <div className="bg-white rounded-2xl p-4 shadow-sm">
+          <div className="bg-[var(--lb-surface)] rounded-[14px] p-[18px] border border-[var(--lb-line)]">
             <h3 className="font-semibold text-[var(--foreground)] mb-3 pb-2 border-b border-gray-200">
               Languages
             </h3>
@@ -2100,7 +2248,7 @@ export default function OtherProfilePage() {
           if (isOwnProfile) {
             if (hasPrefs) {
               return (
-                <div className="bg-white rounded-2xl p-4 shadow-sm">
+                <div className="bg-[var(--lb-surface)] rounded-[14px] p-[18px] border border-[var(--lb-line)]">
                   <div className="flex items-start justify-between gap-3 mb-1">
                     <h3 className="font-semibold text-[var(--foreground)]">Partner Preferences</h3>
                     {!isPublic && (
@@ -2132,7 +2280,7 @@ export default function OtherProfilePage() {
             }
             // Owner with no real preferences yet → nudge.
             return (
-              <div className="bg-white rounded-2xl p-5 shadow-sm border border-dashed border-[var(--primary)]/30">
+              <div className="bg-[var(--lb-surface)] rounded-[14px] p-5 border border-dashed border-[var(--lb-accent)]/35">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-9 h-9 rounded-xl bg-[var(--primary)]/10 text-[var(--primary)] flex items-center justify-center">
                     <Heart size={18} />
@@ -2163,7 +2311,7 @@ export default function OtherProfilePage() {
           if (!hasPrefs) return null;
           if (!isPublic) {
             return (
-              <div className="bg-white rounded-2xl p-4 shadow-sm">
+              <div className="bg-[var(--lb-surface)] rounded-[14px] p-[18px] border border-[var(--lb-line)]">
                 <h3 className="font-semibold text-[var(--foreground)] mb-1">Partner Preferences</h3>
                 <div className="flex items-start gap-3 mt-2">
                   <div className="w-9 h-9 rounded-xl bg-gray-100 text-gray-500 flex items-center justify-center shrink-0">
@@ -2182,7 +2330,7 @@ export default function OtherProfilePage() {
             );
           }
           return (
-            <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <div className="bg-[var(--lb-surface)] rounded-[14px] p-[18px] border border-[var(--lb-line)]">
               <h3 className="font-semibold text-[var(--foreground)] mb-1">Partner Preferences</h3>
               <PartnerPreferenceTiles profile={profile} />
             </div>
@@ -2190,7 +2338,7 @@ export default function OtherProfilePage() {
         })()}
       </div>
 
-      {getRule("contactDetails") !== "hide" && <div className="bg-white rounded-2xl p-4 shadow-sm">
+      {getRule("contactDetails") !== "hide" && <div className="bg-[var(--lb-surface)] rounded-[14px] p-[18px] border border-[var(--lb-line)]">
         <h3 className="font-semibold text-[var(--foreground)] mb-3">Contact Information</h3>
         <div className="py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
@@ -2198,29 +2346,29 @@ export default function OtherProfilePage() {
             <p className="text-xs sm:text-sm text-gray-500">Address</p>
           </div>
           <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
-            <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
-              <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+            <div className="rounded-[10px] border border-[var(--lb-line)] bg-white/[0.04] px-2.5 py-2 min-h-0">
+              <p className="text-[11px] font-medium tracking-[0.01em] text-[var(--lb-subtle)]">
                 City
               </p>
-              <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">{profile.city || "—"}</p>
+              <p className="mt-0.5 text-[0.86rem] font-semibold text-[var(--lb-text)] break-words leading-snug">{profile.city || "—"}</p>
             </div>
-            <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
-              <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+            <div className="rounded-[10px] border border-[var(--lb-line)] bg-white/[0.04] px-2.5 py-2 min-h-0">
+              <p className="text-[11px] font-medium tracking-[0.01em] text-[var(--lb-subtle)]">
                 District
               </p>
-              <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">{profile.district || "—"}</p>
+              <p className="mt-0.5 text-[0.86rem] font-semibold text-[var(--lb-text)] break-words leading-snug">{profile.district || "—"}</p>
             </div>
-            <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
-              <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+            <div className="rounded-[10px] border border-[var(--lb-line)] bg-white/[0.04] px-2.5 py-2 min-h-0">
+              <p className="text-[11px] font-medium tracking-[0.01em] text-[var(--lb-subtle)]">
                 State
               </p>
-              <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">{profile.state || "—"}</p>
+              <p className="mt-0.5 text-[0.86rem] font-semibold text-[var(--lb-text)] break-words leading-snug">{profile.state || "—"}</p>
             </div>
-            <div className="rounded-lg border border-[#eee6dd] bg-[#f8f5f2] px-2.5 py-2 min-h-0">
-              <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+            <div className="rounded-[10px] border border-[var(--lb-line)] bg-white/[0.04] px-2.5 py-2 min-h-0">
+              <p className="text-[11px] font-medium tracking-[0.01em] text-[var(--lb-subtle)]">
                 Country
               </p>
-              <p className="mt-0.5 text-[0.86rem] font-semibold text-[#2d241d] break-words leading-snug">{profile.country || "—"}</p>
+              <p className="mt-0.5 text-[0.86rem] font-semibold text-[var(--lb-text)] break-words leading-snug">{profile.country || "—"}</p>
             </div>
           </div>
         </div>
@@ -2307,7 +2455,7 @@ export default function OtherProfilePage() {
               <div className="space-y-2">
                 <a
                   href={`tel:${(config.callContactNumber || "6360130905").replace(/\D/g, "")}`}
-                  className="flex w-full items-center gap-3 rounded-xl bg-white p-2.5 text-[var(--primary)] font-medium hover:bg-gray-50 transition"
+                  className="flex w-full items-center gap-3 rounded-xl bg-white/[0.04] border border-[var(--lb-line)] p-2.5 text-[var(--lb-accent-text)] font-medium hover:bg-white/[0.08] transition"
                 >
                   <Phone size={16} />
                   <span>{config.callContactNumber || "6360130905"}</span>
@@ -2317,7 +2465,7 @@ export default function OtherProfilePage() {
                   href={`https://wa.me/${(config.whatsappContactNumber || config.callContactNumber || "6360130905").replace(/\D/g, "")}?text=${encodeURIComponent("I need assistance with profile contact details")}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex w-full items-center gap-3 rounded-xl bg-white p-2.5 text-[#25D366] font-medium hover:bg-gray-50 transition"
+                  className="flex w-full items-center gap-3 rounded-xl bg-white/[0.04] border border-[var(--lb-line)] p-2.5 text-[#86EFAC] font-medium hover:bg-white/[0.08] transition"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="flex-shrink-0">
                     <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
@@ -2333,7 +2481,7 @@ export default function OtherProfilePage() {
 
       <div className="space-y-4 mt-4">
         {hasMultiplePhotos && (
-          <div className="bg-white rounded-2xl p-4 shadow-sm">
+          <div className="bg-[var(--lb-surface)] rounded-[14px] p-[18px] border border-[var(--lb-line)]">
             <h3 className="font-semibold text-[var(--foreground)] mb-3">More Photos</h3>
             {!canViewSensitiveFields ? (
               <div className="relative">
@@ -2349,7 +2497,6 @@ export default function OtherProfilePage() {
                         fill
                         className="object-cover"
                         style={{ filter: "blur(var(--blur-md))" }}
-                        unoptimized
                         sizes="(max-width: 640px) 33vw, 25vw"
                       />
                     </div>
@@ -2391,7 +2538,6 @@ export default function OtherProfilePage() {
                       alt={`${profile.fullName} photo ${i + 1}`}
                       fill
                       className="object-cover"
-                      unoptimized
                       sizes="(max-width: 640px) 33vw, 25vw"
                     />
                   </button>
@@ -2426,9 +2572,9 @@ export default function OtherProfilePage() {
         <div className="flex gap-2 pt-4">
           <button
             onClick={() => setShowReportModal(true)}
-            className="flex-1 flex items-center justify-center gap-2 py-3 text-sm sm:text-base text-gray-600 border border-[var(--border)] rounded-xl hover:bg-gray-50 transition-colors"
+            className="lb-btn-glass flex-1 flex items-center justify-center gap-2 h-12 text-sm sm:text-base rounded-2xl"
           >
-            <Flag size={18} className="text-gray-500" />
+            <Flag size={18} className="text-[var(--lb-muted)]" />
             Report
           </button>
           {isLoggedIn && actorId && profile && actorId !== profile.id && (
@@ -2440,7 +2586,7 @@ export default function OtherProfilePage() {
                   router.push("/search");
                 }
               }}
-              className="flex-1 flex items-center justify-center gap-2 py-3 text-sm sm:text-base text-red-600 border border-red-200 rounded-xl hover:bg-red-50 transition-colors"
+              className="lb-btn-danger flex-1 flex items-center justify-center gap-2 h-12 text-sm sm:text-base rounded-2xl hover:brightness-110 transition"
             >
               <Ban size={18} />
               Block
@@ -2449,8 +2595,8 @@ export default function OtherProfilePage() {
         </div>
 
         {showReportModal && isLoggedIn && actorId && profile && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-            <div className="bg-white rounded-2xl p-6 max-w-md w-full">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+            <div className="bg-[var(--lb-surface)] border border-[var(--lb-line)] rounded-[16px] p-6 max-w-md w-full">
               <h3 className="text-lg font-semibold mb-4">Report Profile</h3>
               <p className="text-sm text-gray-600 mb-4">Help us keep the community safe. Select a reason and add details if needed.</p>
               <select
@@ -2496,7 +2642,7 @@ export default function OtherProfilePage() {
                       setReportMessage("");
                     }
                   }}
-                  className="flex-1 py-3 rounded-xl bg-red-600 text-white disabled:opacity-50"
+                  className="lb-btn-danger flex-1 py-3 rounded-xl font-semibold disabled:opacity-50"
                 >
                   {reporting ? "Submitting..." : "Submit Report"}
                 </button>
@@ -2514,10 +2660,10 @@ export default function OtherProfilePage() {
           continues to compare females; same for males).
         */}
         <div className="pt-8">
-          <div className="rounded-xl border border-gray-200/90 bg-gradient-to-br from-white via-orange-50/30 to-slate-50/80 p-5 sm:p-6 lg:p-8 shadow-sm">
+          <div className="rounded-[16px] border border-[var(--lb-line)] bg-gradient-to-br from-[#15141E] to-[#100F18] p-4 sm:p-6 lg:p-8">
             <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3 mb-5 lg:mb-6">
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--primary)] mb-1">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--lb-accent-text)] mb-1">
                   Similar profiles
                 </p>
                 <h3 className="text-xl sm:text-2xl font-bold text-[var(--foreground)] tracking-tight">
@@ -2527,7 +2673,7 @@ export default function OtherProfilePage() {
                       ? "More grooms you may like"
                       : "More results for you"}
                 </h3>
-                <p className="text-sm text-gray-600 mt-1.5 max-w-xl">
+                <p className="text-sm text-[var(--lb-muted)] mt-1.5 max-w-xl">
                   Same section as this profile — open any card to compare details side by side.
                 </p>
               </div>
@@ -2566,12 +2712,12 @@ export default function OtherProfilePage() {
           aria-labelledby="profile-contact-sheet-title"
         >
           <div
-            className="absolute inset-0 bg-black/45 backdrop-blur-md supports-[backdrop-filter]:bg-black/35"
+            className="absolute inset-0 bg-black/70 backdrop-blur-md"
             aria-hidden
             onClick={() => setShowContact(false)}
           />
           <div
-            className="relative z-[71] mx-3 w-[calc(100%-1.5rem)] max-w-lg sm:mx-auto sm:w-full rounded-2xl bg-white shadow-2xl border border-gray-100 max-h-[min(82vh,680px)] flex flex-col sm:max-h-[85vh] mb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] sm:mb-0"
+            className="relative z-[71] mx-3 w-[calc(100%-1.5rem)] max-w-lg sm:mx-auto sm:w-full rounded-[16px] bg-[var(--lb-surface)] shadow-[0_-20px_60px_rgba(0,0,0,0.55)] border border-[var(--lb-line)] max-h-[min(82vh,680px)] flex flex-col sm:max-h-[85vh] mb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] sm:mb-0"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between gap-2 px-4 pt-4 pb-2 border-b border-gray-100 shrink-0">
@@ -2619,8 +2765,8 @@ export default function OtherProfilePage() {
             role="status"
             className={`w-full rounded-2xl border shadow-xl backdrop-blur px-3 py-2.5 text-sm ${
               toast.type === "success"
-                ? "bg-emerald-50/95 border-emerald-200 text-emerald-900"
-                : "bg-rose-50/95 border-rose-200 text-rose-900"
+                ? "bg-[#1F1D2B]/95 border-[var(--lb-line-strong)] text-[var(--lb-text)]"
+                : "bg-[#2A1820]/95 border-rose-400/30 text-rose-100"
             }`}
           >
             <div className="flex items-start gap-2">
@@ -2655,8 +2801,8 @@ export default function OtherProfilePage() {
       />
 
       {showCreateProfileModal && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-[16px] bg-[var(--lb-surface)] border border-[var(--lb-line)] p-5 shadow-xl">
             <h3 className="text-lg font-semibold text-[var(--foreground)]">Create profile to continue</h3>
             <p className="mt-2 text-sm text-gray-600">
               You can browse and save profiles, but sending Interest requires at least one profile in your account.

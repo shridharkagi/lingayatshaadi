@@ -7,7 +7,6 @@ import { ProfileCard } from "@/components/ui/ProfileCard";
 import { SearchFilters, defaultFilters, type SearchFiltersState } from "@/components/SearchFilters";
 import { debounce } from "@/lib/security";
 import { useAuth } from "@/contexts/AuthContext";
-import { ViewerForensicWatermark } from "@/components/ViewerForensicWatermark";
 import { getAccountAccessState } from "@/lib/api/accessState";
 import { maskLastNameKeepPrefix, type AccountAccessState } from "@/lib/accessPolicy";
 import { WhatsAppGroupCta } from "@/components/whatsapp/WhatsAppGroupCta";
@@ -88,6 +87,7 @@ export default function SearchPage() {
         ageRange: filters.ageRange,
         maritalStatuses: filters.maritalStatuses,
         professionTypes: filters.professionTypes,
+        foodHabits: filters.foodHabits,
         query: debouncedQuery,
       },
       { cursor: 0, pageSize }
@@ -113,6 +113,7 @@ export default function SearchPage() {
         ageRange: filters.ageRange,
         maritalStatuses: filters.maritalStatuses,
         professionTypes: filters.professionTypes,
+        foodHabits: filters.foodHabits,
         query: debouncedQuery,
       },
       { cursor, pageSize }
@@ -301,7 +302,6 @@ export default function SearchPage() {
         )}
       </div>
 
-      {isLoggedIn && <ViewerForensicWatermark />}
     </div>
   );
 }

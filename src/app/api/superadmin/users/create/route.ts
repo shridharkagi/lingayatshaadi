@@ -5,6 +5,7 @@ import { requireSuperAdmin } from "@/lib/server/requireSuperAdmin";
 import { generatePublicIdFromExistingIds } from "@/lib/memberId";
 import { toProfileRow } from "@/lib/profileMapper";
 import { logAdminAudit } from "@/lib/server/adminAudit";
+import { invalidateAuthUsersCache } from "@/lib/server/authUsers";
 
 function fallbackProfileEmail(superAdminUserId: string): string {
   const safe = String(superAdminUserId || "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 20) || "admin";
@@ -12,6 +13,7 @@ function fallbackProfileEmail(superAdminUserId: string): string {
 }
 
 export async function POST(req: NextRequest) {
+  invalidateAuthUsersCache();
   const auth = await requireSuperAdmin(req);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 

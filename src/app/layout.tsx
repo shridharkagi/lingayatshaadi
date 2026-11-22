@@ -9,6 +9,7 @@ import { ConfigInjector } from "@/components/ConfigInjector";
 import { AuthModalProvider } from "@/contexts/AuthModalContext";
 import { TurnstileProvider } from "@/components/turnstile/TurnstileProvider";
 import { InstallPWAButton } from "@/components/pwa/InstallPWAButton";
+import { SiteThemeScope } from "@/components/SiteThemeScope";
 
 const siteUrl = getPublicSiteUrl();
 
@@ -29,7 +30,7 @@ export async function generateMetadata(): Promise<Metadata> {
     publisher: "LingayatBandhu",
     appleWebApp: {
       capable: true,
-      statusBarStyle: "default",
+      statusBarStyle: "black",
       title: "LingayatBandhu",
     },
     icons: {
@@ -84,7 +85,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#d4a437",
+  themeColor: "#0B0B12",
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
 };
@@ -125,6 +126,7 @@ export default function RootLayout({
         ))}
       </head>
       <body className="antialiased min-h-screen">
+        <SiteThemeScope>
         <TurnstileProvider>
           <AuthProvider>
             <AppConfigProvider>
@@ -139,6 +141,7 @@ export default function RootLayout({
             </AppConfigProvider>
           </AuthProvider>
         </TurnstileProvider>
+        </SiteThemeScope>
       </body>
     </html>
   );

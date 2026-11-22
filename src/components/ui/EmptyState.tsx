@@ -29,9 +29,9 @@ export function EmptyState({
         <div className={compact ? "mb-4" : "mb-6"}>{illustration}</div>
       ) : (
         <div
-          className={`${compact ? "w-14 h-14 mb-4" : "w-20 h-20 mb-6"} rounded-full bg-gray-100 flex items-center justify-center`}
+          className={`${compact ? "w-14 h-14 mb-4" : "w-20 h-20 mb-6"} rounded-full bg-[var(--lb-accent-tint)] border border-[var(--lb-accent)]/20 flex items-center justify-center`}
         >
-          <Icon size={compact ? 28 : 40} className="text-gray-400" strokeWidth={1.5} />
+          <Icon size={compact ? 28 : 40} className="text-[var(--lb-accent-text)]" strokeWidth={1.5} />
         </div>
       )}
       

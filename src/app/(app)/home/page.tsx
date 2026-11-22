@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
-import Image from "next/image";
+import Image from "@/components/ui/SmartImage";
 import { Search, ChevronRight, Quote } from "lucide-react";
 import { useProfiles } from "@/contexts/ProfilesContext";
 import { ProfileCard } from "@/components/ui/ProfileCard";
@@ -65,7 +65,7 @@ export default function HomePage() {
 
   return (
     <div className="w-full pb-8 space-y-5">
-      <header className="bg-[var(--primary)] text-white px-4 py-6 lg:py-8 rounded-2xl shadow-sm">
+      <header className="lb-hero-panel text-white mt-4 px-5 py-6 lg:py-8 rounded-[16px]">
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-white/80 text-sm sm:text-base">Welcome back,</p>
@@ -86,7 +86,7 @@ export default function HomePage() {
               className="w-10 h-10 rounded-full overflow-hidden border-2 border-white hover:ring-2 hover:ring-white/50 transition"
             >
               {user?.profilePhoto ? (
-                <Image src={user.profilePhoto} alt={`Profile photo of ${user?.fullName || "user"}`} width={40} height={40} className="object-cover w-10 h-10" unoptimized />
+                <Image src={user.profilePhoto} alt={`Profile photo of ${user?.fullName || "user"}`} width={40} height={40} className="object-cover w-10 h-10"  />
               ) : (
                 <div className="w-full h-full bg-white/30 flex items-center justify-center text-lg w-10 h-10">
                   {user?.fullName?.[0] || "?"}
@@ -106,7 +106,7 @@ export default function HomePage() {
       </header>
 
       <div className="px-0 space-y-6">
-        <div className="bg-white rounded-2xl shadow-sm p-4 lg:p-6">
+        <div className="bg-[var(--lb-surface)] rounded-[14px] border border-[var(--lb-line)] p-4 lg:p-6">
           <h2 className="font-semibold text-base sm:text-lg text-[var(--foreground)] mb-3">Quick Actions</h2>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Link href="/search?tab=recommended" className="p-3 rounded-xl bg-[var(--primary)]/5 border border-[var(--primary)]/10 hover:bg-[var(--primary)]/10 transition">
@@ -148,7 +148,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm p-6 lg:p-8">
+        <div className="bg-[var(--lb-surface)] rounded-[14px] border border-[var(--lb-line)] p-6 lg:p-8">
           <h2 className="font-semibold text-base sm:text-lg text-[var(--foreground)] mb-4 flex items-center gap-2">
             <Quote size={24} className="text-[var(--primary)]" />
             Success Stories

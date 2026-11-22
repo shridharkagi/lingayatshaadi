@@ -178,59 +178,84 @@ export async function GET(req: NextRequest) {
   const ownerNameByUserId = new Map<string, string>();
   const ownerPhoneByUserId = new Map<string, string>();
   const ownerCodeByUserId = new Map<string, string>();
-  if (ownerUserIds.length > 0) {
-    try {
-      const authUsers = await listAllAuthUsers(admin);
-      const codeMap = await resolveAccountCodeMap(
-        admin,
-        authUsers.map((u) => ({ id: u.id, created_at: u.created_at }))
-      );
-      for (const u of authUsers) {
-        if (!ownerUserIds.includes(u.id)) continue;
-        const code = String(codeMap.get(u.id) || "").trim();
-        if (code) ownerCodeByUserId.set(u.id, code);
-        const fullName = String((u.user_metadata?.full_name as string) || "").trim();
-        if (fullName) ownerNameByUserId.set(u.id, fullName);
-        const phone = String(u.phone || "").trim();
-        if (phone) ownerPhoneByUserId.set(u.id, phone);
-      }
-    } catch {
-      // Fallback to profile-derived owner info below.
-    }
-    const { data: ownerProfiles } = await admin
-      .from("profiles")
-      .select("user_id, account_holder_name, contact, updated_at")
-      .in("user_id", ownerUserIds)
-      .order("updated_at", { ascending: false })
-      .limit(1000);
-    for (const row of (ownerProfiles || []) as Array<{
-      user_id?: string;
-      account_holder_name?: string | null;
-      contact?: string | null;
-    }>) {
-      const uid = String(row.user_id || "").trim();
-      if (!uid) continue;
-      if (!ownerNameByUserId.has(uid)) {
-        const n = String(row.account_holder_name || "").trim();
-        if (n) ownerNameByUserId.set(uid, n);
-      }
-      if (!ownerPhoneByUserId.has(uid)) {
-        const p = String(row.contact || "").trim();
-        if (p) ownerPhoneByUserId.set(uid, p);
-      }
-    }
-  }
-
   const planByProfileId: Record<
     string,
     { name: string; code: string; starts_at: string | null; expires_at: string | null; status: string }
   > = {};
+
+  // These three lookups are independent — run them concurrently instead of back-to-back.
+  const authLookup =
+    ownerUserIds.length > 0
+      ? (async () => {
+          try {
+            const authUsers = await listAllAuthUsers(admin);
+            const codeMap = await resolveAccountCodeMap(
+              admin,
+              authUsers.map((u) => ({ id: u.id, created_at: u.created_at }))
+            );
+            return { authUsers, codeMap };
+          } catch {
+            return null; // fall back to profile-derived owner info below
+          }
+        })()
+      : Promise.resolve(null);
+  const ownerProfilesLookup =
+    ownerUserIds.length > 0
+      ? admin
+          .from("profiles")
+          .select("user_id, account_holder_name, contact, updated_at")
+          .in("user_id", ownerUserIds)
+          .order("updated_at", { ascending: false })
+          .limit(1000)
+      : Promise.resolve({ data: null });
+  const subsLookup =
+    profileIds.length > 0
+      ? admin
+          .from("user_subscriptions")
+          .select("profile_id, status, starts_at, expires_at, created_at, subscription_plans(name, code)")
+          .in("profile_id", profileIds)
+          .order("created_at", { ascending: false })
+      : Promise.resolve({ data: null, error: null });
+  const [authResult, ownerProfilesResult, subsResult] = await Promise.all([
+    authLookup,
+    ownerProfilesLookup,
+    subsLookup,
+  ]);
+
+  if (authResult) {
+    const { authUsers, codeMap } = authResult;
+    for (const u of authUsers) {
+      if (!ownerUserIds.includes(u.id)) continue;
+      const code = String(codeMap.get(u.id) || "").trim();
+      if (code) ownerCodeByUserId.set(u.id, code);
+      const fullName = String((u.user_metadata?.full_name as string) || "").trim();
+      if (fullName) ownerNameByUserId.set(u.id, fullName);
+      const phone = String(u.phone || "").trim();
+      if (phone) ownerPhoneByUserId.set(u.id, phone);
+    }
+  }
+  for (const row of (ownerProfilesResult.data || []) as Array<{
+    user_id?: string;
+    account_holder_name?: string | null;
+    contact?: string | null;
+  }>) {
+    const uid = String(row.user_id || "").trim();
+    if (!uid) continue;
+    if (!ownerNameByUserId.has(uid)) {
+      const n = String(row.account_holder_name || "").trim();
+      if (n) ownerNameByUserId.set(uid, n);
+    }
+    if (!ownerPhoneByUserId.has(uid)) {
+      const ph = String(row.contact || "").trim();
+      if (ph) ownerPhoneByUserId.set(uid, ph);
+    }
+  }
+
   if (profileIds.length > 0) {
-    const { data: subs, error: subsErr } = await admin
-      .from("user_subscriptions")
-      .select("profile_id, status, starts_at, expires_at, created_at, subscription_plans(name, code)")
-      .in("profile_id", profileIds)
-      .order("created_at", { ascending: false });
+    const { data: subs, error: subsErr } = subsResult as {
+      data: unknown[] | null;
+      error: { message?: string } | null;
+    };
     if (!subsErr || isMissingRelation(subsErr?.message)) {
       for (const row of subs || []) {
         const r = row as {

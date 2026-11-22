@@ -26,15 +26,15 @@ export function ProfilesPageHeader() {
   }, [mobileMenuOpen]);
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-[var(--color-border)] shadow-[var(--shadow-soft)]">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-[#0B0B12]/85 backdrop-blur-xl border-b border-[var(--lb-line)]">
       <div className="max-w-6xl mx-auto px-2.5 sm:px-4 flex items-center justify-between h-14 sm:h-16 gap-1.5 sm:gap-2 min-w-0">
         <Link href="/" className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 pr-1">
-          <Heart className="w-7 h-7 sm:w-8 sm:h-8 shrink-0 text-[var(--primary)] fill-[var(--primary)]" aria-hidden />
+          <Heart className="w-7 h-7 sm:w-8 sm:h-8 shrink-0 text-[var(--lb-accent)] fill-[var(--lb-accent)]" aria-hidden />
           <span className="leading-tight text-[var(--primary)] min-w-0">
-            <span className="block text-[0.95rem] sm:text-xl font-bold truncate max-w-[56vw] sm:max-w-none">
+            <span className="block text-[0.95rem] sm:text-xl font-bold truncate max-w-[56vw] sm:max-w-none lb-grad-text">
               LingayatBandhu
             </span>
-            <span className="block text-[9px] sm:text-xs font-semibold tracking-[0.12em] sm:tracking-[0.14em] uppercase text-[var(--primary)]/85 truncate">
+            <span className="block text-[9px] sm:text-xs font-semibold tracking-[0.12em] sm:tracking-[0.14em] uppercase text-[var(--lb-subtle)] truncate">
               Matrimony
             </span>
           </span>
@@ -48,7 +48,7 @@ export function ProfilesPageHeader() {
           </Link>
           <Link
             href="/contact"
-            className="text-[var(--color-text-muted)] hover:text-[var(--primary)] transition"
+            className="text-[var(--color-text-muted)] hover:text-[var(--lb-accent-text)] transition"
           >
             Help
           </Link>
@@ -56,7 +56,7 @@ export function ProfilesPageHeader() {
             <>
               <Link
                 href="/home"
-                className="text-[var(--color-text-muted)] hover:text-[var(--primary)] transition"
+                className="text-[var(--color-text-muted)] hover:text-[var(--lb-accent-text)] transition"
               >
                 Home
               </Link>
@@ -69,7 +69,7 @@ export function ProfilesPageHeader() {
               <button
                 type="button"
                 onClick={() => openAuthModal("login")}
-                className="text-[var(--color-text-muted)] hover:text-[var(--primary)] transition"
+                className="text-[var(--color-text-muted)] hover:text-[var(--lb-accent-text)] transition"
               >
                 Sign In
               </button>
@@ -80,7 +80,7 @@ export function ProfilesPageHeader() {
         <div className="md:hidden flex shrink-0 items-center gap-0.5 sm:gap-1">
           <Link
             href="/search"
-            className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-[var(--color-border)]/50 active:bg-[var(--color-border)] transition-colors touch-manipulation"
+            className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-white/5 active:bg-white/10 transition-colors touch-manipulation"
             aria-label="Open search"
           >
             <Search size={22} strokeWidth={2} aria-hidden />
@@ -89,7 +89,7 @@ export function ProfilesPageHeader() {
             type="button"
             id="profiles-menu-btn"
             onClick={() => setMobileMenuOpen((prev) => !prev)}
-            className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-[var(--color-border)]/50 active:bg-[var(--color-border)] transition-colors touch-manipulation"
+            className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-white/5 active:bg-white/10 transition-colors touch-manipulation"
             aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
             aria-expanded={mobileMenuOpen}
           >
@@ -99,7 +99,7 @@ export function ProfilesPageHeader() {
       </div>
       <div
         id="profiles-menu-panel"
-        className={`md:hidden bg-white shadow-lg relative z-[60] overflow-hidden grid transition-all duration-200 ease-out origin-top ${
+        className={`md:hidden bg-[var(--lb-surface)] border-b border-[var(--lb-line)] shadow-lg relative z-[60] overflow-hidden grid transition-all duration-200 ease-out origin-top ${
           mobileMenuOpen
             ? "grid-rows-[1fr] opacity-100 translate-y-0 pointer-events-auto border-t border-[var(--color-border)]"
             : "grid-rows-[0fr] opacity-0 -translate-y-2 pointer-events-none border-t-0"

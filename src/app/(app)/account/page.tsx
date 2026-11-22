@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
+import Image from "@/components/ui/SmartImage";
 import {
   Pencil,
   Plus,
@@ -506,14 +506,15 @@ export default function AccountPage() {
 
   return (
     <div className="max-w-2xl mx-auto pb-10 space-y-4">
-      <header className="bg-[var(--primary)] text-white px-6 py-4 rounded-2xl shadow-sm flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/85">LingayatBandhu</p>
-          <h1 className="text-xl font-bold leading-tight">My Account</h1>
+      <header className="relative mt-4 overflow-hidden rounded-[16px] border border-[var(--lb-accent)]/20 bg-gradient-to-br from-[#2A2418] via-[#1A1824] to-[#15141E] px-5 py-5 flex items-center justify-between gap-3">
+        <div className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(235,201,131,0.22),transparent_70%)]" aria-hidden />
+        <div className="relative min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--lb-subtle)]">LingayatBandhu</p>
+          <h1 className="mt-0.5 text-[26px] font-bold leading-tight tracking-[-0.02em] lb-grad-text">My Account</h1>
         </div>
         <Link
           href="/settings"
-          className="p-2.5 rounded-full bg-white/20 hover:bg-white/30 transition"
+          className="lb-btn-glass relative flex h-11 w-11 items-center justify-center rounded-full"
           aria-label="Settings"
         >
           <SettingsIcon size={20} />
@@ -522,7 +523,7 @@ export default function AccountPage() {
 
       <div className="px-0 space-y-4">
         {/* Account-holder basic details */}
-        <section className="bg-white rounded-2xl shadow-sm p-5">
+        <section className="bg-[var(--lb-surface)] rounded-[14px] border border-[var(--lb-line)] p-5">
           {accountHolderCompletion < 100 && (
             <div className="mb-4 rounded-xl border border-amber-100 bg-amber-50/80 px-3 py-2.5">
               <div className="flex items-center justify-between text-xs font-medium text-amber-900">
@@ -531,7 +532,7 @@ export default function AccountPage() {
               </div>
               <div className="mt-1.5 h-2 rounded-full bg-amber-100/80 overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-amber-500 transition-all"
+                  className="h-full rounded-full bg-[image:var(--lb-accent-grad)] transition-all"
                   style={{ width: `${accountHolderCompletion}%` }}
                 />
               </div>
@@ -634,7 +635,7 @@ export default function AccountPage() {
                         type="button"
                         disabled
                         onClick={sendContactEmailCode}
-                        className="px-4 py-2 rounded-xl text-sm font-medium bg-[var(--primary)] text-white disabled:opacity-50"
+                        className="h-10 px-4 rounded-full text-sm font-semibold bg-[var(--primary)] text-white disabled:opacity-50"
                       >
                         Send verification code
                       </button>
@@ -643,7 +644,7 @@ export default function AccountPage() {
                         type="button"
                         disabled
                         onClick={confirmContactEmail}
-                        className="px-4 py-2 rounded-xl text-sm font-medium bg-[var(--primary)] text-white disabled:opacity-50"
+                        className="h-10 px-4 rounded-full text-sm font-semibold bg-[var(--primary)] text-white disabled:opacity-50"
                       >
                         Verify email
                       </button>
@@ -763,7 +764,7 @@ export default function AccountPage() {
                         type="button"
                         disabled
                         onClick={sendContactEmailCode}
-                        className="px-4 py-2 rounded-xl text-sm font-medium bg-[var(--primary)] text-white disabled:opacity-50"
+                        className="h-10 px-4 rounded-full text-sm font-semibold bg-[var(--primary)] text-white disabled:opacity-50"
                       >
                         Send verification code
                       </button>
@@ -772,7 +773,7 @@ export default function AccountPage() {
                         type="button"
                         disabled
                         onClick={confirmContactEmail}
-                        className="px-4 py-2 rounded-xl text-sm font-medium bg-[var(--primary)] text-white disabled:opacity-50"
+                        className="h-10 px-4 rounded-full text-sm font-semibold bg-[var(--primary)] text-white disabled:opacity-50"
                       >
                         Verify email
                       </button>
@@ -806,7 +807,7 @@ export default function AccountPage() {
         </section>
 
         {/* My Profiles */}
-        <section className="bg-white rounded-2xl shadow-sm p-5">
+        <section className="bg-[var(--lb-surface)] rounded-[14px] border border-[var(--lb-line)] p-5">
           <div className="flex items-start justify-between gap-3 mb-5">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -899,7 +900,7 @@ export default function AccountPage() {
           )}
         </section>
 
-        <section className="bg-white rounded-2xl shadow-sm p-4 sm:p-5 border border-gray-100/80">
+        <section className="bg-[var(--lb-surface)] rounded-[14px] border border-[var(--lb-line)] p-4 sm:p-5 border border-gray-100/80">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 mb-4">
             <div className="min-w-0">
               <h2 className="text-lg font-semibold text-[var(--foreground)]">Membership History</h2>
@@ -998,7 +999,7 @@ export default function AccountPage() {
           })()}
         </section>
 
-        <div className="bg-white rounded-2xl shadow-sm p-3">
+        <div className="bg-[var(--lb-surface)] rounded-[14px] border border-[var(--lb-line)] p-3">
           <button
             onClick={handleLogout}
             className="w-full flex items-center justify-center gap-2 p-3 rounded-xl text-red-600 font-medium hover:bg-red-50 transition"
@@ -1016,7 +1017,7 @@ export default function AccountPage() {
           aria-modal="true"
           aria-labelledby="deletion-request-title"
         >
-          <div className="w-full max-w-md rounded-2xl bg-white shadow-xl p-5 space-y-4">
+          <div className="w-full max-w-md rounded-[16px] bg-[var(--lb-surface)] border border-[var(--lb-line)] shadow-xl p-5 space-y-4">
             <div>
               <h2 id="deletion-request-title" className="text-lg font-semibold text-[var(--foreground)]">
                 Request profile removal
@@ -1197,7 +1198,6 @@ function DeletedProfileRow({ profile: p }: { profile: Profile }) {
             alt={p.fullName || "Profile"}
             width={48}
             height={48}
-            unoptimized
             className="w-12 h-12 rounded-xl object-cover grayscale opacity-80"
           />
         ) : (
@@ -1282,7 +1282,6 @@ function ProfileRow({
             alt={p.fullName || "Profile"}
             width={48}
             height={48}
-            unoptimized
             className="w-12 h-12 rounded-xl object-cover"
           />
         ) : (
@@ -1502,7 +1501,7 @@ function RelationshipPickerModal({
         }
       `}</style>
       <div
-        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-5 sm:p-6"
+        className="relative bg-[var(--lb-surface)] border border-[var(--lb-line)] rounded-[16px] shadow-2xl w-full max-w-lg p-5 sm:p-6"
         onClick={(e) => e.stopPropagation()}
         style={{ animation: "popIn 160ms ease-out" }}
       >
