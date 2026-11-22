@@ -21,6 +21,8 @@ import {
   UserRoundX,
   UsersRound,
   ArrowLeft,
+  Handshake,
+  MessageCircle,
   type LucideIcon,
 } from "lucide-react";
 import { adminFetch } from "@/lib/api/adminClient";
@@ -62,10 +64,17 @@ const NAV: NavGroup[] = [
   {
     title: "Revenue",
     items: [
-      { href: "/superadmin/subscriptions", label: "Subscriptions & plans", icon: CreditCard, badge: (i) => i.upgradeOpen || 0 },
+      { href: "/superadmin/pipeline", label: "Upgrade pipeline", icon: Handshake, badge: (i) => i.upgradeOpen || 0 },
+      { href: "/superadmin/subscriptions", label: "Subscriptions & plans", icon: CreditCard },
     ],
   },
-  { title: "Insights", items: [{ href: "/superadmin/analytics", label: "Reports", icon: BarChart3 }] },
+  {
+    title: "Insights",
+    items: [
+      { href: "/superadmin/analytics", label: "Reports", icon: BarChart3 },
+      { href: "/superadmin/leads", label: "WhatsApp leads", icon: MessageCircle },
+    ],
+  },
   {
     title: "System",
     items: [

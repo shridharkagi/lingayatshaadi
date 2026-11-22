@@ -128,6 +128,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
+    // Permanent deletion only on an explicit "purge"; anything else is rejected
+    // (previously any unknown action fell through to a hard delete).
+    if (body.action !== "purge") {
+      return NextResponse.json({ error: `Unknown action: ${String(body.action)}` }, { status: 400 });
+    }
     await admin
       .from("profile_trash")
       .update({ is_purged: true, purged_at: now })

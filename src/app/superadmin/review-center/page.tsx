@@ -1,612 +1,338 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { MoreHorizontal, Search, UserRound } from "lucide-react";
 import { adminFetch } from "@/lib/api/adminClient";
 import { ProfileTransferModal } from "@/components/admin/ProfileTransferModal";
+import {
+  CsvButton,
+  PageHeader,
+  Pager,
+  ProfileStatusChip,
+  downloadCsv,
+  fmtDate,
+  initials,
+  useDebounced,
+} from "@/components/superadmin/ui";
 
-type Tab = "published" | "pending" | "draft" | "rejected" | "suspended" | "trash" | "plan_over";
-type DateFilter = "all" | "today" | "last7" | "last30" | "this_month";
-type BulkAction = "suspend" | "unsuspend" | "restore" | "purge" | "to_draft" | "trash";
+type ProfileRow = {
+  id: string;
+  publicId: string | null;
+  name: string | null;
+  gender: string | null;
+  age: number | null;
+  city: string | null;
+  state: string | null;
+  profession: string | null;
+  relationship: string | null;
+  status: string;
+  photo: string | null;
+  userId: string | null;
+  accountCode: string | null;
+  createdAt: string;
+  approvedAt: string | null;
+  rejectionReason: string | null;
+  views: number;
+  contactedBy: number;
+};
 
-function toProfileSlug(publicId: string, fullName: string, fallbackId: string) {
-  const base = (publicId || fallbackId || "").toLowerCase();
-  const first = (fullName || "profile").trim().split(/\s+/)[0] || "profile";
-  const name = first
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "") || "profile";
-  return `${base}-${name}`;
+const TABS = [
+  { id: "all", label: "All active" },
+  { id: "live", label: "Live", key: "approved" },
+  { id: "pending", label: "Pending review", key: "pending_review" },
+  { id: "draft", label: "Drafts", key: "draft" },
+  { id: "rejected", label: "Rejected", key: "rejected" },
+  { id: "suspended", label: "Suspended", key: "suspended" },
+  { id: "deleted", label: "Deleted", key: "deleted" },
+];
+const LIMIT = 25;
+type Action = "suspend" | "unsuspend" | "to_draft" | "trash" | "restore";
+const ACTION_LABEL: Record<Action, string> = {
+  suspend: "Suspend (hide from members)",
+  unsuspend: "Unsuspend",
+  to_draft: "Move back to draft",
+  trash: "Move to trash",
+  restore: "Restore from trash",
+};
+
+function RowMenu({ row, onAction, onTransfer }: { row: ProfileRow; onAction: (a: Action) => void; onTransfer: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && setOpen(false);
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+  const acts: Action[] =
+    row.status === "deleted" ? ["restore"] : row.status === "suspended" ? ["unsuspend", "trash"] : ["suspend", "to_draft", "trash"];
+  return (
+    <div className="ad-menu" ref={ref}>
+      <button type="button" className="ad-btn ghost" style={{ minHeight: 32, width: 36, padding: 0 }} aria-label="More actions" onClick={() => setOpen((v) => !v)}>
+        <MoreHorizontal size={16} />
+      </button>
+      {open && (
+        <div className="ad-menu-pop" role="menu">
+          <Link href={`/superadmin/users/${row.id}/edit`}>Edit profile</Link>
+          {row.publicId && row.status !== "deleted" && (
+            <a href={`/profile/${row.publicId.toLowerCase()}`} target="_blank" rel="noreferrer">View as member ↗</a>
+          )}
+          {row.userId && <Link href={`/superadmin/accounts/${row.userId}`}>Open account 360°</Link>}
+          {row.status === "pending_review" && <Link href="/superadmin/moderation">Review now</Link>}
+          {row.status !== "deleted" && (
+            <button type="button" onClick={() => { setOpen(false); onTransfer(); }}>Move to another account</button>
+          )}
+          {acts.map((a) => (
+            <button key={a} type="button" className={a === "trash" || a === "suspend" ? "danger" : ""} onClick={() => { setOpen(false); onAction(a); }}>
+              {ACTION_LABEL[a]}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
-export default function SuperAdminReviewCenterPage() {
-  const [tab, setTab] = useState<Tab>("published");
-  const [dateFilter, setDateFilter] = useState<DateFilter>("all");
-  const [genderFilter, setGenderFilter] = useState<"all" | "male" | "female">("all");
-  const [rows, setRows] = useState<Array<Record<string, unknown>>>([]);
+export default function ProfilesPage() {
+  const [tab, setTab] = useState("all");
+  const [q, setQ] = useState("");
+  const dq = useDebounced(q);
+  const [gender, setGender] = useState("");
+  const [stateF, setStateF] = useState("");
+  const [photo, setPhoto] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [rows, setRows] = useState<ProfileRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [counts, setCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
-  const [transferProfileId, setTransferProfileId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [transferId, setTransferId] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
 
-  const load = async (nextTab: Tab) => {
-    setLoading(true);
-    setError(null);
-    const qs = new URLSearchParams({
-      tab: nextTab,
-      dateFilter,
-      gender: genderFilter,
-    });
-    const res = await adminFetch(`/api/superadmin/review-center?${qs.toString()}`);
-    const json = (await res.json()) as { items?: Array<Record<string, unknown>>; error?: string };
-    if (!res.ok) {
-      setError(json.error || "Failed to load");
-      setRows([]);
-    } else {
-      setRows(json.items || []);
-    }
-    setSelected(new Set());
-    setLoading(false);
-  };
+  const fetchPage = useCallback(
+    async (lim: number, off: number) => {
+      const qs = new URLSearchParams({ q: dq, status: tab, gender, state: stateF, photo, limit: String(lim), offset: String(off) });
+      const res = await adminFetch(`/api/superadmin/profiles?${qs}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to load profiles");
+      return json as { total: number; rows: ProfileRow[]; counts: Record<string, number> };
+    },
+    [dq, tab, gender, stateF, photo]
+  );
 
   useEffect(() => {
-    void load(tab);
-  }, [tab, dateFilter, genderFilter]);
+    setOffset(0);
+    setSelected(new Set());
+  }, [dq, tab, gender, stateF, photo]);
 
-  const toggleOne = (id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    setError(null);
+    fetchPage(LIMIT, offset)
+      .then((json) => {
+        if (!alive) return;
+        setRows(json.rows);
+        setTotal(json.total);
+        setCounts(json.counts || {});
+      })
+      .catch((e) => alive && setError(e instanceof Error ? e.message : "Failed to load"))
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [fetchPage, offset, reload]);
 
-  const selectableIds = rows
-    .map((r) => String(r.profile_id || r.id || ""))
-    .filter(Boolean);
-  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selected.has(id));
-
-  const toggleAll = () => {
-    if (allSelected) {
-      setSelected(new Set());
-      return;
-    }
-    setSelected(new Set(selectableIds));
-  };
-
-  const runBulk = async (action: BulkAction) => {
-    if (selected.size === 0) return;
+  const runAction = async (ids: string[], action: Action) => {
+    let reason: string | undefined;
+    if (action === "trash") {
+      const r = window.prompt(`Move ${ids.length} profile(s) to trash. Reason (required):`);
+      if (!r || !r.trim()) return;
+      reason = r.trim();
+    } else if (!window.confirm(`${ACTION_LABEL[action]} — ${ids.length} profile(s)?`)) return;
     setBusy(true);
     setError(null);
-    setSuccess(null);
     let ok = 0;
-    let fail = 0;
-    const needsTrashReason = action === "trash";
-    const reason = needsTrashReason
-      ? window.prompt("Trash reason for selected profiles (required):", "No longer active")
-      : null;
-    if (needsTrashReason && (!reason || !reason.trim())) {
-      setBusy(false);
-      return;
-    }
-    const note = needsTrashReason
-      ? window.prompt("Optional trash note for selected profiles:", "") || ""
-      : "";
-    for (const profileId of selected) {
+    for (const id of ids) {
       const res = await adminFetch("/api/superadmin/lifecycle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          profileId,
-          action,
-          ...(needsTrashReason
-            ? { reason: reason?.trim(), note: note.trim() || null }
-            : {}),
-        }),
+        body: JSON.stringify({ profileId: id, action, reason }),
       });
       if (res.ok) ok += 1;
-      else fail += 1;
+      else {
+        const j = await res.json().catch(() => ({}));
+        setError((j as { error?: string }).error || "Some actions failed");
+      }
     }
     setBusy(false);
-    setSuccess(`${ok} updated${fail ? `, ${fail} failed` : ""}.`);
-    await load(tab);
+    setSelected(new Set());
+    setNotice(`${ACTION_LABEL[action]}: ${ok} of ${ids.length} done.`);
+    setTimeout(() => setNotice(null), 4000);
+    setReload((n) => n + 1);
   };
 
-  const runBulkReject = async () => {
-    if (selected.size === 0) return;
-    const reason = window.prompt("Reason for rejection (required):", "Needs correction");
-    if (!reason || !reason.trim()) return;
-    setBusy(true);
-    setError(null);
-    setSuccess(null);
-    let ok = 0;
-    let fail = 0;
-    for (const profileId of selected) {
-      const res = await adminFetch("/api/superadmin/moderation/profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profileId, action: "reject", reason: reason.trim() }),
-      });
-      if (res.ok) ok += 1;
-      else fail += 1;
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      const all: ProfileRow[] = [];
+      for (let off = 0; off < Math.max(total, 1); off += 500) all.push(...(await fetchPage(500, off)).rows);
+      downloadCsv(
+        `profiles-${tab}-${new Date().toISOString().slice(0, 10)}.csv`,
+        ["Member ID", "Name", "Gender", "Age", "City", "State", "Profession", "For", "Status", "Account code", "Created", "Approved", "Views", "Contacted by"],
+        all.map((p) => [p.publicId, p.name, p.gender, p.age, p.city, p.state, p.profession, p.relationship, p.status, p.accountCode, fmtDate(p.createdAt), fmtDate(p.approvedAt), p.views, p.contactedBy])
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Export failed");
+    } finally {
+      setExporting(false);
     }
-    setBusy(false);
-    setSuccess(`${ok} rejected${fail ? `, ${fail} failed` : ""}.`);
-    await load(tab);
   };
 
-  const runBulkApprove = async () => {
-    if (selected.size === 0) return;
-    if (!window.confirm("Approve selected profiles and publish their current data?")) return;
-    setBusy(true);
-    setError(null);
-    setSuccess(null);
-    let ok = 0;
-    let fail = 0;
-    for (const profileId of selected) {
-      const res = await adminFetch("/api/superadmin/moderation/profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profileId, action: "approve" }),
-      });
-      if (res.ok) ok += 1;
-      else fail += 1;
-    }
-    setBusy(false);
-    setSuccess(`${ok} approved${fail ? `, ${fail} failed` : ""}.`);
-    await load(tab);
-  };
-
-  const runBulkTransfer = async () => {
-    if (selected.size === 0) return;
-    const target = window.prompt("Transfer selected profiles to account ID / user ID:", "");
-    if (!target || !target.trim()) return;
-    const note = window.prompt("Transfer note (optional):", "Bulk transfer from review center") || "";
-    setBusy(true);
-    setError(null);
-    setSuccess(null);
-    let ok = 0;
-    let fail = 0;
-    for (const profileId of selected) {
-      const res = await adminFetch("/api/superadmin/profiles/transfer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          profileId,
-          target: target.trim(),
-          note: note.trim() || "Bulk transfer from review center",
-        }),
-      });
-      if (res.ok) ok += 1;
-      else fail += 1;
-    }
-    setBusy(false);
-    setSuccess(`${ok} transferred${fail ? `, ${fail} failed` : ""}.`);
-    await load(tab);
-  };
-
-  const runSingleLifecycle = async (
-    profileId: string,
-    action: "suspend" | "to_draft",
-    reason?: string
-  ) => {
-    setBusy(true);
-    setError(null);
-    setSuccess(null);
-    const res = await adminFetch("/api/superadmin/lifecycle", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profileId, action, reason: reason || null }),
+  const allActive = Object.entries(counts).filter(([k]) => k !== "deleted").reduce((s, [, n]) => s + n, 0);
+  const tabCount = (t: (typeof TABS)[number]) => (t.id === "all" ? allActive : counts[t.key || ""] || 0);
+  const toggle = (id: string) =>
+    setSelected((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
     });
-    const json = (await res.json()) as { error?: string };
-    setBusy(false);
-    if (!res.ok) {
-      setError(json.error || "Action failed");
-      return;
-    }
-    setSuccess("Profile updated.");
-    await load(tab);
-  };
-
-  const runReject = async (profileId: string) => {
-    const reason = window.prompt("Reason for rejection (required):", "Needs correction");
-    if (!reason || !reason.trim()) return;
-    setBusy(true);
-    setError(null);
-    setSuccess(null);
-    const res = await adminFetch("/api/superadmin/moderation/profile", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profileId, action: "reject", reason: reason.trim() }),
-    });
-    const json = (await res.json()) as { error?: string };
-    setBusy(false);
-    if (!res.ok) {
-      setError(json.error || "Reject failed");
-      return;
-    }
-    setSuccess("Profile rejected.");
-    await load(tab);
-  };
-
-  const runApprove = async (profileId: string) => {
-    if (!window.confirm("Approve this profile and publish the current data as the approved snapshot?")) return;
-    setBusy(true);
-    setError(null);
-    setSuccess(null);
-    const res = await adminFetch("/api/superadmin/moderation/profile", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profileId, action: "approve" }),
-    });
-    const json = (await res.json()) as { error?: string };
-    setBusy(false);
-    if (!res.ok) {
-      setError(json.error || "Approve failed");
-      return;
-    }
-    setSuccess("Profile approved.");
-    await load(tab);
-  };
-
-  const runTrash = async (profileId: string) => {
-    const reason = window.prompt("Trash reason (required). Example: Married / Engaged / Spam", "");
-    if (!reason || !reason.trim()) return;
-    const note = window.prompt("Optional note for trash:", "") || "";
-    setBusy(true);
-    setError(null);
-    setSuccess(null);
-    const res = await adminFetch("/api/superadmin/lifecycle", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        profileId,
-        action: "trash",
-        reason: reason.trim(),
-        note: note.trim() || null,
-      }),
-    });
-    const json = (await res.json()) as { error?: string };
-    setBusy(false);
-    if (!res.ok) {
-      setError(json.error || "Trash failed");
-      return;
-    }
-    setSuccess("Profile moved to trash.");
-    await load(tab);
-  };
-
-  const formatDate = (value: unknown) => {
-    if (!value || typeof value !== "string") return "-";
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return "-";
-    return d.toLocaleDateString();
-  };
+  const allChecked = rows.length > 0 && rows.every((r) => selected.has(r.id));
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900">Review Center</h1>
-      <p className="text-gray-500 mt-1">Single place for lifecycle review, moderation, and plan-expiry tracking.</p>
-      <div className="mt-5 flex gap-2 border-b border-gray-200">
-        {(["published", "pending", "draft", "rejected", "suspended", "trash", "plan_over"] as Tab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-2 -mb-px border-b-2 text-sm font-medium capitalize ${
-              tab === t ? "border-[var(--primary)] text-[var(--primary)]" : "border-transparent text-gray-500"
-            }`}
-          >
-            {t === "plan_over" ? "Plan over" : t}
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <PageHeader title="Profiles" subtitle="Matrimony profiles created by accounts (for self or family members).">
+        <CsvButton onClick={exportCsv} busy={exporting} />
+        <Link href="/superadmin/users/create" className="ad-btn pri">Create profile</Link>
+      </PageHeader>
+
+      <div className="ad-tabs" role="tablist">
+        {TABS.map((t) => (
+          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={`ad-tab ${tab === t.id ? "on" : ""}`} onClick={() => setTab(t.id)}>
+            {t.label}<span className="cnt">{tabCount(t)}</span>
           </button>
         ))}
       </div>
 
-      {error && (
-        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
-      )}
-      {success && (
-        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
-          {success}
-        </div>
-      )}
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <button
-          onClick={toggleAll}
-          disabled={loading || busy || selectableIds.length === 0}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-        >
-          {allSelected ? "Unselect all" : "Select all"}
-        </button>
-        {(tab === "pending" || tab === "draft" || tab === "rejected") && (
-          <button
-            onClick={runBulkApprove}
-            disabled={busy || selected.size === 0}
-            className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 disabled:opacity-50"
-          >
-            Bulk Approve
-          </button>
-        )}
-        {(tab === "published" || tab === "pending" || tab === "draft" || tab === "rejected" || tab === "plan_over") && (
-          <button
-            onClick={() => runBulk("suspend")}
-            disabled={busy || selected.size === 0}
-            className="rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 disabled:opacity-50"
-          >
-            Bulk Suspend
-          </button>
-        )}
-        {(tab === "published" || tab === "pending" || tab === "rejected" || tab === "suspended" || tab === "plan_over") && (
-          <button
-            onClick={() => runBulk("to_draft")}
-            disabled={busy || selected.size === 0}
-            className="rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 disabled:opacity-50"
-          >
-            Bulk Draft
-          </button>
-        )}
-        {(tab === "published" || tab === "pending" || tab === "draft" || tab === "suspended" || tab === "plan_over") && (
-          <button
-            onClick={runBulkReject}
-            disabled={busy || selected.size === 0}
-            className="rounded-md border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 disabled:opacity-50"
-          >
-            Bulk Reject
-          </button>
-        )}
-        {(tab === "published" || tab === "pending" || tab === "draft" || tab === "rejected" || tab === "suspended" || tab === "plan_over") && (
-          <button
-            onClick={() => runBulk("trash")}
-            disabled={busy || selected.size === 0}
-            className="rounded-md border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 disabled:opacity-50"
-          >
-            Bulk Trash
-          </button>
-        )}
-        {(tab === "published" || tab === "pending" || tab === "draft" || tab === "rejected" || tab === "suspended" || tab === "plan_over") && (
-          <button
-            onClick={runBulkTransfer}
-            disabled={busy || selected.size === 0}
-            className="rounded-md border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 disabled:opacity-50"
-          >
-            Bulk Transfer
-          </button>
-        )}
-        {tab === "suspended" && (
-          <button
-            onClick={() => runBulk("unsuspend")}
-            disabled={busy || selected.size === 0}
-            className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 disabled:opacity-50"
-          >
-            Bulk Unsuspend
-          </button>
-        )}
-        {tab === "trash" && (
-          <>
-            <button
-              onClick={() => runBulk("restore")}
-              disabled={busy || selected.size === 0}
-              className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 disabled:opacity-50"
-            >
-              Bulk Restore
-            </button>
-            <button
-              onClick={() => runBulk("purge")}
-              disabled={busy || selected.size === 0}
-              className="rounded-md border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 disabled:opacity-50"
-            >
-              Bulk Purge
-            </button>
-          </>
-        )}
-        <span className="text-xs text-gray-500">{selected.size} selected</span>
-      </div>
-      <div className="mt-3 rounded-lg border border-gray-200 bg-white p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold text-gray-500 uppercase">Date</span>
-          {([
-            { key: "today", label: "Today" },
-            { key: "last7", label: "Last week" },
-            { key: "last30", label: "Last 30 days" },
-            { key: "this_month", label: "This month" },
-            { key: "all", label: "All" },
-          ] as Array<{ key: DateFilter; label: string }>).map((item) => (
-            <button
-              key={item.key}
-              onClick={() => setDateFilter(item.key)}
-              className={`rounded-full border px-3 py-1 text-xs font-medium ${
-                dateFilter === item.key
-                  ? "border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary)]"
-                  : "border-gray-300 text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
-          <span className="ml-2 text-xs font-semibold text-gray-500 uppercase">Profile</span>
-          {([
-            { key: "all", label: "All" },
-            { key: "female", label: "Bride" },
-            { key: "male", label: "Groom" },
-          ] as const).map((item) => (
-            <button
-              key={item.key}
-              onClick={() => setGenderFilter(item.key)}
-              className={`rounded-full border px-3 py-1 text-xs font-medium ${
-                genderFilter === item.key
-                  ? "border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary)]"
-                  : "border-gray-300 text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
+      <div className="ad-toolbar">
+        <label className="ad-search-box" style={{ flex: "1 1 280px", maxWidth: 420, height: 40 }}>
+          <Search size={16} aria-hidden="true" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, LB-ID, U-code, city or phone" aria-label="Search profiles" />
+        </label>
+        <select className="ad-select" value={gender} onChange={(e) => setGender(e.target.value)} aria-label="Bride or groom">
+          <option value="">Brides &amp; grooms</option>
+          <option value="female">Brides</option>
+          <option value="male">Grooms</option>
+        </select>
+        <select className="ad-select" value={stateF} onChange={(e) => setStateF(e.target.value)} aria-label="State">
+          <option value="">All states</option>
+          <option value="Karnataka">Karnataka</option>
+          <option value="Maharashtra">Maharashtra</option>
+          <option value="Goa">Goa</option>
+          <option value="Telangana">Telangana</option>
+          <option value="Andhra Pradesh">Andhra Pradesh</option>
+          <option value="Tamil Nadu">Tamil Nadu</option>
+        </select>
+        <select className="ad-select" value={photo} onChange={(e) => setPhoto(e.target.value)} aria-label="Photo">
+          <option value="">Any photo</option>
+          <option value="with">With photo</option>
+          <option value="without">Without photo</option>
+        </select>
       </div>
 
-      <div className="mt-4 bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full min-w-[1200px]">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="text-left px-3 py-3 text-xs text-gray-500">
-                <input type="checkbox" checked={allSelected} onChange={toggleAll} />
-              </th>
-              <th className="text-left px-5 py-3 text-xs text-gray-500">Member</th>
-              <th className="text-left px-5 py-3 text-xs text-gray-500">Account ID</th>
-              <th className="text-left px-5 py-3 text-xs text-gray-500">Account Owner</th>
-              <th className="text-left px-5 py-3 text-xs text-gray-500">Location</th>
-              <th className="text-left px-5 py-3 text-xs text-gray-500">Note</th>
-              <th className="text-left px-5 py-3 text-xs text-gray-500">Published Date</th>
-              <th className="text-left px-5 py-3 text-xs text-gray-500">Plan</th>
-              <th className="text-left px-5 py-3 text-xs text-gray-500">Validity</th>
-              <th className="text-left px-5 py-3 text-xs text-gray-500">Status</th>
-              <th className="text-left px-5 py-3 text-xs text-gray-500">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={11} className="px-5 py-10 text-center text-gray-500">Loading…</td></tr>
-            ) : rows.length === 0 ? (
-              <tr><td colSpan={11} className="px-5 py-10 text-center text-gray-500">No items found</td></tr>
-            ) : (
-              rows.map((r) => {
-                const id = String(r.profile_id || r.id || "");
-                const publicId = String(r.public_id || "");
-                const fullName = String(r.full_name || "Unknown");
-                const viewHref = toProfileSlug(publicId, fullName, id);
-                const status =
-                  tab === "trash"
-                    ? "trashed"
-                    : tab === "rejected"
-                      ? String(
-                          r.moderation_status ||
-                            r.profile_status ||
-                            (Boolean(r.verified) ? "verified" : "rejected")
-                        )
-                      : String(
-                          r.profile_status || r.moderation_status || (Boolean(r.verified) ? "verified" : "pending")
-                        );
-                return (
-                  <tr key={String(r.id)} className="border-t border-gray-100">
-                    <td className="px-3 py-3">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(id)}
-                        onChange={() => toggleOne(id)}
-                        disabled={!id || busy}
-                      />
-                    </td>
-                    <td className="px-5 py-3">
-                      <div className="font-medium text-sm">{fullName}</div>
-                      <div className="text-xs text-gray-500">{publicId}</div>
-                    </td>
-                    <td className="px-5 py-3 text-sm font-medium">
-                      {String(r.account_owner_code || "-")}
-                    </td>
-                    <td className="px-5 py-3 text-sm">
-                      <div className="font-medium">{String(r.account_owner_name || "-")}</div>
-                      <div className="text-xs text-gray-500">{String(r.account_owner_number || "-")}</div>
-                    </td>
-                    <td className="px-5 py-3 text-sm">{tab === "trash" ? String(r.city || "-") : String(r.city || "-")}</td>
-                    <td className="px-5 py-3 text-sm">
-                      {tab === "trash"
-                        ? `${String(r.deleted_reason || "-")}${r.deleted_note ? ` - ${String(r.deleted_note)}` : ""}`
-                        : "-"}
-                    </td>
-                    <td className="px-5 py-3 text-sm">{formatDate(r.published_at)}</td>
-                    <td className="px-5 py-3 text-sm capitalize">{String(r.plan_name || "Free")}</td>
-                    <td className="px-5 py-3 text-sm">
-                      {formatDate(r.plan_starts_at)} - {formatDate(r.plan_expires_at)}
-                    </td>
-                    <td className="px-5 py-3 text-sm capitalize">{status}</td>
-                    <td className="px-5 py-3 text-sm">
-                      {id ? (
-                        <div className="flex flex-wrap gap-2">
-                          <Link href={`/profile/${viewHref}?preview=admin`} className="text-[var(--primary)] hover:underline">
-                            View
-                          </Link>
-                          <Link href={`/superadmin/users/${id}/edit`} className="text-[var(--primary)] hover:underline">
-                            Edit
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() => setTransferProfileId(id)}
-                            disabled={busy}
-                            className="text-indigo-700 hover:underline disabled:opacity-50"
-                          >
-                            Transfer
-                          </button>
-                          {(tab === "rejected" || tab === "draft" || tab === "pending") && (
-                            <button
-                              type="button"
-                              onClick={() => void runApprove(id)}
-                              disabled={busy}
-                              className="text-emerald-700 hover:underline disabled:opacity-50 font-medium"
-                            >
-                              Approve
-                            </button>
-                          )}
-                          {tab === "published" && (
-                            <>
-                              <button
-                                onClick={() => void runSingleLifecycle(id, "to_draft")}
-                                disabled={busy}
-                                className="text-amber-700 hover:underline disabled:opacity-50"
-                              >
-                                Draft
-                              </button>
-                              <button
-                                onClick={() => void runSingleLifecycle(id, "suspend")}
-                                disabled={busy}
-                                className="text-amber-700 hover:underline disabled:opacity-50"
-                              >
-                                Suspend
-                              </button>
-                              <button
-                                onClick={() => void runReject(id)}
-                                disabled={busy}
-                                className="text-red-700 hover:underline disabled:opacity-50"
-                              >
-                                Reject
-                              </button>
-                              <button
-                                onClick={() => void runTrash(id)}
-                                disabled={busy}
-                                className="text-red-700 hover:underline disabled:opacity-50"
-                              >
-                                Trash
-                              </button>
-                            </>
-                          )}
-                          {tab === "trash" && (
-                            <span className="text-xs text-gray-500">
-                              Trashed: {formatDate(r.deleted_at)}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+      {selected.size > 0 && (
+        <div className="ad-bulk">
+          <strong>{selected.size} selected</strong>
+          <span style={{ flex: 1 }} />
+          {tab === "deleted" ? (
+            <button type="button" className="ad-btn ghost" disabled={busy} onClick={() => runAction([...selected], "restore")}>Restore</button>
+          ) : (
+            <>
+              <button type="button" className="ad-btn ghost" disabled={busy} onClick={() => runAction([...selected], "suspend")}>Suspend</button>
+              <button type="button" className="ad-btn ghost" disabled={busy} onClick={() => runAction([...selected], "trash")}>Move to trash</button>
+            </>
+          )}
+          <button type="button" className="ad-btn ghost" onClick={() => setSelected(new Set())}>Clear</button>
+        </div>
+      )}
+      {notice && <div className="m3-ok" role="status">{notice}</div>}
+      {error && <div className="m3-error">{error}</div>}
+
+      <div className="ad-card" style={{ padding: 0, overflow: "visible" }}>
+        <div className="ad-table-wrap" style={{ overflow: "visible" }}>
+          <table className="ad-table">
+            <thead>
+              <tr>
+                <th style={{ width: 36 }}>
+                  <input type="checkbox" aria-label="Select all on this page" checked={allChecked}
+                    onChange={() => setSelected(allChecked ? new Set() : new Set(rows.map((r) => r.id)))} />
+                </th>
+                <th>Profile</th><th>Details</th><th>Status</th><th>Account</th><th>Views</th><th>Created</th><th />
+              </tr>
+            </thead>
+            <tbody>
+              {loading && rows.length === 0 &&
+                Array.from({ length: 6 }).map((_, i) => <tr key={i}><td colSpan={8}><div className="ad-skel" style={{ height: 30 }} /></td></tr>)}
+              {rows.map((p) => (
+                <tr key={p.id}>
+                  <td><input type="checkbox" aria-label={`Select ${p.name || "profile"}`} checked={selected.has(p.id)} onChange={() => toggle(p.id)} /></td>
+                  <td>
+                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                      <span className="ad-av" style={{ background: p.gender === "female" ? "#c2367a" : "#5b3aa8", width: 38, height: 38 }}>
+                        {p.photo ? <img src={p.photo} alt="" /> : p.name ? initials(p.name) : <UserRound size={16} />}
+                      </span>
+                      <div>
+                        <Link href={`/superadmin/users/${p.id}/edit`} className="ad-link">{p.name || "Unnamed"}</Link>
+                        <div className="ad-muted" style={{ fontSize: 12 }}>{p.publicId || "No ID yet"}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ fontSize: 12 }}>
+                    {[p.gender === "female" ? "Bride" : p.gender === "male" ? "Groom" : null, p.age, p.city, p.profession].filter(Boolean).join(" · ") || "—"}
+                    {p.relationship && p.relationship !== "self" && <div className="ad-muted">for {p.relationship}</div>}
+                  </td>
+                  <td>
+                    <ProfileStatusChip status={p.status} />
+                    {p.status === "rejected" && p.rejectionReason && (
+                      <div className="ad-muted" style={{ fontSize: 11, maxWidth: 200, marginTop: 2 }} title={p.rejectionReason}>
+                        {p.rejectionReason.slice(0, 50)}{p.rejectionReason.length > 50 ? "…" : ""}
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ whiteSpace: "nowrap" }}>
+                    {p.userId ? <Link href={`/superadmin/accounts/${p.userId}`} className="ad-link" style={{ fontWeight: 500 }}>{p.accountCode || "Account"}</Link> : "—"}
+                  </td>
+                  <td style={{ whiteSpace: "nowrap", fontSize: 12 }}>{p.views} views<div className="ad-muted">{p.contactedBy} contacted</div></td>
+                  <td style={{ whiteSpace: "nowrap" }}>{fmtDate(p.createdAt)}</td>
+                  <td><RowMenu row={p} onAction={(a) => runAction([p.id], a)} onTransfer={() => setTransferId(p.id)} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!loading && rows.length === 0 && <div className="ad-empty">No profiles match these filters.</div>}
+        </div>
       </div>
-      <ProfileTransferModal
-        open={!!transferProfileId}
-        profileId={transferProfileId || ""}
-        note="Transferred from review center"
-        onClose={() => setTransferProfileId(null)}
-        onTransferred={() => {
-          setSuccess("Profile transferred.");
-          void load(tab);
-        }}
-      />
+      <Pager total={total} limit={LIMIT} offset={offset} onChange={setOffset} />
+
+      {transferId && (
+        <ProfileTransferModal
+          open
+          profileId={transferId}
+          note="Moved from Profiles list"
+          onClose={() => setTransferId(null)}
+          onTransferred={() => {
+            setTransferId(null);
+            setNotice("Profile moved to the other account.");
+            setReload((n) => n + 1);
+          }}
+        />
+      )}
     </div>
   );
 }
